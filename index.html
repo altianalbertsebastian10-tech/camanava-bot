@@ -3,11 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NaviGo AI</title>
+    <title>NaviGo Chat - CAMANAVA Guide</title>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
     
     <style>
-        /* [Existing CSS Variables and Body Styles Stay the Same] */
         :root {
             --bg-scaffold: #f4f7f6;
             --card-bg: #ffffff;
@@ -71,6 +70,8 @@
             font-weight: 600;
         }
 
+        .logo { font-size: 1.2rem; }
+
         .theme-toggle {
             background: rgba(255, 255, 255, 0.2);
             border: 1px solid var(--header-text);
@@ -100,19 +101,6 @@
             animation: fadeIn 0.3s ease;
         }
 
-        /* --- STYLING FOR LISTS --- */
-        /* Better spacing for lists inside bubbles */
-        .message ul {
-            margin: 10px 0;
-            padding-left: 20px;
-            list-style-type: disc;
-        }
-
-        .message li {
-            margin-bottom: 8px; /* Adds space between each food item */
-            line-height: 1.4;
-        }
-
         .user-msg {
             align-self: flex-end;
             background-color: var(--user-bubble);
@@ -127,74 +115,24 @@
             border-bottom-left-radius: 2px;
         }
 
+        /* Structured Formatting */
+        .response-container { display: flex; flex-direction: column; gap: 8px; }
+        .resp-header { 
+            font-weight: 600; 
+            color: var(--header-bg); 
+            border-bottom: 1px solid rgba(0,0,0,0.1);
+            padding-bottom: 4px;
+        }
+        body.dark-mode .resp-header { color: var(--header-text); border-bottom-color: rgba(255,255,255,0.1); }
+        .resp-body ul { margin: 5px 0; padding-left: 20px; list-style-type: disc; }
+        .resp-body li { margin-bottom: 5px; }
+        .resp-footer { font-style: italic; font-size: 0.8rem; opacity: 0.7; margin-top: 5px; }
+
         .input-area {
             display: flex;
             padding: 15px;
             background: var(--card-bg);
             border-top: 1px solid var(--border);
-        }
-
-        .message-content {
-            display: block;
-        }
-
-        .message-header {
-            display: block;
-            font-weight: 600;
-            font-size: 1rem;
-            margin-bottom: 5px;
-            color: var(--header-bg); /* Use NaviGo Navy */
-        }
-
-        body.dark-mode .message-header {
-            color: var(--header-text); /* Use Light Blue */
-        }
-
-        .message-body {
-            display: block;
-            margin-bottom: 8px;
-        }
-
-        .bot-question {
-            display: block;
-            margin-top: 10px;
-            font-style: italic;
-            opacity: 0.8;
-        }
-
-        /* Container for the structured response */
-        .response-container {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-
-        /* Category Title */
-        .resp-header {
-            font-weight: 600;
-            font-size: 1rem;
-            color: var(--header-bg); /* Navy Blue */
-            border-bottom: 1px solid rgba(0,0,0,0.1);
-            padding-bottom: 4px;
-        }
-
-        body.dark-mode .resp-header {
-            color: var(--header-text); /* Light Blue */
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-        }
-
-        /* Status/Main Content */
-        .resp-body {
-            font-size: 0.9rem;
-            line-height: 1.4;
-        }
-
-        /* Follow-up Question */
-        .resp-footer {
-            font-style: italic;
-            font-size: 0.85rem;
-            opacity: 0.7;
-            margin-top: 5px;
         }
 
         input {
@@ -205,6 +143,7 @@
             padding: 10px 15px;
             border-radius: 20px;
             outline: none;
+            font-family: 'Poppins', sans-serif;
         }
 
         button.send-btn {
@@ -217,8 +156,6 @@
             cursor: pointer;
             font-weight: 600;
         }
-
-        
 
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(5px); }
@@ -235,7 +172,7 @@
     </header>
     
     <div id="chat">
-        <div class="message bot-msg">Hello! I am NaviGo. How can I help you?</div>
+        <div class="message bot-msg">Hello! I am NaviGo. How can I help you explore CAMANAVA today?</div>
     </div>
 
     <div class="input-area">
@@ -247,45 +184,42 @@
 <script>
     let history = [];
 
-    // --- HELPER TO CONVERT AI MARKDOWN TO HTML ---
+    // Helper to format structured text if the backend hasn't already sent HTML
     function formatMessage(text) {
-    // 1. Detect the footer question (e.g., "What next?" or "Anything else?")
-    let footer = "";
-    const footerRegex = /(What next\?|Anything else\?|How can I help\?)$/i;
-    const footerMatch = text.match(footerRegex);
-    
-    let remainingText = text;
-    if (footerMatch) {
-        footer = `<div class="resp-footer">${footerMatch[0]}</div>`;
-        remainingText = text.replace(footerMatch[0], "").trim();
-    }
+        if (text.includes('<div')) return text; // Skip if already HTML
 
-    // 2. Detect the Header (First 2-3 words, e.g., "Valenzuela Go To")
-    // We assume the header ends where the first full sentence starts ("This section...")
-    let header = "";
-    let bodyText = remainingText;
-    
-    const bodyStartMatch = remainingText.match(/(This section is|Welcome to|You might|Here are)/i);
-    if (bodyStartMatch) {
-        header = remainingText.substring(0, bodyStartMatch.index).trim();
-        bodyText = remainingText.substring(bodyStartMatch.index).trim();
-    }
+        let footer = "";
+        const footerRegex = /(What next\?|Anything else\?|How can I help\?|Another one\?)$/i;
+        const footerMatch = text.match(footerRegex);
+        
+        let remainingText = text;
+        if (footerMatch) {
+            footer = `<div class="resp-footer">${footerMatch[0]}</div>`;
+            remainingText = text.replace(footerMatch[0], "").trim();
+        }
 
-    // 3. Handle Lists if present
-    if (bodyText.includes('•')) {
-        let items = bodyText.split('•').map(i => i.trim()).filter(i => i);
-        bodyText = `<ul>${items.map(i => `<li>${i}</li>`).join('')}</ul>`;
-    }
+        let header = "";
+        let bodyText = remainingText;
+        const bodyStartMatch = remainingText.match(/(This section is|Welcome to|You might|Here are|•)/i);
+        
+        if (bodyStartMatch && bodyStartMatch.index > 0) {
+            header = remainingText.substring(0, bodyStartMatch.index).trim();
+            bodyText = remainingText.substring(bodyStartMatch.index).trim();
+        }
 
-    // Return the structured HTML
-    return `
-        <div class="response-container">
-            ${header ? `<div class="resp-header">${header}</div>` : ""}
-            <div class="resp-body">${bodyText}</div>
-            ${footer}
-        </div>
-    `;
-}
+        if (bodyText.includes('•')) {
+            let items = bodyText.split('•').map(i => i.trim()).filter(i => i);
+            bodyText = `<ul>${items.map(i => `<li>${i}</li>`).join('')}</ul>`;
+        }
+
+        return `
+            <div class="response-container">
+                ${header ? `<div class="resp-header">${header}</div>` : ""}
+                <div class="resp-body">${bodyText}</div>
+                ${footer}
+            </div>
+        `;
+    }
 
     function toggleTheme() {
         const body = document.body;
@@ -304,26 +238,39 @@
         if (!msg) return;
 
         const chat = document.getElementById('chat');
+        
+        // 1. Add User Message
         chat.innerHTML += `<div class="message user-msg">${msg}</div>`;
         input.value = '';
         chat.scrollTop = chat.scrollHeight;
 
+        // 2. Add temporary "loading" indicator
+        const loadingId = "loading-" + Date.now();
+        chat.innerHTML += `<div class="message bot-msg" id="${loadingId}">NaviGo is thinking...</div>`;
+        chat.scrollTop = chat.scrollHeight;
+
         try {
-            const res = await fetch('http://localhost:8000/chat', {
+            const res = await fetch('https://camanava-bot.onrender.com/chat', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({message: msg, history})
+                body: JSON.stringify({message: msg, history: history})
             });
+            
             const data = await res.json();
             
-            // Apply formatting to the bot response
-            const botHTML = formatMessage(data.response);
+            // Remove loading indicator
+            document.getElementById(loadingId).remove();
             
+            // 3. Add Bot Response
+            const botHTML = formatMessage(data.response);
             chat.innerHTML += `<div class="message bot-msg">${botHTML}</div>`;
+            
             history = data.history;
             chat.scrollTop = chat.scrollHeight;
         } catch (error) {
-            chat.innerHTML += `<div class="message bot-msg" style="border: 1px solid #FA003F;">[System] Connection error.</div>`;
+            document.getElementById(loadingId).remove();
+            chat.innerHTML += `<div class="message bot-msg" style="border: 1px solid #FA003F;">[System] Connection error. Please try again in a few seconds.</div>`;
+            chat.scrollTop = chat.scrollHeight;
         }
     }
 </script>
