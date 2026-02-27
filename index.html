@@ -2,8 +2,8 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NaviGo Chat - CAMANAVA Guide</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>NaviGo AI</title>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
     
     <style>
@@ -46,11 +46,14 @@
             height: 100vh;
             margin: 0;
             transition: all 0.3s ease;
+            /* Prevents weird scrolling on some mobile browsers */
+            overflow: hidden; 
         }
 
         .chat-container {
-            width: 420px;
-            height: 650px;
+            width: 450px; /* Default desktop width */
+            height: 85vh; /* Responsive height */
+            max-height: 800px;
             background: var(--card-bg);
             display: flex;
             flex-direction: column;
@@ -58,6 +61,28 @@
             box-shadow: 0 15px 35px rgba(0,0,0,0.2);
             overflow: hidden;
             border: 1px solid var(--border);
+            transition: width 0.3s, height 0.3s;
+        }
+
+        /* --- MOBILE COMPATIBILITY --- */
+        @media (max-width: 600px) {
+            body {
+                align-items: flex-start;
+            }
+            .chat-container {
+                width: 100vw;
+                height: 100vh;
+                max-height: 100vh;
+                border-radius: 0;
+                border: none;
+            }
+            header {
+                padding: 12px 15px;
+                border-radius: 0;
+            }
+            .logo { font-size: 1.1rem; }
+            .message { max-width: 90%; font-size: 0.85rem; }
+            .input-area { padding: 10px; }
         }
 
         header {
@@ -68,6 +93,7 @@
             justify-content: space-between;
             align-items: center;
             font-weight: 600;
+            z-index: 10;
         }
 
         .logo { font-size: 1.2rem; }
@@ -90,6 +116,8 @@
             flex-direction: column;
             gap: 12px;
             background: var(--chat-bg);
+            /* Smooth scrolling for iOS */
+            -webkit-overflow-scrolling: touch; 
         }
 
         .message {
@@ -99,6 +127,7 @@
             font-size: 0.9rem;
             line-height: 1.5;
             animation: fadeIn 0.3s ease;
+            word-wrap: break-word;
         }
 
         .user-msg {
@@ -115,19 +144,6 @@
             border-bottom-left-radius: 2px;
         }
 
-        /* Structured Formatting */
-        .response-container { display: flex; flex-direction: column; gap: 8px; }
-        .resp-header { 
-            font-weight: 600; 
-            color: var(--header-bg); 
-            border-bottom: 1px solid rgba(0,0,0,0.1);
-            padding-bottom: 4px;
-        }
-        body.dark-mode .resp-header { color: var(--header-text); border-bottom-color: rgba(255,255,255,0.1); }
-        .resp-body ul { margin: 5px 0; padding-left: 20px; list-style-type: disc; }
-        .resp-body li { margin-bottom: 5px; }
-        .resp-footer { font-style: italic; font-size: 0.8rem; opacity: 0.7; margin-top: 5px; }
-
         .input-area {
             display: flex;
             padding: 15px;
@@ -140,10 +156,10 @@
             background: var(--input-bg);
             border: 1px solid var(--border);
             color: var(--input-text);
-            padding: 10px 15px;
-            border-radius: 20px;
+            padding: 12px 15px;
+            border-radius: 25px;
             outline: none;
-            font-family: 'Poppins', sans-serif;
+            font-size: 16px; /* Prevents auto-zoom on iOS */
         }
 
         button.send-btn {
@@ -151,16 +167,23 @@
             color: var(--user-text);
             border: none;
             padding: 0 20px;
-            margin-left: 10px;
-            border-radius: 20px;
+            margin-left: 8px;
+            border-radius: 25px;
             cursor: pointer;
             font-weight: 600;
+            white-space: nowrap;
         }
 
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(5px); }
             to { opacity: 1; transform: translateY(0); }
         }
+
+        /* Structured Response Styling (from your previous versions) */
+        .response-container { display: flex; flex-direction: column; gap: 8px; }
+        .resp-header { font-weight: 600; border-bottom: 1px solid rgba(0,0,0,0.1); padding-bottom: 4px; }
+        .resp-body ul { margin: 5px 0; padding-left: 18px; }
+        .resp-footer { font-style: italic; font-size: 0.8rem; opacity: 0.7; }
     </style>
 </head>
 <body>
@@ -176,7 +199,7 @@
     </div>
 
     <div class="input-area">
-        <input id="input" type="text" placeholder="Message NaviGo..." onkeypress="handleKeyPress(event)">
+        <input id="input" type="text" placeholder="Message NaviGo..." onkeypress="handleKeyPress(event)" inputmode="text">
         <button class="send-btn" onclick="send()">Send</button>
     </div>
 </div>
@@ -184,10 +207,8 @@
 <script>
     let history = [];
 
-    // Helper to format structured text if the backend hasn't already sent HTML
     function formatMessage(text) {
-        if (text.includes('<div')) return text; // Skip if already HTML
-
+        if (text.includes('<div')) return text;
         let footer = "";
         const footerRegex = /(What next\?|Anything else\?|How can I help\?|Another one\?)$/i;
         const footerMatch = text.match(footerRegex);
@@ -212,13 +233,11 @@
             bodyText = `<ul>${items.map(i => `<li>${i}</li>`).join('')}</ul>`;
         }
 
-        return `
-            <div class="response-container">
-                ${header ? `<div class="resp-header">${header}</div>` : ""}
-                <div class="resp-body">${bodyText}</div>
-                ${footer}
-            </div>
-        `;
+        return `<div class="response-container">
+                    ${header ? `<div class="resp-header">${header}</div>` : ""}
+                    <div class="resp-body">${bodyText}</div>
+                    ${footer}
+                </div>`;
     }
 
     function toggleTheme() {
@@ -238,15 +257,12 @@
         if (!msg) return;
 
         const chat = document.getElementById('chat');
-        
-        // 1. Add User Message
         chat.innerHTML += `<div class="message user-msg">${msg}</div>`;
         input.value = '';
         chat.scrollTop = chat.scrollHeight;
 
-        // 2. Add temporary "loading" indicator
         const loadingId = "loading-" + Date.now();
-        chat.innerHTML += `<div class="message bot-msg" id="${loadingId}">NaviGo is thinking...</div>`;
+        chat.innerHTML += `<div class="message bot-msg" id="${loadingId}">Thinking...</div>`;
         chat.scrollTop = chat.scrollHeight;
 
         try {
@@ -257,19 +273,16 @@
             });
             
             const data = await res.json();
-            
-            // Remove loading indicator
             document.getElementById(loadingId).remove();
             
-            // 3. Add Bot Response
             const botHTML = formatMessage(data.response);
             chat.innerHTML += `<div class="message bot-msg">${botHTML}</div>`;
             
             history = data.history;
             chat.scrollTop = chat.scrollHeight;
         } catch (error) {
-            document.getElementById(loadingId).remove();
-            chat.innerHTML += `<div class="message bot-msg" style="border: 1px solid #FA003F;">[System] Connection error. Please try again in a few seconds.</div>`;
+            if(document.getElementById(loadingId)) document.getElementById(loadingId).remove();
+            chat.innerHTML += `<div class="message bot-msg" style="border: 1px solid #FA003F;">[System] Connection error.</div>`;
             chat.scrollTop = chat.scrollHeight;
         }
     }

@@ -33,7 +33,7 @@ KNOWLEDGE = {
         "info": "Monumento is the heart of Caloocan, featuring the iconic Andrés Bonifacio Monument designed by Guillermo Tolentino.",
         "roads": ["Samson Road (to Malabon)", "EDSA (to QC)", "McArthur Highway (to Valenzuela)"],
         "food": ["Street food (kwek-kwek, isaw, fishball)", "Lugaw hubs", "Halo-halo stands"],
-        "malls": ["SM City Grand Central", "Victory Plaza", "North Mall"],
+        "malls": ["SM City Grand Central", "Victory Plaza", "North Mall", "Araneta Square Mall"],
         "go to": ["LRT Line 1 - Yamaha Monumento Station", "Jeeps from Manila or Valenzuela drop off at Puregold Monumento."],
         "trivia": "Guillermo Tolentino interviewed Bonifacio's sister to ensure the monument's face was accurate."
     },
@@ -57,7 +57,7 @@ KNOWLEDGE = {
         "spots": ["Pio Valenzuela Ancestral House", "San Diego de Alcala Church", "Valenzuela City People’s Park", "Tagalag Fishing Village", "Polo Riverwalk"],
         "food": ["Putong Polo"],
         "restaurants": ["D'Pond", "Alvarez Park and Cafe", "Kamayan sa Palapat", "Snp 'n Roll"],
-        "go to": ["Take any jeepney or bus along McArthur Highway labeled 'Malanday' or 'Meycauayan'.", "For Polo: Take a 'Polo' labeled jeepney from Karuhatan."],
+        "go to": ["Take any jeepney or bus along McArthur Highway labeled 'Malanday' or 'Meycauayan'.", "For Polo: Take a 'Malanday' labeled jeepney from Karuhatan and upon arriving to Malanday take a jeepney labeled 'Paco' and drop off at Polo."],
         "tip": "Sunset photos at Polo Riverwalk are highly recommended!"
     }
 }
@@ -130,7 +130,7 @@ class SmartBot:
         """
 
 bot = SmartBot()
-BLOCKED_WORDS = ["tite", "puke", "burat", "pekpek", "gago", "puta", "bobo", "tanga"]
+BLOCKED_WORDS = ["tite", "puke", "burat", "pekpek", "gago", "puta", "bobo", "tanga", "putang ina mo", "putanginamo", "tangina mo", "tanginamo"]
 
 @app.get("/", response_class=HTMLResponse)
 async def get_gui():
