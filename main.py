@@ -125,7 +125,7 @@ BLOCKED_WORDS = ["tite", "puke", "burat", "pekpek", "gago", "puta", "bobo", "tan
 async def get_gui():
     """Serves the NaviGo HTML GUI when visiting the root URL."""
     try:
-        with open("index.html", "r", encoding="utf-8") as f:
+        with open("frontend.html", "r", encoding="utf-8") as f:
             return f.read()
     except FileNotFoundError:
         return "Welcome to NaviGo! (index.html not found in repository)"
