@@ -3,208 +3,252 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>NaviGo AI</title>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+    <title>NaviGo AI | Explore CAMANAVA</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Poppins:wght@600;700&display=swap" rel="stylesheet">
     
     <style>
         :root {
-            --bg-scaffold: #f4f7f6;
-            --card-bg: #ffffff;
-            --header-bg: #000080; 
-            --header-text: #ffffff;
-            --chat-bg: #ffffff;
-            --user-bubble: #000080;
-            --user-text: #ffffff;
-            --bot-bubble: #e9ecef;
-            --bot-text: #333333;
-            --border: #eeeeee;
-            --input-bg: #ffffff;
-            --input-text: #333333;
+            /* NaviGo 2.0 Color Palette */
+            --primary: #003366;
+            --primary-gradient: linear-gradient(135deg, #003366 0%, #0055aa 100%);
+            --accent: #00d2ff;
+            --bg-glass: rgba(255, 255, 255, 0.9);
+            --bg-scaffold: #f0f2f5;
+            --text-main: #1c1e21;
+            --text-muted: #65676b;
+            --bot-bubble: #f0f2f5;
+            --user-bubble: #003366;
+            --glass-border: rgba(255, 255, 255, 0.5);
         }
 
         body.dark-mode {
-            --bg-scaffold: #0D1B2A;
-            --card-bg: #162A45;
-            --header-bg: #0A1F44;
-            --header-text: #5B9BD5;
-            --chat-bg: #1A2F4A;
-            --user-bubble: #1B3A6B;
-            --user-text: #ffffff;
-            --bot-bubble: #2A4060;
-            --bot-text: #5B9BD5;
-            --border: #2A4060;
-            --input-bg: #0D1B2A;
-            --input-text: #ffffff;
+            --bg-scaffold: #0b141d;
+            --bg-glass: rgba(21, 32, 43, 0.95);
+            --text-main: #e4e6eb;
+            --text-muted: #b0b3b8;
+            --bot-bubble: #243447;
+            --user-bubble: #1d9bf0;
+            --glass-border: rgba(255, 255, 255, 0.1);
         }
 
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
         body {
-            font-family: 'Poppins', sans-serif;
-            background-color: var(--bg-scaffold);
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-scaffold);
+            background-image: radial-gradient(circle at 10% 20%, rgba(0, 51, 102, 0.05) 0%, transparent 40%),
+                              radial-gradient(circle at 90% 80%, rgba(0, 210, 255, 0.05) 0%, transparent 40%);
             display: flex;
             justify-content: center;
             align-items: center;
-            /* 100dvh accounts for browser toolbars on Android/iOS */
-            height: 100dvh; 
+            height: 100dvh;
             margin: 0;
-            transition: all 0.3s ease;
-            overflow: hidden; 
-            /* Fixes background bounce on iOS */
+            overflow: hidden;
             position: fixed;
             width: 100%;
         }
 
-        .chat-container {
-            width: 450px;
+        .chat-shell {
+            width: 480px;
             height: 90dvh;
             max-height: 850px;
-            background: var(--card-bg);
+            background: var(--bg-glass);
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
             display: flex;
             flex-direction: column;
-            border-radius: 20px;
-            box-shadow: 0 15px 35px rgba(0,0,0,0.2);
-            overflow: hidden;
-            border: 1px solid var(--border);
+            border-radius: 28px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15);
+            border: 1px solid var(--glass-border);
+            position: relative;
         }
 
-        /* --- ADVANCED MOBILE COMPATIBILITY --- */
         @media (max-width: 600px) {
-            .chat-container {
+            .chat-shell {
                 width: 100%;
                 height: 100dvh;
                 max-height: 100dvh;
                 border-radius: 0;
-                border: none;
-            }
-            header {
-                /* Adds padding for the iPhone "notch" area */
-                padding-top: calc(15px + env(safe-area-inset-top));
-            }
-            .input-area {
-                /* Adds padding for the iPhone home indicator/Android nav bar */
-                padding-bottom: calc(15px + env(safe-area-inset-bottom));
-            }
-            #chat {
-                /* Ensures content doesn't get stuck behind the fixed input */
-                padding-bottom: 20px;
             }
         }
 
         header {
-            background-color: var(--header-bg);
-            color: var(--header-text);
-            padding: 15px 20px;
+            padding: 20px 24px;
+            background: var(--primary-gradient);
+            color: white;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            font-weight: 600;
-            z-index: 10;
+            border-radius: 28px 28px 0 0;
             flex-shrink: 0;
         }
 
-        .logo { font-size: 1.2rem; }
+        @media (max-width: 600px) { header { border-radius: 0; padding-top: calc(15px + env(safe-area-inset-top)); } }
 
-        .theme-toggle {
-            background: rgba(255, 255, 255, 0.2);
-            border: 1px solid var(--header-text);
-            color: var(--header-text);
-            padding: 5px 12px;
-            border-radius: 15px;
-            cursor: pointer;
-            font-size: 0.75rem;
+        .logo-area h1 {
+            font-family: 'Poppins', sans-serif;
+            margin: 0;
+            font-size: 1.25rem;
+            letter-spacing: -0.5px;
         }
+
+        .logo-area span { font-size: 0.75rem; opacity: 0.8; font-weight: 400; }
+
+        .theme-btn {
+            background: rgba(255, 255, 255, 0.15);
+            border: none;
+            color: white;
+            width: 40px;
+            height: 40px;
+            border-radius: 12px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: 0.3s;
+        }
+
+        .theme-btn:hover { background: rgba(255, 255, 255, 0.25); transform: translateY(-2px); }
 
         #chat {
             flex: 1;
-            padding: 20px;
+            padding: 24px;
             overflow-y: auto;
             display: flex;
             flex-direction: column;
-            gap: 12px;
-            background: var(--chat-bg);
-            -webkit-overflow-scrolling: touch; 
+            gap: 16px;
+            scroll-behavior: smooth;
         }
 
-        .message {
-            max-width: 85%;
-            padding: 12px 16px;
-            border-radius: 18px;
-            font-size: 0.9rem;
-            line-height: 1.5;
-            animation: fadeIn 0.3s ease;
-            word-wrap: break-word;
+        /* Modern Bubble Design */
+        .msg {
+            max-width: 82%;
+            padding: 14px 18px;
+            font-size: 0.93rem;
+            line-height: 1.6;
+            animation: slideUp 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+            position: relative;
         }
 
-        .user-msg {
-            align-self: flex-end;
-            background-color: var(--user-bubble);
-            color: var(--user-text);
-            border-bottom-right-radius: 2px;
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(15px) scale(0.95); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
         }
 
         .bot-msg {
             align-self: flex-start;
-            background-color: var(--bot-bubble);
-            color: var(--bot-text);
-            border-bottom-left-radius: 2px;
+            background: var(--bot-bubble);
+            color: var(--text-main);
+            border-radius: 20px 20px 20px 4px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.02);
         }
 
-        .input-area {
+        .user-msg {
+            align-self: flex-end;
+            background: var(--user-bubble);
+            color: white;
+            border-radius: 20px 20px 4px 20px;
+            box-shadow: 0 4px 12px rgba(0, 51, 102, 0.2);
+            font-weight: 500;
+        }
+
+        /* Structured Elements */
+        .response-container { display: flex; flex-direction: column; gap: 10px; }
+        .resp-header { 
+            font-weight: 700; 
+            font-family: 'Poppins', sans-serif;
+            font-size: 1rem;
+            color: var(--accent);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .resp-body ul { margin: 8px 0; padding-left: 18px; list-style: none; }
+        .resp-body li { margin-bottom: 8px; position: relative; }
+        .resp-body li::before {
+            content: "→";
+            position: absolute;
+            left: -18px;
+            color: var(--accent);
+            font-weight: bold;
+        }
+        .resp-footer { 
+            font-size: 0.8rem; 
+            border-top: 1px solid rgba(0,0,0,0.05);
+            padding-top: 8px;
+            color: var(--text-muted);
+            font-style: italic;
+        }
+
+        .input-bar {
+            padding: 20px 24px;
+            background: var(--bg-glass);
             display: flex;
-            padding: 15px;
-            background: var(--card-bg);
-            border-top: 1px solid var(--border);
+            align-items: center;
+            gap: 12px;
+            border-top: 1px solid var(--glass-border);
             flex-shrink: 0;
         }
 
+        @media (max-width: 600px) { .input-bar { padding-bottom: calc(20px + env(safe-area-inset-bottom)); } }
+
         input {
             flex: 1;
-            background: var(--input-bg);
-            border: 1px solid var(--border);
-            color: var(--input-text);
-            padding: 12px 15px;
-            border-radius: 25px;
+            background: var(--bot-bubble);
+            border: 2px solid transparent;
+            color: var(--text-main);
+            padding: 14px 20px;
+            border-radius: 16px;
             outline: none;
-            /* 16px prevents iOS from zooming in on tap */
-            font-size: 16px; 
+            font-size: 16px;
+            transition: 0.3s;
         }
 
-        button.send-btn {
-            background: var(--user-bubble);
-            color: var(--user-text);
+        input:focus { border-color: var(--accent); background: var(--bg-glass); }
+
+        .send-pill {
+            background: var(--primary-gradient);
+            color: white;
             border: none;
-            padding: 0 20px;
-            margin-left: 8px;
-            border-radius: 25px;
+            width: 50px;
+            height: 50px;
+            border-radius: 16px;
             cursor: pointer;
-            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: 0.3s;
+            box-shadow: 0 4px 15px rgba(0, 51, 102, 0.3);
         }
 
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(5px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
+        .send-pill:hover { transform: scale(1.05) rotate(5deg); }
+        .send-pill:active { transform: scale(0.95); }
 
-        .response-container { display: flex; flex-direction: column; gap: 8px; }
-        .resp-header { font-weight: 600; border-bottom: 1px solid rgba(0,0,0,0.1); padding-bottom: 4px; }
-        .resp-body ul { margin: 5px 0; padding-left: 18px; }
-        .resp-footer { font-style: italic; font-size: 0.8rem; opacity: 0.7; }
+        /* Custom Scrollbar */
+        #chat::-webkit-scrollbar { width: 5px; }
+        #chat::-webkit-scrollbar-track { background: transparent; }
+        #chat::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.1); border-radius: 10px; }
     </style>
 </head>
 <body>
 
-<div class="chat-container">
+<div class="chat-shell">
     <header>
-        <span class="logo">NaviGo Chat</span>
-        <button class="theme-toggle" onclick="toggleTheme()">🌙</button>
+        <div class="logo-area">
+            <h1>NaviGo AI</h1>
+            <span>Smart Tourism Guide</span>
+        </div>
+        <button class="theme-btn" onclick="toggleTheme()" aria-label="Toggle Dark Mode">🌙</button>
     </header>
     
     <div id="chat">
-        <div class="message bot-msg">Hello! I am NaviGo. How can I help you explore CAMANAVA today?</div>
+        <div class="msg bot-msg">Welcome! I'm NaviGo. Ready to explore the hidden gems of Caloocan, Malabon, Navotas, or Valenzuela? 🏝️</div>
     </div>
 
-    <div class="input-area">
-        <input id="input" type="text" placeholder="Message NaviGo..." onkeypress="handleKeyPress(event)" inputmode="text">
-        <button class="send-btn" onclick="send()">Send</button>
+    <div class="input-bar">
+        <input id="input" type="text" placeholder="Where do you want to go?" onkeypress="handleKeyPress(event)" autocomplete="off">
+        <button class="send-pill" onclick="send()" aria-label="Send Message">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+        </button>
     </div>
 </div>
 
@@ -246,7 +290,7 @@
 
     function toggleTheme() {
         const body = document.body;
-        const btn = document.querySelector('.theme-toggle');
+        const btn = document.querySelector('.theme-btn');
         body.classList.toggle('dark-mode');
         btn.innerHTML = body.classList.contains('dark-mode') ? "☀️" : "🌙";
     }
@@ -261,12 +305,12 @@
         if (!msg) return;
 
         const chat = document.getElementById('chat');
-        chat.innerHTML += `<div class="message user-msg">${msg}</div>`;
+        chat.innerHTML += `<div class="msg user-msg">${msg}</div>`;
         input.value = '';
         chat.scrollTop = chat.scrollHeight;
 
         const loadingId = "loading-" + Date.now();
-        chat.innerHTML += `<div class="message bot-msg" id="${loadingId}">Thinking...</div>`;
+        chat.innerHTML += `<div class="msg bot-msg" id="${loadingId}" style="opacity: 0.6">NaviGo is typing...</div>`;
         chat.scrollTop = chat.scrollHeight;
 
         try {
@@ -280,13 +324,13 @@
             document.getElementById(loadingId).remove();
             
             const botHTML = formatMessage(data.response);
-            chat.innerHTML += `<div class="message bot-msg">${botHTML}</div>`;
+            chat.innerHTML += `<div class="msg bot-msg">${botHTML}</div>`;
             
             history = data.history;
             chat.scrollTop = chat.scrollHeight;
         } catch (error) {
             if(document.getElementById(loadingId)) document.getElementById(loadingId).remove();
-            chat.innerHTML += `<div class="message bot-msg" style="border: 1px solid #FA003F;">[System] Connection error.</div>`;
+            chat.innerHTML += `<div class="msg bot-msg" style="border: 1px solid #ff4444; color: #ff4444;">System encountered a connection blip. Please try again!</div>`;
             chat.scrollTop = chat.scrollHeight;
         }
     }

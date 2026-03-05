@@ -5,8 +5,9 @@ from pydantic import BaseModel
 from typing import Dict, List
 import os
 
-app = FastAPI(title="🤖 Smart NaviGo CAMANAVA Bot")
+app = FastAPI(title="🤖 NaviGo - Smart CAMANAVA Tourism Guide")
 
+# Enable CORS for local and online development
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -19,45 +20,45 @@ class ChatRequest(BaseModel):
     message: str
     history: List[Dict[str, str]] = []
 
-# --- IMPROVED KNOWLEDGE BASE ---
+# --- EXTENDED KNOWLEDGE BASE ---
 KNOWLEDGE = {
     "caloocan": {
-        "info": "Caloocan is divided into two sections: South Caloocan (urban hub) and North Caloocan (residential). It is a major gateway for the CAMANAVA area.",
-        "spots": ["Andres Bonifacio Monument (Monumento Circle)", "San Roque Cathedral Parish", "La Mesa Watershed", "Caloocan City People's Park"],
+        "info": "Caloocan is a historic city divided into South (urban hub) and North (residential/nature). It is home to the iconic Monumento.",
+        "spots": ["Andres Bonifacio Monument (Monumento Circle)", "San Roque Cathedral Parish", "La Mesa Watershed", "Caloocan City People's Park", "Gubat sa Ciudad"],
         "food": ["Arny Dading Peachy Peachy", "Padi's Point", "SM City Grand Central", "NDY Buffet"],
         "go to": ["From Valenzuela: Take Pier-South or LRT Monumento MCU jeep/bus.", "From Sangandaan: Take a jeepney to LRT Monumento MCU."],
         "malls": ["SM City Grand Central", "Victory Central Mall", "Araneta Square"],
         "tip": "Morning visits = cooler weather!"
     },
     "monumento": {
-        "info": "Monumento is the heart of Caloocan, featuring the iconic Andrés Bonifacio Monument designed by Guillermo Tolentino.",
+        "info": "Monumento is the heart of Caloocan, featuring the Andrés Bonifacio Monument—a masterpiece by National Artist Guillermo Tolentino.",
         "roads": ["Samson Road (to Malabon)", "EDSA (to QC)", "McArthur Highway (to Valenzuela)"],
         "food": ["Street food (kwek-kwek, isaw, fishball)", "Lugaw hubs", "Halo-halo stands"],
         "malls": ["SM City Grand Central", "Victory Plaza", "North Mall", "Araneta Square Mall"],
         "go to": ["LRT Line 1 - Yamaha Monumento Station", "Jeeps from Manila or Valenzuela drop off at Puregold Monumento."],
-        "trivia": "Guillermo Tolentino interviewed Bonifacio's sister to ensure the monument's face was accurate."
+        "trivia": "The monument face was modeled after Bonifacio’s sister for historical accuracy."
     },
     "malabon": {
-        "info": "Malabon is the culinary soul of CAMANAVA, famous for its heritage homes and 'Pancit Malabon'.",
-        "spots": ["Malabon Zoo", "San Bartolome Church (1614)", "Raymundo Ancestral House", "Sy Juco Mansion"],
+        "info": "Malabon is the 'Culinary Soul' of CAMANAVA, famous for its heritage homes and legendary Pancit Malabon.",
+        "spots": ["Malabon Zoo", "San Bartolome Church (1614)", "Raymundo Ancestral House", "Sy Juco Mansion", "Malabon City Square"],
         "food": ["Pancit Malabon", "Dolor’s Kakanin", "Judy Ann’s Crispy Pata", "Hazel’s Puto", "Valencia Triangulo"],
         "go to": ["From Monumento: Take a jeepney labeled 'Malabon' or 'Hulo'.", "From Valenzuela: Take a jeepney to Sangandaan, then transfer to a Malabon-bound jeep."],
         "tip": "Visit on weekends for fresh kakanin demos!"
     },
     "navotas": {
-        "info": "The 'Fishing Capital of the Philippines', Navotas is a coastal city known for shipyards and the freshest seafood.",
-        "spots": ["Navotas Fisheries Port", "Centennial Park", "San Jose de Navotas Parish"],
+        "info": "Known as the 'Fishing Capital of the Philippines', Navotas offers a unique look at local shipyards and coastal life.",
+        "spots": ["Navotas Fisheries Port", "Centennial Park", "San Jose de Navotas Parish", "Agora Market"],
         "food": ["Sinigang na Isda", "Seafood Paluto", "Puto Sulot", "Norma’s Pansit Luglog"],
         "restaurants": ["BABA's Shawarma", "Pia's Boodle Fight", "Bistro Kakamberta", "Samgyupan 199"],
-        "go to": ["From Monumento: Take a jeepney labeled 'Navotas' or 'Agora'.", "From C4 Road: There are multiple jeepney routes passing through the Fisheries Port."],
+        "go to": ["From Monumento: Take a jeepney labeled 'Navotas' or 'Agora'.", "From C4 Road: Multiple jeepney routes pass through the Fisheries Port."],
         "tip": "May-June = Bangus Festival!"
     },
     "valenzuela": {
-        "info": "The 'Vibrant City', blending industrial growth with heritage parks like the Tagalag Fishing Village.",
-        "spots": ["Pio Valenzuela Ancestral House", "San Diego de Alcala Church", "Valenzuela City People’s Park", "Tagalag Fishing Village", "Polo Riverwalk"],
+        "info": "The 'Vibrant City', blending industrial growth with peaceful heritage parks and the Tagalag Fishing Village.",
+        "spots": ["Pio Valenzuela Ancestral House", "San Diego de Alcala Church", "Valenzuela City People’s Park", "Tagalag Fishing Village", "Polo Riverwalk", "Arkong Bato"],
         "food": ["Putong Polo"],
         "restaurants": ["D'Pond", "Alvarez Park and Cafe", "Kamayan sa Palapat", "Snp 'n Roll"],
-        "go to": ["Take any jeepney or bus along McArthur Highway labeled 'Malanday' or 'Meycauayan'.", "For Polo: Take a 'Malanday' labeled jeepney from Karuhatan and upon arriving to Malanday take a jeepney labeled 'Paco' and drop off at Polo."],
+        "go to": ["Take any jeepney/bus along McArthur Highway labeled 'Malanday' or 'Meycauayan'.", "To reach Polo: From Karuhatan, take a Malanday-bound jeep. At Malanday, transfer to a jeep labeled 'Paco' and drop off at Polo."],
         "tip": "Sunset photos at Polo Riverwalk are highly recommended!"
     }
 }
@@ -76,17 +77,22 @@ class SmartBot:
         msg = message.lower().strip()
         context_city = self._get_context_city(history)
 
-        # 1. Handle Contextual Category (e.g., user asks "how about food?" after talking about Malabon)
+        # 1. Handle Contextual Category
         if context_city:
-            for field in KNOWLEDGE[context_city]:
-                if field != 'info' and field in msg:
-                    return self._build_html(context_city, field)
-            
-            if any(w in msg for w in ['where','go to','paano','transport']):
-                return self._build_html(context_city, 'go to')
-            if any(w in msg for w in ['food','kain','restaurant']):
-                f = 'restaurants' if 'restaurants' in KNOWLEDGE[context_city] else 'food'
-                return self._build_html(context_city, f)
+            # Map common synonyms to knowledge base keys
+            synonyms = {
+                'spots': ['spots', 'attractions', 'places', 'visit', 'parks', 'monument', 'landmark'],
+                'food': ['food', 'kain', 'restaurant', 'hungry', 'meryenda', 'delicacy'],
+                'go to': ['where', 'go to', 'paano', 'transport', 'directions', 'bus', 'jeep']
+            }
+
+            for key, words in synonyms.items():
+                if any(w in msg for w in words):
+                    target_field = key
+                    # Specific restaurant logic
+                    if key == 'food' and 'restaurants' in KNOWLEDGE[context_city]:
+                        target_field = 'restaurants'
+                    return self._build_html(context_city, target_field)
 
         # 2. Handle City + Category directly
         for city in KNOWLEDGE:
@@ -96,11 +102,24 @@ class SmartBot:
                         return self._build_html(city, field)
                 return self._city_intro(city)
 
-        # 3. Fallbacks
-        if any(w in msg for w in ["hi", "hello", "start", "navigo"]):
-            return "Hello! I am NaviGo. I can help you find food, spots, and directions in CAMANAVA. Which city are you visiting today?"
+        # 3. Fallbacks and Greetings
+        if any(w in msg for w in ["hi", "hello", "start", "kamusta"]):
+            return """
+            <div class="response-container">
+                <div class="resp-header">Welcome to NaviGo! 🤖</div>
+                <div class="resp-body">I'm your tourism guide for the <b>CAMANAVA</b> area (Caloocan, Malabon, Navotas, Valenzuela).<br><br>
+                Try asking me things like:
+                <ul>
+                    <li>"Tell me about Malabon food"</li>
+                    <li>"Where to go in Valenzuela?"</li>
+                    <li>"How to get to Monumento?"</li>
+                </ul>
+                </div>
+                <div class="resp-footer">Which city are you exploring today?</div>
+            </div>
+            """
         
-        return "NaviGo here! Try asking about 'Malabon food' or 'Valenzuela spots'."
+        return "NaviGo here! I'm best at finding Food, Spots, and Directions in CAMANAVA. Which city are you interested in?"
 
     def _city_intro(self, city: str) -> str:
         data = KNOWLEDGE[city]
@@ -108,13 +127,13 @@ class SmartBot:
         return f"""
         <div class="response-container">
             <div class="resp-header">{city.title()}</div>
-            <div class="resp-body">{data['info']}<br><br><b>What to expect:</b> {', '.join(fields)}</div>
-            <div class="resp-footer">Ask me about '{city} food' or '{city} go to'!</div>
+            <div class="resp-body">{data['info']}<br><br><b>Explore {city.title()} by asking about:</b> {', '.join(fields)}</div>
+            <div class="resp-footer">Try: "{city} spots" or "{city} food"</div>
         </div>
         """
 
     def _build_html(self, city: str, field: str) -> str:
-        data = KNOWLEDGE[city][field]
+        data = KNOWLEDGE[city].get(field, "I don't have information on that yet.")
         if isinstance(data, list):
             items = "".join([f"<li>{i}</li>" for i in data])
             body = f"<ul>{items}</ul>"
@@ -125,7 +144,7 @@ class SmartBot:
         <div class="response-container">
             <div class="resp-header">{city.title()} {field.title()}</div>
             <div class="resp-body">{body}</div>
-            <div class="resp-footer">Anything else you want to know about {city.title()}?</div>
+            <div class="resp-footer">Would you like to know about other parts of {city.title()}?</div>
         </div>
         """
 
@@ -135,7 +154,6 @@ BLOCKED_WORDS = ["tite", "puke", "burat", "pekpek", "gago", "puta", "bobo", "tan
 @app.get("/", response_class=HTMLResponse)
 async def get_gui():
     try:
-        # Changed to index.html as per your previous convention
         with open("index.html", "r", encoding="utf-8") as f:
             return f.read()
     except FileNotFoundError:
@@ -146,7 +164,7 @@ async def chat(request: ChatRequest):
     try:
         user_msg = request.message.lower()
         if any(b in user_msg for b in BLOCKED_WORDS):
-            resp = "Let's keep the conversation respectful while exploring CAMANAVA! 😊"
+            resp = "I'm here to help you explore CAMANAVA! Let's keep our conversation respectful. 😊"
             return {"response": resp, "history": request.history + [{"user": request.message, "bot": resp}]}
         
         response = bot.think(request.message, request.history)
