@@ -19,7 +19,7 @@ class ChatRequest(BaseModel):
     message: str
     history: List[Dict[str, str]] = []
 
-# --- KNOWLEDGE BASE ---
+# --- KNOWLEDGE BASE stays the same ---
 KNOWLEDGE = {
     "caloocan": {
         "info": "Caloocan is divided into two sections: South Caloocan (urban hub) and North Caloocan (residential). It is a major gateway for the CAMANAVA area.",
@@ -64,23 +64,22 @@ KNOWLEDGE = {
 
 class SmartBot:
     def __init__(self):
-        # Intent Logic Mapping: Grouping synonyms and phrases into logic categories
         self.INTENT_MAP = {
             "FOOD": ["food", "kain", "gutom", "hungry", "restaurant", "meryenda", "lunch", "dinner", "maki-kain"],
             "SPOTS": ["spot", "attraction", "visit", "punta", "pasyal", "park", "church", "historical", "place", "view"],
             "DIRECTIONS": ["direction", "paano", "way", "route", "sakay", "jeep", "bus", "transport", "lrt", "landmark", "how to"],
-            "MALLS": ["mall", "shopping", "bili", "sm", "grocery"]
+            "MALLS": ["mall", "shopping", "bili", "sm", "grocery"],
+            "STOP": ["shut up", "stop", "quiet", "tama na", "manahimik", "ayoko na"],
+            "GREET": ["hi", "hello", "hey", "kamusta", "start"]
         }
 
     def _get_entity(self, message: str) -> str:
-        """Entity Recognition: Identify which city the user is talking about"""
         for city in KNOWLEDGE:
             if city in message:
                 return city
         return None
 
     def _detect_intent(self, message: str) -> str:
-        """Intent Detection: Identify what the user wants to do"""
         for intent, keywords in self.INTENT_MAP.items():
             if any(keyword in message for keyword in keywords):
                 return intent
@@ -88,77 +87,79 @@ class SmartBot:
 
     def _get_context_city(self, history: List) -> str:
         if not history: return None
-        # Check last 3 interactions for context
         for i in range(-1, -4, -1):
             if i >= -len(history):
-                combined = (history[i].get("bot", "") + " " + history[i].get("user", "")).lower()
-                city = self._get_entity(combined)
+                user_msg = history[i].get("user", "").lower()
+                city = self._get_entity(user_msg)
                 if city: return city
         return None
 
     def think(self, message: str, history: List) -> str:
         msg = message.lower().strip()
-        
-        # 1. Identify Intent and Entity
         intent = self._detect_intent(msg)
-        target_city = self._get_entity(msg) or self._get_context_city(history)
+        
+        # 1. Handle Command Intents First (Stop/Shut up)
+        if intent == "STOP":
+            return "Understood. I'll stop the tour info. What else can I do for you?"
 
-        # 2. Logic-Based Mapping
+        # 2. Handle Repeated Greetings
+        if intent == "GREET":
+            if len(history) > 0 and self._detect_intent(history[-1].get("user", "").lower()) == "GREET":
+                return "Hello again! Just a reminder: I'm here to help with <b>CAMANAVA</b> tourism. Which city would you like to know more about?"
+            return self._welcome_screen()
+
+        # 3. Handle City Discovery
+        target_city = self._get_entity(msg)
+        
+        # If no city in current message, check history IF the user is asking a relevant question
+        if not target_city and intent != "GENERAL":
+            target_city = self._get_context_city(history)
+
+        # 4. Logic-Based Mapping
         if target_city:
             city_data = KNOWLEDGE[target_city]
             
             if intent == "FOOD":
-                # Priority: Check restaurants field first, then food
                 field = 'restaurants' if 'restaurants' in city_data else 'food'
                 return self._build_html(target_city, field, "Food & Dining")
-            
             elif intent == "DIRECTIONS":
                 return self._build_html(target_city, 'directions', "How to get there")
-            
             elif intent == "SPOTS":
                 return self._build_html(target_city, 'spots', "Must-visit Attractions")
             
-            elif intent == "MALLS":
-                if 'malls' in city_data:
-                    return self._build_html(target_city, 'malls', "Malls & Shopping")
-                return f"I don't have a specific mall list for {target_city.title()}, but you can check out their local markets!"
-
-            # If no specific intent, provide general intro
+            # If they just mentioned a city with no intent, don't just dump info if they already got it.
+            if len(history) > 0 and target_city in history[-1].get("bot", "").lower() and intent == "GENERAL":
+                 return f"We're currently looking at <b>{target_city.title()}</b>. Do you want to know about its food or directions?"
+            
             return self._city_intro(target_city)
 
-        # 3. Handling General Inquiries / Fallbacks
-        if any(w in msg for w in ["hi", "hello", "start", "navigo"]):
-            return """
-            <div class="response-container">
-                <div class="resp-header">Welcome to NaviGo! 🤖</div>
-                <div class="resp-body">I'm your tourism guide for <b>CAMANAVA</b>. You can ask me things like:<br>
-                • <i>"Gutom na ako sa Malabon"</i><br>
-                • <i>"Saan pwedeng mamasyal sa Valenzuela?"</i><br>
-                • <i>"Paano pumunta sa Monumento?"</i></div>
-                <div class="resp-footer">Which city are you exploring today?</div>
-            </div>
-            """
-        
         return "I'm not sure which city you're asking about. Try mentioning <b>Caloocan, Malabon, Navotas, or Valenzuela</b>!"
+
+    def _welcome_screen(self):
+        return """
+        <div class="response-container">
+            <div class="resp-header">Welcome back! 🤖</div>
+            <div class="resp-body">I'm your tourism guide. You can ask me things like:<br>
+            • <i>"Saan pwedeng kumain sa Malabon?"</i><br>
+            • <i>"Valenzuela attractions"</i></div>
+            <div class="resp-footer">How can I help you?</div>
+        </div>
+        """
 
     def _city_intro(self, city: str) -> str:
         data = KNOWLEDGE[city]
         return f"""
         <div class="response-container">
             <div class="resp-header">Exploring {city.title()}</div>
-            <div class="resp-body">{data['info']}<br><br><b>Ask me about:</b> Food, Spots, or Directions!</div>
-            <div class="resp-footer">Try: "{city.title()} directions"</div>
+            <div class="resp-body">{data['info']}</div>
+            <div class="resp-footer">Ask me about food or directions in {city.title()}!</div>
         </div>
         """
 
     def _build_html(self, city: str, field: str, label: str) -> str:
         data = KNOWLEDGE[city][field]
-        if isinstance(data, list):
-            items = "".join([f"<li>{i}</li>" for i in data])
-            body = f"<ul>{items}</ul>"
-        else:
-            body = data
-
+        items = "".join([f"<li>{i}</li>" for i in data]) if isinstance(data, list) else data
+        body = f"<ul>{items}</ul>" if isinstance(data, list) else data
         return f"""
         <div class="response-container">
             <div class="resp-header">{city.title()} - {label}</div>
@@ -167,6 +168,8 @@ class SmartBot:
         </div>
         """
 
+bot = SmartBot()
+# BLOCKED_WORDS and Routes stay the same...
 bot = SmartBot()
 BLOCKED_WORDS = ["tite", "puke", "burat", "pekpek", "gago", "puta", "bobo", "tanga", "putang ina mo", "putanginamo", "tangina mo", "tanginamo"]
 
