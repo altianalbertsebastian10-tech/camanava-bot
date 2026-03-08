@@ -50,7 +50,11 @@ KNOWLEDGE = {
         "directions_template": "From {user_loc}, take a jeepney labeled 'Agora' or 'Navotas' passing through C4 road."
     },
     "valenzuela": {
-        "info": "Known historically as 'Polo', it is the home of the revolutionary hero Dr. Pio Valenzuela.",
+        "info": "The 'Vibrant City', home of Dr. Pio Valenzuela.",
+        "local_routes": {
+            "wawang_pulo": "Since malapit ka lang, take a jeep bound for 'Polo' or 'Malanday'. Baba ka sa Polo Church, walking distance na lang ang Museo.",
+            "karuhatan": "Take any jeep going North (Malanday). Baba sa Gen. T. De Leon or Malanday, then transfer to a Polo-bound jeep."
+        },
         "heritage_spots": [
             {"name": "Museo ni Dr. Pio Valenzuela", "info": "The ancestral house of the hero, now a museum containing artifacts of the Katipunan."},
             {"name": "San Diego de Alcala Church", "info": "A 17th-century church with a stone belfry that survived WWII."},
@@ -68,45 +72,62 @@ class ChatRequest(BaseModel):
 async def health_check():
     """
     This is the 'Keep-Awake' endpoint. 
-    Point your cronjob/UptimeRobot here.
     """
     return {"status": "alive", "city": "Valenzuela", "mode": "RAG"}
 
 @app.post("/chat")
 async def chat(request: ChatRequest):
-    # Ai response
     context = str(KNOWLEDGE)
     
     system_prompt = f"""
-    You are NaviGo, a Cultural Tourism AI for CAMANAVA. 
-    DATA: {str(KNOWLEDGE)}
+    You are NaviGo, a CAMANAVA local expert and Cultural Tourism AI. 
+    DATA: {context}
 
-    GUIDELINES:
+    RULES:
     1. FOCUS: Only talk about Heritage Spots, Info, Tips, and Directions.
-    2. DIRECTIONS RULE: If a user asks 'How to go to [Place]', you MUST ask: 'Saan po kayo manggagaling? (Where are you coming from?)' before giving the route.
-    3. Once the user provides their location, use the 'directions_template' to fill in the route.
+    2. SMART DIRECTIONS: 
+       - Check history FIRST. If the user already said their location, do NOT ask "Saan po kayo manggagaling?".
+       - If user is in the SAME city (e.g., Wawang Pulo to Polo Museum), give specific local landmarks or jeepney routes.
+       - If they are from a DIFFERENT city, give the "Major Highway" (McArthur, C4, EDSA) route.
+       - If location is unknown, you MUST ask: "Saan po kayo manggagaling?" before giving routes.
+    3. ADAPTIVE RESPONSES: If they ask for ONE specific place, give info for that place ONLY, then offer others as 'Related Spots' in the footer.
     4. TONE: Be a polite, proud local guide. Use English.
-    5. FORMAT: Always use the HTML structure:
+    5. FORMAT: Always use this HTML structure:
     <div class="response-container">
         <div class="resp-header">HERITAGE TITLE</div>
         <div class="resp-body">CONTENT (use bullets for spots)</div>
-        <div class="resp-footer">ASK FOR STARTING LOCATION OR NEXT SPOT</div>
+        <div class="resp-footer">FOLLOW-UP OR RELATED SPOTS</div>
     </div>
     """
     try:
+        # Build the message thread with Memory
+        messages = [{"role": "system", "content": system_prompt}]
+        
+        # This loop is what makes the bot remember "Wawang Pulo"
+        for entry in request.history:
+            messages.append({"role": entry["role"], "content": entry["content"]})
+        
+        messages.append({"role": "user", "content": request.message})
+
         completion = client.chat.completions.create(
             model="llama-3.1-8b-instant",
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": request.message}
-            ],
-            temperature=0.2 # Keeps it focused on data
+            messages=messages,
+            temperature=0.2
         )
+        
         response = completion.choices[0].message.content
-        return {"response": response, "history": request.history}
+        
+        # Update history so the next turn remembers this one
+        updated_history = request.history + [
+            {"role": "user", "content": request.message},
+            {"role": "assistant", "content": response}
+        ]
+        
+        return {"response": response, "history": updated_history}
+
     except Exception as e:
         return {"response": f"System Error: {str(e)}", "history": request.history}
-
+    
 @app.get("/", response_class=HTMLResponse)
 async def get_gui():
     with open("index.html", "r", encoding="utf-8") as f:
