@@ -191,6 +191,49 @@
     }
 
     .send-pill:hover { transform: scale(1.1) rotate(5deg); }
+
+    /* Internal Header/Title for Bot Messages */
+    .resp-header {
+        font-family: var(--font-header);
+        font-weight: 800;
+        font-size: 1.1rem;
+        color: var(--primary-blue);
+        margin-bottom: 10px;
+        letter-spacing: -0.3px;
+        border-bottom: 1px solid rgba(0,0,0,0.05);
+        padding-bottom: 8px;
+    }
+
+    .dark-mode .resp-header {
+        color: #00d2ff;
+        border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .resp-body {
+        margin-bottom: 10px;
+    }
+
+    .resp-body ul {
+        margin: 8px 0;
+        padding-left: 20px;
+    }
+
+    .resp-body li {
+        margin-bottom: 6px;
+    }
+
+    /* Internal Footer for Related Spots */
+    .resp-footer {
+        font-size: 0.82rem;
+        color: var(--text-sub);
+        border-top: 1px solid rgba(0,0,0,0.05);
+        padding-top: 8px;
+        margin-top: 5px;
+    }
+
+    .dark-mode .resp-footer {
+        border-top: 1px solid rgba(255,255,255,0.1);
+    }
 </style>
 </head>
 <body>
@@ -220,37 +263,50 @@
     let history = [];
 
     function formatMessage(text) {
-        if (text.includes('<div')) return text;
-        let footer = "";
-        const footerRegex = /(What next\?|Anything else\?|How can I help\?|Another one\?)$/i;
-        const footerMatch = text.match(footerRegex);
-        
-        let remainingText = text;
-        if (footerMatch) {
-            footer = `<div class="resp-footer">${footerMatch[0]}</div>`;
-            remainingText = text.replace(footerMatch[0], "").trim();
-        }
+    // If the message already contains our HTML structure, just return it
+    if (text.includes('<div class="response-container"')) return text;
 
-        let header = "";
-        let bodyText = remainingText;
-        const bodyStartMatch = remainingText.match(/(This section is|Welcome to|You might|Here are|•)/i);
-        
-        if (bodyStartMatch && bodyStartMatch.index > 0) {
-            header = remainingText.substring(0, bodyStartMatch.index).trim();
-            bodyText = remainingText.substring(bodyStartMatch.index).trim();
-        }
+    let header = "";
+    let body = text;
+    let footer = "";
 
-        if (bodyText.includes('•')) {
-            let items = bodyText.split('•').map(i => i.trim()).filter(i => i);
-            bodyText = `<ul>${items.map(i => `<li>${i}</li>`).join('')}</ul>`;
+    // 1. Detect Footer (Related Spots or Follow-up questions)
+    const footerKeywords = ["Related Spots:", "Gusto mo ba", "Would you like", "What's next?"];
+    for (let keyword of footerKeywords) {
+        if (body.includes(keyword)) {
+            let parts = body.split(keyword);
+            body = parts[0].trim();
+            footer = keyword + parts[1];
+            break;
         }
-
-        return `<div class="response-container">
-                    ${header ? `<div class="resp-header">${header}</div>` : ""}
-                    <div class="resp-body">${bodyText}</div>
-                    ${footer}
-                </div>`;
     }
+
+    // 2. Detect Header/Title
+    // We look for the first line or a sentence that looks like a title
+    let lines = body.split('\n');
+    if (lines.length > 1) {
+        header = lines[0].trim();
+        body = lines.slice(1).join('\n').trim();
+    }
+
+    // 3. Handle Bullet Points (Converting • to <li>)
+    if (body.includes('•')) {
+        let items = body.split('•').map(i => i.trim()).filter(i => i);
+        body = `<ul>${items.map(i => `<li>${i}</li>`).join('')}</ul>`;
+    } else {
+        // Convert newlines to breaks for regular text
+        body = body.replace(/\n/g, '<br>');
+    }
+
+    // Assemble the Bubble Layout
+    return `
+        <div class="response-container">
+            ${header ? `<div class="resp-header">${header}</div>` : ''}
+            <div class="resp-body">${body}</div>
+            ${footer ? `<div class="resp-footer">${footer}</div>` : ''}
+        </div>
+    `;
+}
 
     function toggleTheme() {
         const body = document.body;
