@@ -21,46 +21,45 @@ app.add_middleware(
 
 KNOWLEDGE = {
     "caloocan": {
-        "info": "Caloocan is divided into two sections: South Caloocan (urban hub) and North Caloocan (residential). It is a major gateway for the CAMANAVA area.",
-        "spots": ["Andres Bonifacio Monument (Monumento Circle)", "San Roque Cathedral Parish", "La Mesa Watershed", "Caloocan City People's Park"],
-        "food": ["Arny Dading Peachy Peachy", "Padi's Point", "SM City Grand Central", "NDY Buffet"],
-        "directions": ["From Valenzuela: Take Pier-South or LRT Monumento MCU jeep/bus.", "From Sangandaan: Take a jeepney to LRT Monumento MCU."],
-        "malls": ["SM City Grand Central", "Victory Central Mall", "Araneta Square"],
-        "tip": "Morning visits = cooler weather!"
-    },
-    "monumento": {
-        "info": "Monumento is the heart of Caloocan, featuring the iconic Andrés Bonifacio Monument designed by Guillermo Tolentino.",
-        "roads": ["Samson Road (to Malabon)", "EDSA (to QC)", "McArthur Highway (to Valenzuela)"],
-        "food": ["Street food (kwek-kwek, isaw, fishball)", "Lugaw hubs", "Halo-halo stands"],
-        "malls": ["SM City Grand Central", "Victory Plaza", "North Mall", "Araneta Square Mall"],
-        "directions": ["LRT Line 1 - Yamaha Monumento Station", "Jeeps from Manila or Valenzuela drop off at Puregold Monumento."],
-        "trivia": "Guillermo Tolentino interviewed Bonifacio's sister to ensure the monument's face was accurate."
+        "info": "Caloocan is a historic city known as the 'Home of the Katipunan'. It played a crucial role during the Philippine Revolution.",
+        "heritage_spots": [
+            {"name": "Monumento (Bonifacio Monument)", "info": "An iconic 45-foot pylon designed by Guillermo Tolentino commemorating Andres Bonifacio."},
+            {"name": "San Roque Cathedral", "info": "Established in 1815, it served as a spiritual center during the Spanish colonial period."},
+            {"name": "Tandang Sora Birthplace", "info": "The site where Melchora Aquino, the 'Mother of the Katipunan', was born."}
+        ],
+        "tips": "Visit Monumento at night to see the lighting; it's perfect for photography.",
+        "directions_template": "From {user_loc}, take the LRT-1 to Monumento Station or a jeepney passing through McArthur Highway."
     },
     "malabon": {
-        "info": "Malabon is the culinary soul of CAMANAVA, famous for its heritage homes and 'Pancit Malabon'.",
-        "spots": ["Malabon Zoo", "San Bartolome Church (1614)", "Raymundo Ancestral House", "Sy Juco Mansion"],
-        "food": ["Pancit Malabon", "Dolor’s Kakanin", "Judy Ann’s Crispy Pata", "Hazel’s Puto", "Valencia Triangulo"],
-        "directions": ["From Monumento: Take a jeepney labeled 'Malabon' or 'Hulo'.", "From Valenzuela: Take a jeepney to Sangandaan, then transfer to a Malabon-bound jeep."],
-        "tip": "Visit on weekends for fresh kakanin demos!"
+        "info": "A coastal city rich in heritage houses and 17th-century architecture, often called the 'Venice of the Philippines'.",
+        "heritage_spots": [
+            {"name": "San Bartolome Church", "info": "Built in 1614, this Greco-Roman church is a masterpiece of Spanish colonial engineering."},
+            {"name": "Raymundo Ancestral House", "info": "The oldest documented heritage house in Malabon, built in 1861 with a distinct 'Bahay-na-Bato' style."},
+            {"name": "Angel Cacnio Art Gallery", "info": "Home to the works of a Master Painter; a hub for Malabon's local art scene."}
+        ],
+        "tips": "Try the Tricycle Heritage Tour for an easy way to see all these spots in one go.",
+        "directions_template": "From {user_loc}, take a jeepney to Sangandaan, then transfer to a 'Malabon-Hulo' jeepney."
     },
     "navotas": {
-        "info": "The 'Fishing Capital of the Philippines', Navotas is a coastal city known for shipyards and the freshest seafood.",
-        "spots": ["Navotas Fisheries Port", "Centennial Park", "San Jose de Navotas Parish"],
-        "food": ["Sinigang na Isda", "Seafood Paluto", "Puto Sulot", "Norma’s Pansit Luglog"],
-        "restaurants": ["BABA's Shawarma", "Pia's Boodle Fight", "Bistro Kakamberta", "Samgyupan 199"],
-        "directions": ["From Monumento: Take a jeepney labeled 'Navotas' or 'Agora'.", "From C4 Road: There are multiple jeepney routes passing through the Fisheries Port."],
-        "tip": "May-June = Bangus Festival!"
+        "info": "The 'Fishing Capital', Navotas holds maritime secrets and centennial religious sites.",
+        "heritage_spots": [
+            {"name": "San Jose de Navotas Parish", "info": "Established in 1859, it stands as a witness to the city's transformation from a fishing village to a city."},
+            {"name": "Navotas Fisheries Port", "info": "While industrial, it is the historical heart of the city's identity since the 1900s."}
+        ],
+        "tips": "Visit during the Bangus Festival (May) to see the traditional coastal celebrations.",
+        "directions_template": "From {user_loc}, take a jeepney labeled 'Agora' or 'Navotas' passing through C4 road."
     },
     "valenzuela": {
-        "info": "The 'Vibrant City', blending industrial growth with heritage parks like the Tagalag Fishing Village.",
-        "spots": ["Pio Valenzuela Ancestral House", "San Diego de Alcala Church", "Valenzuela City People’s Park", "Tagalag Fishing Village", "Polo Riverwalk"],
-        "food": ["Putong Polo"],
-        "restaurants": ["D'Pond", "Alvarez Park and Cafe", "Kamayan sa Palapat", "Snp 'n Roll"],
-        "directions": ["Take any jeepney or bus along McArthur Highway labeled 'Malanday' or 'Meycauayan'.", "For Polo: Take a 'Malanday' labeled jeepney from Karuhatan and upon arriving to Malanday take a jeepney labeled 'Paco' and drop off at Polo."],
-        "tip": "Sunset photos at Polo Riverwalk are highly recommended!"
+        "info": "Known historically as 'Polo', it is the home of the revolutionary hero Dr. Pio Valenzuela.",
+        "heritage_spots": [
+            {"name": "Museo ni Dr. Pio Valenzuela", "info": "The ancestral house of the hero, now a museum containing artifacts of the Katipunan."},
+            {"name": "San Diego de Alcala Church", "info": "A 17th-century church with a stone belfry that survived WWII."},
+            {"name": "Arkong Bato", "info": "Built in 1910, this stone arch marks the boundary between Bulacan and Rizal (now Valenzuela)."}
+        ],
+        "tips": "Drop by the Polo Riverwalk nearby after visiting the Museum for a quiet sunset view.",
+        "directions_template": "From {user_loc}, take a jeepney to Malanday, then a tricycle or jeep to Polo Church/Museum."
     }
 }
-
 class ChatRequest(BaseModel):
     message: str
     history: List[Dict[str, str]] = []
@@ -75,25 +74,25 @@ async def health_check():
 
 @app.post("/chat")
 async def chat(request: ChatRequest):
-    # This turns your dictionary into a string for the AI to read
+    # Ai response
     context = str(KNOWLEDGE)
     
     system_prompt = f"""
-    You are NaviGo, a friendly local guide for CAMANAVA.
-    DATA: {context}
-    
-    RULES:
-    1. Use ONLY the DATA provided.
-    2. If the user is rude or says "shut up", respond politely but stop the info dump.
-    3. Use Taglish (Tagalog-English).
-    4. Format your answer using this EXACT HTML:
-       <div class="response-container">
-         <div class="resp-header">TITLE</div>
-         <div class="resp-body">CONTENT (use <ul><li> for lists)</div>
-         <div class="resp-footer">FOLLOW UP</div>
-       </div>
-    """
+    You are NaviGo, a Cultural Tourism AI for CAMANAVA. 
+    DATA: {str(KNOWLEDGE)}
 
+    GUIDELINES:
+    1. FOCUS: Only talk about Heritage Spots, Info, Tips, and Directions.
+    2. DIRECTIONS RULE: If a user asks 'How to go to [Place]', you MUST ask: 'Saan po kayo manggagaling? (Where are you coming from?)' before giving the route.
+    3. Once the user provides their location, use the 'directions_template' to fill in the route.
+    4. TONE: Be a polite, proud local guide. Use English.
+    5. FORMAT: Always use the HTML structure:
+    <div class="response-container">
+        <div class="resp-header">HERITAGE TITLE</div>
+        <div class="resp-body">CONTENT (use bullets for spots)</div>
+        <div class="resp-footer">ASK FOR STARTING LOCATION OR NEXT SPOT</div>
+    </div>
+    """
     try:
         completion = client.chat.completions.create(
             model="llama-3.1-8b-instant",
@@ -101,7 +100,7 @@ async def chat(request: ChatRequest):
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": request.message}
             ],
-            temperature=0.2 # Keeps it focused on your data
+            temperature=0.2 # Keeps it focused on data
         )
         response = completion.choices[0].message.content
         return {"response": response, "history": request.history}
