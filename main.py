@@ -52,13 +52,17 @@ KNOWLEDGE = {
     "valenzuela": {
         "info": "The 'Vibrant City', home of Dr. Pio Valenzuela.",
         "local_routes": {
-            "wawang_pulo": "Since malapit ka lang, take a jeep bound for 'Polo' or 'Malanday'. Baba ka sa Polo Church, walking distance na lang ang Museo.",
+            "wawang_pulo_to_museo": "Since malapit ka lang, take a jeep bound for 'Polo' or 'Malanday'. Baba ka sa Polo Church, walking distance na lang ang Museo.",
             "karuhatan": "Take any jeep going North (Malanday). Baba sa Gen. T. De Leon or Malanday, then transfer to a Polo-bound jeep."
         },
         "heritage_spots": [
-            {"name": "Museo ni Dr. Pio Valenzuela", "info": "The ancestral house of the hero, now a museum containing artifacts of the Katipunan."},
+            {"name": "Museo ni Dr. Pio Valenzuela", "info": "The Museo ni Dr. Pio Valenzuela is the restored ancestral home of the Katipunan hero, located in Barangay Pariancillo Villa within the historic district of Polo. It serves as a community museum that showcases artifacts, personal memorabilia, and historical narratives about Dr. Valenzuela's life and the city’s revolutionary past."},
             {"name": "San Diego de Alcala Church", "info": "A 17th-century church with a stone belfry that survived WWII."},
-            {"name": "Arkong Bato", "info": "Built in 1910, this stone arch marks the boundary between Bulacan and Rizal (now Valenzuela)."}
+            {"name": "Arkong Bato", "info": "Built in 1910, this stone arch marks the boundary between Bulacan and Rizal (now Valenzuela)."},
+            {"name": "Arkong Bato Park", "info": "Arkong Bato Park in Valenzuela City is a historic linear park centered around a 1910 stone arch that once served as the provincial boundary between Bulacan and Rizal. Today, it functions as a landscaped heritage site featuring the monument of Katipunan hero Captain Delfin Velilla and provides a safe, pedestrian-friendly space for residents and tourists to explore local history"},
+            {"name": "Polo Park", "info": "Polo Park, also known as the Polo People’s Park, is a vibrant community space in Valenzuela City that serves as the modern counterpart to the historic San Diego de Alcala Church. This 2,500-square-meter plaza features a fountain, landscaped gardens, and a dedicated memorial to the 159 local residents who died during World War II, making it a key destination for both relaxation and historical reflection."},
+            {"name": "Valenzuela City People's Park", "info": "The Valenzuela City People's Park is a 1.5-hectare urban green space in Karuhatan located right beside the Valenzuela City Hall complex. It features popular amenities like a dancing fountain, an aero-circle for exercise, and a dedicated children's playground, making it the city's primary destination for family picnics and morning joggers."},
+            {"name": "Valenzuela City Family Park", "info": "The Valenzuela City Family Park is a 1.1-hectare nature-centric space in Karuhatan that preserves over 30 varieties of trees, including century-old mango and santol trees. It offers a more tranquil, shaded alternative to the People's Park, featuring a children's playground, fitness equipment, and a designated amphitheater for community events."},
         ],
         "tips": "Drop by the Polo Riverwalk nearby after visiting the Museum for a quiet sunset view.",
         "directions_template": "From {user_loc}, take a jeepney to Malanday, then a tricycle or jeep to Polo Church/Museum."
@@ -99,7 +103,7 @@ async def chat(request: ChatRequest):
         <div class="resp-footer">FOLLOW-UP OR RELATED SPOTS</div>
     </div>
     """
-    
+
     try:
         # Build the message thread with Memory
         messages = [{"role": "system", "content": system_prompt}]
