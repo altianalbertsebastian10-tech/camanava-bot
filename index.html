@@ -7,45 +7,53 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Poppins:wght@600;700&display=swap" rel="stylesheet">
     
     <style>
+    /* Importing Inter as primary high-end header font */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800&display=swap');
+
     :root {
-        /* Apple-inspired Light Mode */
+        /* Apple-inspired Glass Palette */
         --primary-blue: #0071e3;
-        --glass-bg: rgba(255, 255, 255, 0.4);
+        --glass-bg: rgba(255, 255, 255, 0.45);
         --glass-border: rgba(255, 255, 255, 0.7);
-        --text-color: #1d1d1f;
-        --bot-bubble: rgba(255, 255, 255, 0.6);
-        --bg-color: #f5f5f7;
+        --text-main: #1d1d1f;
+        --text-header: #000000;
+        --bot-bubble: rgba(255, 255, 255, 0.7);
+        --bg-scaffold: #f5f5f7;
+        
+        /* Font Hierarchy */
+        --font-header: 'Inter', -apple-system, sans-serif;
+        --font-body: 'OPPOSans', 'One Sans', 'Inter', sans-serif;
     }
 
-    .dark-mode {
+    body.dark-mode {
         --glass-bg: rgba(28, 28, 30, 0.6);
-        --glass-border: rgba(255, 255, 255, 0.1);
-        --text-color: #f5f5f7;
-        --bot-bubble: rgba(50, 50, 50, 0.5);
-        --bg-color: #000000;
+        --glass-border: rgba(255, 255, 255, 0.15);
+        --text-main: #f5f5f7;
+        --text-header: #ffffff; /* Sharp white for dark mode headers */
+        --bot-bubble: rgba(44, 44, 46, 0.85);
+        --bg-scaffold: #000000;
     }
-
-    * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
 
     body {
         margin: 0;
-        background-color: var(--bg-color);
-        /* 1. Colorful blobs behind the glass to create liquid look */
+        background-color: var(--bg-scaffold);
+        /* Liquid background effect */
         background-image: 
-            radial-gradient(at 0% 0%, rgba(0, 113, 227, 0.2) 0px, transparent 50%),
-            radial-gradient(at 100% 0%, rgba(255, 0, 150, 0.1) 0px, transparent 50%),
-            radial-gradient(at 50% 100%, rgba(0, 210, 255, 0.15) 0px, transparent 50%);
+            radial-gradient(at 0% 0%, rgba(0, 113, 227, 0.15) 0px, transparent 50%),
+            radial-gradient(at 100% 100%, rgba(0, 210, 255, 0.1) 0px, transparent 50%);
         height: 100vh;
         display: flex;
         justify-content: center;
         align-items: center;
+        font-family: var(--font-body); /* Oppo One Sans style for body */
+        color: var(--text-main);
+        overflow: hidden;
     }
 
-    /* 2. High blur and saturation */
     .chat-shell {
         width: 100%;
         max-width: 450px;
-        height: 85vh;
+        height: 88vh;
         background: var(--glass-bg);
         backdrop-filter: blur(40px) saturate(180%);
         -webkit-backdrop-filter: blur(40px) saturate(180%);
@@ -53,85 +61,67 @@
         border-radius: 40px;
         display: flex;
         flex-direction: column;
-        overflow: hidden;
-        box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        box-shadow: 0 20px 50px rgba(0,0,0,0.15);
     }
 
+    /* Header using Gotham/Inter style */
     header {
-        padding: 25px;
+        padding: 28px 24px;
         border-bottom: 1px solid var(--glass-border);
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
     }
 
-    #chat {
-        flex: 1;
-        padding: 20px;
-        overflow-y: auto;
-        display: flex;
-        flex-direction: column;
-        gap: 12px;
+    header h1 {
+        font-family: var(--font-header);
+        font-weight: 800;
+        font-size: 1.5rem;
+        letter-spacing: -0.03em;
+        margin: 0;
+        color: var(--text-header);
     }
 
-    /* 3. bubbles: floating "glass" look */
+    .logo-area span {
+        font-family: var(--font-header);
+        font-weight: 500;
+        font-size: 0.85rem;
+        opacity: 0.6;
+        color: var(--text-main);
+    }
+
+    /* Messages using One Sans style */
     .msg {
-        max-width: 80%;
+        max-width: 85%;
         padding: 14px 18px;
         border-radius: 22px;
-        font-size: 15px;
-        line-height: 1.4;
+        font-size: 0.95rem;
+        line-height: 1.5;
+        font-family: var(--font-body);
         animation: bubblePop 0.4s cubic-bezier(0.17, 0.89, 0.32, 1.2);
     }
 
-    @keyframes bubblePop {
-        from { opacity: 0; transform: scale(0.8) translateY(20px); }
-        to { opacity: 1; transform: scale(1) translateY(0); }
-    }
-
     .bot-msg {
-        align-self: flex-start;
         background: var(--bot-bubble);
-        color: var(--text-color);
+        color: var(--text-main);
         border: 1px solid var(--glass-border);
-        box-shadow: 0 4px 10px rgba(0,0,0,0.03);
     }
 
     .user-msg {
-        align-self: flex-end;
         background: var(--primary-blue);
-        color: white;
-        box-shadow: 0 8px 15px rgba(0, 113, 227, 0.3);
-    }
-
-    /* INPUT AREA */
-    .input-bar {
-        padding: 20px;
-        background: rgba(255,255,255,0.1);
-        backdrop-filter: blur(10px);
-        display: flex;
-        gap: 10px;
+        color: #ffffff;
+        font-weight: 500;
+        box-shadow: 0 8px 16px rgba(0, 113, 227, 0.25);
     }
 
     input {
-        flex: 1;
-        padding: 12px 20px;
-        border-radius: 25px;
-        border: 1px solid var(--glass-border);
+        font-family: var(--font-body);
+        font-size: 1rem;
         background: var(--bot-bubble);
-        color: var(--text-color);
-        outline: none;
+        border: 1px solid var(--glass-border);
+        color: var(--text-main);
+        border-radius: 30px;
+        padding: 12px 20px;
     }
 
-    .send-pill {
-        background: var(--primary-blue);
-        color: white;
-        border: none;
-        padding: 10px 20px;
-        border-radius: 25px;
-        cursor: pointer;
-        font-weight: 600;
-    }
+    ::placeholder { color: var(--text-main); opacity: 0.4; }
 </style>
 
 </head>
