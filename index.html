@@ -7,227 +7,133 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Poppins:wght@600;700&display=swap" rel="stylesheet">
     
     <style>
-        :root {
-            /* NaviGo 2.0 Color Palette */
-            --primary: #003366;
-            --primary-gradient: linear-gradient(135deg, #003366 0%, #0055aa 100%);
-            --accent: #00d2ff;
-            --bg-glass: rgba(255, 255, 255, 0.9);
-            --bg-scaffold: #f0f2f5;
-            --text-main: #1c1e21;
-            --text-muted: #65676b;
-            --bot-bubble: #f0f2f5;
-            --user-bubble: #003366;
-            --glass-border: rgba(255, 255, 255, 0.5);
-        }
+    :root {
+        /* Apple-inspired Light Mode */
+        --primary-blue: #0071e3;
+        --glass-bg: rgba(255, 255, 255, 0.4);
+        --glass-border: rgba(255, 255, 255, 0.7);
+        --text-color: #1d1d1f;
+        --bot-bubble: rgba(255, 255, 255, 0.6);
+        --bg-color: #f5f5f7;
+    }
 
-        body.dark-mode {
-            --bg-scaffold: #0b141d;
-            --bg-glass: rgba(21, 32, 43, 0.95);
-            --text-main: #e4e6eb;
-            --text-muted: #b0b3b8;
-            --bot-bubble: #243447;
-            --user-bubble: #1d9bf0;
-            --glass-border: rgba(255, 255, 255, 0.1);
-        }
+    .dark-mode {
+        --glass-bg: rgba(28, 28, 30, 0.6);
+        --glass-border: rgba(255, 255, 255, 0.1);
+        --text-color: #f5f5f7;
+        --bot-bubble: rgba(50, 50, 50, 0.5);
+        --bg-color: #000000;
+    }
 
-        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
 
-        body {
-            font-family: 'Inter', sans-serif;
-            background: var(--bg-scaffold);
-            background-image: radial-gradient(circle at 10% 20%, rgba(0, 51, 102, 0.05) 0%, transparent 40%),
-                              radial-gradient(circle at 90% 80%, rgba(0, 210, 255, 0.05) 0%, transparent 40%);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100dvh;
-            margin: 0;
-            overflow: hidden;
-            position: fixed;
-            width: 100%;
-        }
+    body {
+        margin: 0;
+        background-color: var(--bg-color);
+        /* 1. Colorful blobs behind the glass to create liquid look */
+        background-image: 
+            radial-gradient(at 0% 0%, rgba(0, 113, 227, 0.2) 0px, transparent 50%),
+            radial-gradient(at 100% 0%, rgba(255, 0, 150, 0.1) 0px, transparent 50%),
+            radial-gradient(at 50% 100%, rgba(0, 210, 255, 0.15) 0px, transparent 50%);
+        height: 100vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
 
-        .chat-shell {
-            width: 480px;
-            height: 90dvh;
-            max-height: 850px;
-            background: var(--bg-glass);
-            backdrop-filter: blur(15px);
-            -webkit-backdrop-filter: blur(15px);
-            display: flex;
-            flex-direction: column;
-            border-radius: 28px;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15);
-            border: 1px solid var(--glass-border);
-            position: relative;
-        }
+    /* 2. High blur and saturation */
+    .chat-shell {
+        width: 100%;
+        max-width: 450px;
+        height: 85vh;
+        background: var(--glass-bg);
+        backdrop-filter: blur(40px) saturate(180%);
+        -webkit-backdrop-filter: blur(40px) saturate(180%);
+        border: 1px solid var(--glass-border);
+        border-radius: 40px;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+    }
 
-        @media (max-width: 600px) {
-            .chat-shell {
-                width: 100%;
-                height: 100dvh;
-                max-height: 100dvh;
-                border-radius: 0;
-            }
-        }
+    header {
+        padding: 25px;
+        border-bottom: 1px solid var(--glass-border);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
 
-        header {
-            padding: 20px 24px;
-            background: var(--primary-gradient);
-            color: white;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-radius: 28px 28px 0 0;
-            flex-shrink: 0;
-        }
+    #chat {
+        flex: 1;
+        padding: 20px;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
 
-        @media (max-width: 600px) { header { border-radius: 0; padding-top: calc(15px + env(safe-area-inset-top)); } }
+    /* 3. bubbles: floating "glass" look */
+    .msg {
+        max-width: 80%;
+        padding: 14px 18px;
+        border-radius: 22px;
+        font-size: 15px;
+        line-height: 1.4;
+        animation: bubblePop 0.4s cubic-bezier(0.17, 0.89, 0.32, 1.2);
+    }
 
-        .logo-area h1 {
-            font-family: 'Poppins', sans-serif;
-            margin: 0;
-            font-size: 1.25rem;
-            letter-spacing: -0.5px;
-        }
+    @keyframes bubblePop {
+        from { opacity: 0; transform: scale(0.8) translateY(20px); }
+        to { opacity: 1; transform: scale(1) translateY(0); }
+    }
 
-        .logo-area span { font-size: 0.75rem; opacity: 0.8; font-weight: 400; }
+    .bot-msg {
+        align-self: flex-start;
+        background: var(--bot-bubble);
+        color: var(--text-color);
+        border: 1px solid var(--glass-border);
+        box-shadow: 0 4px 10px rgba(0,0,0,0.03);
+    }
 
-        .theme-btn {
-            background: rgba(255, 255, 255, 0.15);
-            border: none;
-            color: white;
-            width: 40px;
-            height: 40px;
-            border-radius: 12px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: 0.3s;
-        }
+    .user-msg {
+        align-self: flex-end;
+        background: var(--primary-blue);
+        color: white;
+        box-shadow: 0 8px 15px rgba(0, 113, 227, 0.3);
+    }
 
-        .theme-btn:hover { background: rgba(255, 255, 255, 0.25); transform: translateY(-2px); }
+    /* INPUT AREA */
+    .input-bar {
+        padding: 20px;
+        background: rgba(255,255,255,0.1);
+        backdrop-filter: blur(10px);
+        display: flex;
+        gap: 10px;
+    }
 
-        #chat {
-            flex: 1;
-            padding: 24px;
-            overflow-y: auto;
-            display: flex;
-            flex-direction: column;
-            gap: 16px;
-            scroll-behavior: smooth;
-        }
+    input {
+        flex: 1;
+        padding: 12px 20px;
+        border-radius: 25px;
+        border: 1px solid var(--glass-border);
+        background: var(--bot-bubble);
+        color: var(--text-color);
+        outline: none;
+    }
 
-        /* Modern Bubble Design */
-        .msg {
-            max-width: 82%;
-            padding: 14px 18px;
-            font-size: 0.93rem;
-            line-height: 1.6;
-            animation: slideUp 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
-            position: relative;
-        }
+    .send-pill {
+        background: var(--primary-blue);
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 25px;
+        cursor: pointer;
+        font-weight: 600;
+    }
+</style>
 
-        @keyframes slideUp {
-            from { opacity: 0; transform: translateY(15px) scale(0.95); }
-            to { opacity: 1; transform: translateY(0) scale(1); }
-        }
-
-        .bot-msg {
-            align-self: flex-start;
-            background: var(--bot-bubble);
-            color: var(--text-main);
-            border-radius: 20px 20px 20px 4px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.02);
-        }
-
-        .user-msg {
-            align-self: flex-end;
-            background: var(--user-bubble);
-            color: white;
-            border-radius: 20px 20px 4px 20px;
-            box-shadow: 0 4px 12px rgba(0, 51, 102, 0.2);
-            font-weight: 500;
-        }
-
-        /* Structured Elements */
-        .response-container { display: flex; flex-direction: column; gap: 10px; }
-        .resp-header { 
-            font-weight: 700; 
-            font-family: 'Poppins', sans-serif;
-            font-size: 1rem;
-            color: var(--accent);
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-        .resp-body ul { margin: 8px 0; padding-left: 18px; list-style: none; }
-        .resp-body li { margin-bottom: 8px; position: relative; }
-        .resp-body li::before {
-            content: "→";
-            position: absolute;
-            left: -18px;
-            color: var(--accent);
-            font-weight: bold;
-        }
-        .resp-footer { 
-            font-size: 0.8rem; 
-            border-top: 1px solid rgba(0,0,0,0.05);
-            padding-top: 8px;
-            color: var(--text-muted);
-            font-style: italic;
-        }
-
-        .input-bar {
-            padding: 20px 24px;
-            background: var(--bg-glass);
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            border-top: 1px solid var(--glass-border);
-            flex-shrink: 0;
-        }
-
-        @media (max-width: 600px) { .input-bar { padding-bottom: calc(20px + env(safe-area-inset-bottom)); } }
-
-        input {
-            flex: 1;
-            background: var(--bot-bubble);
-            border: 2px solid transparent;
-            color: var(--text-main);
-            padding: 14px 20px;
-            border-radius: 16px;
-            outline: none;
-            font-size: 16px;
-            transition: 0.3s;
-        }
-
-        input:focus { border-color: var(--accent); background: var(--bg-glass); }
-
-        .send-pill {
-            background: var(--primary-gradient);
-            color: white;
-            border: none;
-            width: 50px;
-            height: 50px;
-            border-radius: 16px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: 0.3s;
-            box-shadow: 0 4px 15px rgba(0, 51, 102, 0.3);
-        }
-
-        .send-pill:hover { transform: scale(1.05) rotate(5deg); }
-        .send-pill:active { transform: scale(0.95); }
-
-        /* Custom Scrollbar */
-        #chat::-webkit-scrollbar { width: 5px; }
-        #chat::-webkit-scrollbar-track { background: transparent; }
-        #chat::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.1); border-radius: 10px; }
-    </style>
 </head>
 <body>
 
