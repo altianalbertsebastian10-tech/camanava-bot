@@ -1,25 +1,24 @@
-from fastapi import FastAPI, Request
+import os
+from groq import Groq
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
-from typing import Dict, List
-import os
+from typing import List, Dict
 
-app = FastAPI(title="🤖 Smart NaviGo CAMANAVA Bot")
+# 1. Initialize Groq
+# On Render, add GROQ_API_KEY in Environment Variables
+client = Groq(api_key=os.environ.get("GROQ_API_KEY"))#IF WANT TO ADD API KEY, JUST ADD COMMA AFTER GROQ_API_KEY FOLLOWED BY TWO DOUBLE QUOTES AND PUT API KEY INSIDE
+
+app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-class ChatRequest(BaseModel):
-    message: str
-    history: List[Dict[str, str]] = []
-
-# --- KNOWLEDGE BASE stays the same ---
 KNOWLEDGE = {
     "caloocan": {
         "info": "Caloocan is divided into two sections: South Caloocan (urban hub) and North Caloocan (residential). It is a major gateway for the CAMANAVA area.",
@@ -62,134 +61,46 @@ KNOWLEDGE = {
     }
 }
 
-class SmartBot:
-    def __init__(self):
-        self.INTENT_MAP = {
-            "FOOD": ["food", "kain", "gutom", "hungry", "restaurant", "meryenda", "lunch", "dinner", "maki-kain"],
-            "SPOTS": ["spot", "attraction", "visit", "punta", "pasyal", "park", "church", "historical", "place", "view"],
-            "DIRECTIONS": ["direction", "paano", "way", "route", "sakay", "jeep", "bus", "transport", "lrt", "landmark", "how to"],
-            "MALLS": ["mall", "shopping", "bili", "sm", "grocery"],
-            "STOP": ["shut up", "stop", "quiet", "tama na", "manahimik", "ayoko na"],
-            "GREET": ["hi", "hello", "hey", "kamusta", "start"]
-        }
-
-    def _get_entity(self, message: str) -> str:
-        for city in KNOWLEDGE:
-            if city in message:
-                return city
-        return None
-
-    def _detect_intent(self, message: str) -> str:
-        for intent, keywords in self.INTENT_MAP.items():
-            if any(keyword in message for keyword in keywords):
-                return intent
-        return "GENERAL"
-
-    def _get_context_city(self, history: List) -> str:
-        if not history: return None
-        for i in range(-1, -4, -1):
-            if i >= -len(history):
-                user_msg = history[i].get("user", "").lower()
-                city = self._get_entity(user_msg)
-                if city: return city
-        return None
-
-    def think(self, message: str, history: List) -> str:
-        msg = message.lower().strip()
-        intent = self._detect_intent(msg)
-        
-        # 1. Handle Command Intents First (Stop/Shut up)
-        if intent == "STOP":
-            return "Understood. I'll stop the tour info. What else can I do for you?"
-
-        # 2. Handle Repeated Greetings
-        if intent == "GREET":
-            if len(history) > 0 and self._detect_intent(history[-1].get("user", "").lower()) == "GREET":
-                return "Hello again! Just a reminder: I'm here to help with <b>CAMANAVA</b> tourism. Which city would you like to know more about?"
-            return self._welcome_screen()
-
-        # 3. Handle City Discovery
-        target_city = self._get_entity(msg)
-        
-        # If no city in current message, check history IF the user is asking a relevant question
-        if not target_city and intent != "GENERAL":
-            target_city = self._get_context_city(history)
-
-        # 4. Logic-Based Mapping
-        if target_city:
-            city_data = KNOWLEDGE[target_city]
-            
-            if intent == "FOOD":
-                field = 'restaurants' if 'restaurants' in city_data else 'food'
-                return self._build_html(target_city, field, "Food & Dining")
-            elif intent == "DIRECTIONS":
-                return self._build_html(target_city, 'directions', "How to get there")
-            elif intent == "SPOTS":
-                return self._build_html(target_city, 'spots', "Must-visit Attractions")
-            
-            # If they just mentioned a city with no intent, don't just dump info if they already got it.
-            if len(history) > 0 and target_city in history[-1].get("bot", "").lower() and intent == "GENERAL":
-                 return f"We're currently looking at <b>{target_city.title()}</b>. Do you want to know about its food or directions?"
-            
-            return self._city_intro(target_city)
-
-        return "I'm not sure which city you're asking about. Try mentioning <b>Caloocan, Malabon, Navotas, or Valenzuela</b>!"
-
-    def _welcome_screen(self):
-        return """
-        <div class="response-container">
-            <div class="resp-header">Welcome back! 🤖</div>
-            <div class="resp-body">I'm your tourism guide. You can ask me things like:<br>
-            • <i>"Saan pwedeng kumain sa Malabon?"</i><br>
-            • <i>"Valenzuela attractions"</i></div>
-            <div class="resp-footer">How can I help you?</div>
-        </div>
-        """
-
-    def _city_intro(self, city: str) -> str:
-        data = KNOWLEDGE[city]
-        return f"""
-        <div class="response-container">
-            <div class="resp-header">Exploring {city.title()}</div>
-            <div class="resp-body">{data['info']}</div>
-            <div class="resp-footer">Ask me about food or directions in {city.title()}!</div>
-        </div>
-        """
-
-    def _build_html(self, city: str, field: str, label: str) -> str:
-        data = KNOWLEDGE[city][field]
-        items = "".join([f"<li>{i}</li>" for i in data]) if isinstance(data, list) else data
-        body = f"<ul>{items}</ul>" if isinstance(data, list) else data
-        return f"""
-        <div class="response-container">
-            <div class="resp-header">{city.title()} - {label}</div>
-            <div class="resp-body">{body}</div>
-            <div class="resp-footer">Anything else about {city.title()}?</div>
-        </div>
-        """
-
-bot = SmartBot()
-# BLOCKED_WORDS and Routes stay the same...
-bot = SmartBot()
-BLOCKED_WORDS = ["tite", "puke", "burat", "pekpek", "gago", "puta", "bobo", "tanga", "putang ina mo", "putanginamo", "tangina mo", "tanginamo"]
-
-@app.get("/", response_class=HTMLResponse)
-async def get_gui():
-    try:
-        with open("index.html", "r", encoding="utf-8") as f:
-            return f.read()
-    except FileNotFoundError:
-        return "NaviGo Online. (index.html not found)"
+class ChatRequest(BaseModel):
+    message: str
+    history: List[Dict[str, str]] = []
 
 @app.post("/chat")
 async def chat(request: ChatRequest):
+    # This turns your dictionary into a string for the AI to read
+    context = str(KNOWLEDGE)
+    
+    system_prompt = f"""
+    You are NaviGo, a friendly local guide for CAMANAVA.
+    DATA: {context}
+    
+    RULES:
+    1. Use ONLY the DATA provided.
+    2. If the user is rude or says "shut up", respond politely but stop the info dump.
+    3. Use Taglish (Tagalog-English).
+    4. Format your answer using this EXACT HTML:
+       <div class="response-container">
+         <div class="resp-header">TITLE</div>
+         <div class="resp-body">CONTENT (use <ul><li> for lists)</div>
+         <div class="resp-footer">FOLLOW UP</div>
+       </div>
+    """
+
     try:
-        user_msg = request.message.lower()
-        if any(b in user_msg for b in BLOCKED_WORDS):
-            resp = "Let's keep the conversation respectful while exploring CAMANAVA! 😊"
-            return {"response": resp, "history": request.history + [{"user": request.message, "bot": resp}]}
-        
-        response = bot.think(request.message, request.history)
-        return {"response": response, "history": (request.history + [{"user": request.message, "bot": response}])[-10:]}
-    except Exception:
-        return {"response": "I ran into a problem. Try again! 😅", "history": request.history}
+        completion = client.chat.completions.create(
+            model="llama3-8b-8192",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": request.message}
+            ],
+            temperature=0.2 # Keeps it focused on your data
+        )
+        response = completion.choices[0].message.content
+        return {"response": response, "history": request.history}
+    except Exception as e:
+        return {"response": f"System Error: {str(e)}", "history": request.history}
+
+@app.get("/", response_class=HTMLResponse)
+async def get_gui():
+    with open("index.html", "r", encoding="utf-8") as f:
+        return f.read()
