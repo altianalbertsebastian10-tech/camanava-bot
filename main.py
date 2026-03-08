@@ -8,7 +8,7 @@ from typing import List, Dict
 
 # 1. Initialize Groq
 # On Render, add GROQ_API_KEY in Environment Variables
-client = Groq(api_key=os.environ.get("GROQ_API_KEY"))#IF WANT TO ADD API KEY, JUST ADD COMMA AFTER GROQ_API_KEY FOLLOWED BY TWO DOUBLE QUOTES AND PUT API KEY INSIDE
+client = Groq(api_key=os.environ.get("GROQ_API_KEY"))#IF WANT TO ADD API KEY, JUST ADD COMMA AFTER GROQ_API_KEY FOLLOWED BY TWO DOUBLE QUOTES AND PUT API KEY
 
 app = FastAPI()
 
