@@ -11,30 +11,32 @@
 
     :root {
         --primary-blue: #0071e3;
-        --glass-bg: rgba(255, 255, 255, 0.45);
+        --glass-bg: rgba(255, 255, 255, 0.4);
         --glass-border: rgba(255, 255, 255, 0.7);
         --text-header: #1d1d1f;
         --text-sub: #6e6e73;
-        --bot-bubble: rgba(255, 255, 255, 0.7);
+        --bot-bubble: rgba(255, 255, 255, 0.6);
         --bg-scaffold: #f5f5f7;
+        --transition-speed: 0.5s;
         
         --font-header: 'Inter', sans-serif;
         --font-body: 'OPPOSans', 'One Sans', sans-serif;
     }
 
     body.dark-mode {
-        --glass-bg: rgba(28, 28, 30, 0.6);
-        --glass-border: rgba(255, 255, 255, 0.15);
+        --glass-bg: rgba(28, 28, 30, 0.5);
+        --glass-border: rgba(255, 255, 255, 0.1);
         --text-header: #ffffff;
-        --text-sub: #a1a1a6; /* Eto yung fix para makita ang subtitle */
-        --bot-bubble: rgba(44, 44, 46, 0.85);
+        --text-sub: #a1a1a6;
+        --bot-bubble: rgba(44, 44, 46, 0.7);
         --bg-scaffold: #000000;
     }
 
+    /* Transition para sa buong body pag nag-toggle */
     body {
         margin: 0;
         background-color: var(--bg-scaffold);
-        /* 1. Liquid background blobs (Kailangan ito para gumana ang glass effect) */
+        transition: background-color var(--transition-speed) cubic-bezier(0.4, 0, 0.2, 1);
         background-image: 
             radial-gradient(at 0% 0%, rgba(0, 113, 227, 0.2) 0px, transparent 50%),
             radial-gradient(at 100% 100%, rgba(0, 210, 255, 0.15) 0px, transparent 50%),
@@ -52,7 +54,6 @@
         height: 90dvh;
         max-height: 850px;
         background: var(--glass-bg);
-        /* 2. Liquid Glass Logic */
         backdrop-filter: blur(40px) saturate(180%);
         -webkit-backdrop-filter: blur(40px) saturate(180%);
         display: flex;
@@ -61,9 +62,8 @@
         box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
         border: 1px solid var(--glass-border);
         overflow: hidden;
+        transition: all var(--transition-speed) ease;
     }
-
-    @media (max-width: 600px) { .chat-shell { width: 100%; height: 100dvh; border-radius: 0; } }
 
     header {
         padding: 24px;
@@ -74,28 +74,33 @@
     }
 
     header h1 {
-        font-family: var(--font-header);
-        font-weight: 800;
-        font-size: 1.5rem;
-        margin: 0;
-        color: var(--text-header);
+        transition: color var(--transition-speed) ease;
     }
 
-    .logo-area span {
-        font-size: 0.85rem;
-        color: var(--text-sub); /* Gagamitin ang text-sub para litaw */
-        font-weight: 500;
-    }
-
-    /* 3. Pill-shaped Toggle Fix */
+    /* Liquid Glass Toggle Button */
     .theme-btn {
-        background: var(--glass-border);
-        border: none;
-        padding: 8px 16px;
-        border-radius: 20px; /* Eto yung pill shape */
+        background: rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        border: 1px solid var(--glass-border);
+        padding: 8px 18px;
+        border-radius: 20px;
         cursor: pointer;
-        font-size: 1rem;
-        transition: 0.3s;
+        font-size: 1.1rem;
+        transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+    }
+
+    .theme-btn:hover {
+        transform: scale(1.1);
+        background: rgba(255, 255, 255, 0.2);
+    }
+
+    .theme-btn:active {
+        transform: scale(0.9);
     }
 
     #chat {
@@ -107,28 +112,43 @@
         gap: 16px;
     }
 
+    /* Liquid Bubble Animation */
     .msg {
         max-width: 82%;
         padding: 14px 18px;
         font-size: 0.93rem;
         line-height: 1.6;
-        border-radius: 20px;
-        animation: slideUp 0.4s ease-out;
+        border-radius: 22px;
+        position: relative;
+        /* Animation properties */
+        opacity: 0;
+        transform: scale(0.8) translateY(20px);
+        animation: bubblePop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        transition: background-color var(--transition-speed) ease, color var(--transition-speed) ease;
+    }
+
+    @keyframes bubblePop {
+        to {
+            opacity: 1;
+            transform: scale(1) translateY(0);
+        }
     }
 
     .bot-msg {
         align-self: flex-start;
         background: var(--bot-bubble);
         color: var(--text-header);
-        backdrop-filter: blur(10px);
+        backdrop-filter: blur(15px);
         border: 1px solid var(--glass-border);
+        box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
     }
 
     .user-msg {
         align-self: flex-end;
         background: var(--primary-blue);
         color: white;
-        box-shadow: 0 4px 15px rgba(0, 113, 227, 0.3);
+        box-shadow: 0 8px 20px rgba(0, 113, 227, 0.3);
+        border: 1px solid rgba(255,255,255,0.1);
     }
 
     .input-bar {
@@ -137,16 +157,24 @@
         align-items: center;
         gap: 12px;
         border-top: 1px solid var(--glass-border);
+        background: rgba(255, 255, 255, 0.05);
     }
 
     input {
         flex: 1;
         background: var(--bot-bubble);
+        backdrop-filter: blur(10px);
         border: 1px solid var(--glass-border);
         color: var(--text-header);
         padding: 14px 20px;
-        border-radius: 18px;
+        border-radius: 20px;
         outline: none;
+        transition: all 0.3s ease;
+    }
+
+    input:focus {
+        border-color: var(--primary-blue);
+        box-shadow: 0 0 15px rgba(0, 113, 227, 0.1);
     }
 
     .send-pill {
@@ -155,11 +183,30 @@
         border: none;
         width: 50px;
         height: 50px;
-        border-radius: 18px;
+        border-radius: 50%; /* Rounded para mas liquid feel */
         cursor: pointer;
         display: flex;
         align-items: center;
         justify-content: center;
+        transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        box-shadow: 0 4px 15px rgba(0, 113, 227, 0.3);
+    }
+
+    .send-pill:hover {
+        transform: scale(1.1) rotate(5deg);
+    }
+
+    .send-pill:active {
+        transform: scale(0.9);
+    }
+
+    /* Custom Scrollbar for Liquid Look */
+    #chat::-webkit-scrollbar {
+        width: 6px;
+    }
+    #chat::-webkit-scrollbar-thumb {
+        background: var(--glass-border);
+        border-radius: 10px;
     }
 </style>
 
