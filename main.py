@@ -65,6 +65,14 @@ class ChatRequest(BaseModel):
     message: str
     history: List[Dict[str, str]] = []
 
+@app.get("/health")
+async def health_check():
+    """
+    This is the 'Keep-Awake' endpoint. 
+    Point your cronjob/UptimeRobot here.
+    """
+    return {"status": "alive", "city": "Valenzuela", "mode": "RAG"}
+
 @app.post("/chat")
 async def chat(request: ChatRequest):
     # This turns your dictionary into a string for the AI to read
