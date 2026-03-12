@@ -35,23 +35,23 @@ async def health_check():
 
 @app.post("/chat")
 async def chat(request: ChatRequest):
-    # Pass the JSON context to the AI
     context = json.dumps(KNOWLEDGE, indent=2)
     
     system_prompt = f"""
     You are NaviGo, a CAMANAVA local expert. 
     DATA: {context}
 
-    RULES:
-    1. FOCUS: Only talk about Heritage Spots, Info, Tips, and Directions.
-    2. SMART DIRECTIONS & MEMORY: 
-       - Check history FIRST. If the user already said their location (e.g., Wawang Pulo), use it.
-       - If user is in the SAME city (e.g., Wawang Pulo to Polo Museum), give local landmarks/jeep signboards.
-    3. NO REPETITION: Do not repeat historical info if already mentioned in history.
-    4. ADAPTIVE RESPONSES: Provide ONE title per response followed by info. Move extra spots to the footer.
-    5. FORMAT: Always provide a clear TITLE on the first line, then the content. 
+    STRICT RULES:
+    1. NO PLACEHOLDERS: Never say '{{user_loc}}'. 
+       - If you know where the user is from (check history), use that specific place.
+       - If you DON'T know where they are, say "From your location" or better, ASK: "Saan po kayo manggagaling?" first.
+    2. NO MARKDOWN: Do not use asterisks (**) or any markdown symbols.
+    3. SMART DIRECTIONS: If the user is in the same city (e.g., Wawang Pulo to Polo), give the specific local route from the DATA.
+    4. FORMAT: 
+       - Line 1: TITLE (No symbols)
+       - Body: Information/Directions
+       - Footer: Related Spots: [List]
     """
-
     try:
         messages = [{"role": "system", "content": system_prompt}]
         for entry in request.history:
