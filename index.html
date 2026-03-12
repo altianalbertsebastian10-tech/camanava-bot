@@ -263,50 +263,40 @@
     let history = [];
 
     function formatMessage(text) {
-    // If the message already contains our HTML structure, just return it
-    if (text.includes('<div class="response-container"')) return text;
+        if (text.includes('<div class="response-container"')) return text;
 
-    let header = "";
-    let body = text;
-    let footer = "";
+        let lines = text.trim().split('\n');
+        let header = lines[0].trim(); // Takes the first line as Title
+        let bodyText = lines.slice(1).join('\n').trim();
+        let footer = "";
 
-    // 1. Detect Footer (Related Spots or Follow-up questions)
-    const footerKeywords = ["Related Spots:", "Gusto mo ba", "Would you like", "What's next?"];
-    for (let keyword of footerKeywords) {
-        if (body.includes(keyword)) {
-            let parts = body.split(keyword);
-            body = parts[0].trim();
-            footer = keyword + parts[1];
-            break;
+        // Detect Footer (Related Spots)
+        const footerKeywords = ["Related Spots:", "Gusto mo ba", "Would you like"];
+        for (let keyword of footerKeywords) {
+            if (bodyText.includes(keyword)) {
+                let parts = bodyText.split(keyword);
+                bodyText = parts[0].trim();
+                footer = keyword + parts[1];
+                break;
+            }
         }
-    }
 
-    // 2. Detect Header/Title
-    // We look for the first line or a sentence that looks like a title
-    let lines = body.split('\n');
-    if (lines.length > 1) {
-        header = lines[0].trim();
-        body = lines.slice(1).join('\n').trim();
-    }
+        // Handle Bullet Points
+        if (bodyText.includes('•')) {
+            let items = bodyText.split('•').map(i => i.trim()).filter(i => i);
+            bodyText = `<ul>${items.map(i => `<li>${i}</li>`).join('')}</ul>`;
+        } else {
+            bodyText = bodyText.replace(/\n/g, '<br>');
+        }
 
-    // 3. Handle Bullet Points (Converting • to <li>)
-    if (body.includes('•')) {
-        let items = body.split('•').map(i => i.trim()).filter(i => i);
-        body = `<ul>${items.map(i => `<li>${i}</li>`).join('')}</ul>`;
-    } else {
-        // Convert newlines to breaks for regular text
-        body = body.replace(/\n/g, '<br>');
+        return `
+            <div class="response-container">
+                <div class="resp-header">${header}</div>
+                <div class="resp-body">${bodyText}</div>
+                ${footer ? `<div class="resp-footer">${footer}</div>` : ''}
+            </div>
+        `;
     }
-
-    // Assemble the Bubble Layout
-    return `
-        <div class="response-container">
-            ${header ? `<div class="resp-header">${header}</div>` : ''}
-            <div class="resp-body">${body}</div>
-            ${footer ? `<div class="resp-footer">${footer}</div>` : ''}
-        </div>
-    `;
-}
 
     function toggleTheme() {
         const body = document.body;

@@ -1,0 +1,49 @@
+{
+    "caloocan": {
+        "info": "Caloocan is a historic city known as the 'Home of the Katipunan'. It played a crucial role during the Philippine Revolution.",
+        "heritage_spots": [
+            {"name": "Monumento (Bonifacio Monument)", "info": "An iconic 45-foot pylon designed by Guillermo Tolentino commemorating Andres Bonifacio."},
+            {"name": "San Roque Cathedral", "info": "Established in 1815, it served as a spiritual center during the Spanish colonial period."},
+            {"name": "Tandang Sora Birthplace", "info": "The site where Melchora Aquino, the 'Mother of the Katipunan', was born."}
+        ],
+        "tips": "Visit Monumento at night to see the lighting; it's perfect for photography.",
+        "directions_template": "From {user_loc}, take the LRT-1 to Monumento Station or a jeepney passing through McArthur Highway."
+    },
+    "malabon": {
+        "info": "A coastal city rich in heritage houses and 17th-century architecture, often called the 'Venice of the Philippines'.",
+        "heritage_spots": [
+            {"name": "San Bartolome Church", "info": "Built in 1614, this Greco-Roman church is a masterpiece of Spanish colonial engineering."},
+            {"name": "Raymundo Ancestral House", "info": "The oldest documented heritage house in Malabon, built in 1861 with a distinct 'Bahay-na-Bato' style."},
+            {"name": "Angel Cacnio Art Gallery", "info": "Home to the works of a Master Painter; a hub for Malabon's local art scene."}
+        ],
+        "tips": "Try the Tricycle Heritage Tour for an easy way to see all these spots in one go.",
+        "directions_template": "From {user_loc}, take a jeepney to Sangandaan, then transfer to a 'Malabon-Hulo' jeepney."
+    },
+    "navotas": {
+        "info": "The 'Fishing Capital', Navotas holds maritime secrets and centennial religious sites.",
+        "heritage_spots": [
+            {"name": "San Jose de Navotas Parish", "info": "Established in 1859, it stands as a witness to the city's transformation from a fishing village to a city."},
+            {"name": "Navotas Fisheries Port", "info": "While industrial, it is the historical heart of the city's identity since the 1900s."}
+        ],
+        "tips": "Visit during the Bangus Festival (May) to see the traditional coastal celebrations.",
+        "directions_template": "From {user_loc}, take a jeepney labeled 'Agora' or 'Navotas' passing through C4 road."
+    },
+    "valenzuela": {
+        "info": "The 'Vibrant City', home of Dr. Pio Valenzuela.",
+        "local_routes": {
+            "wawang_pulo_to_museo": "Since malapit ka lang, take a jeep bound for 'Polo' or 'Malanday'. Baba ka sa Polo Church, walking distance na lang ang Museo.",
+            "karuhatan": "Take any jeep going North (Malanday). Baba sa Gen. T. De Leon or Malanday, then transfer to a Polo-bound jeep."
+        },
+        "heritage_spots": [
+            {"name": "Museo ni Dr. Pio Valenzuela", "info": "The restored ancestral home of the Katipunan hero, showcasing artifacts and personal memorabilia."},
+            {"name": "San Diego de Alcala Church", "info": "A 17th-century church with a stone belfry that survived WWII."},
+            {"name": "Arkong Bato", "info": "Built in 1910, this stone arch marks the boundary between Bulacan and Rizal."},
+            {"name": "Arkong Bato Park", "info": "A landscaped heritage site featuring the monument of Katipunan hero Captain Delfin Velilla."},
+            {"name": "Polo Park", "info": "A vibrant 2,500-square-meter plaza featuring a memorial to WWII local residents."},
+            {"name": "Valenzuela City People's Park", "info": "A 1.5-hectare urban green space in Karuhatan beside the City Hall."},
+            {"name": "Valenzuela City Family Park", "info": "A nature-centric space preserving over 30 varieties of century-old trees."}
+        ],
+        "tips": "Drop by the Polo Riverwalk nearby after visiting the Museum for a quiet sunset view.",
+        "directions_template": "From {user_loc}, take a jeepney to Malanday, then a tricycle or jeep to Polo Church/Museum."
+    }
+}
