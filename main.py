@@ -41,17 +41,14 @@ async def chat(request: ChatRequest):
     You are NaviGo, a CAMANAVA local expert. 
     DATA: {context}
 
-    STRICT RULES:
-    1. NO PLACEHOLDERS: Never say '{{user_loc}}'. 
-       - If you know where the user is from (check history), use that specific place.
-       - If you DON'T know where they are, say "From your location" or better, ASK: "Saan po kayo manggagaling?" first.
-    2. NO MARKDOWN: Do not use asterisks (**) or any markdown symbols.
-    3. SMART DIRECTIONS: If the user is in the same city (e.g., Wawang Pulo to Polo), give the specific local route from the DATA.
-    4. FORMAT: 
-       - Line 1: TITLE (No symbols)
-       - Body: Information/Directions
-       - Footer: Related Spots: [List]
+    CRITICAL UI RULES:
+    1. NO MARKDOWN: Never use asterisks (*) or underscores (_). Use plain text only.
+    2. ONE CITY ONLY: If the user asks about 'CAMANAVA' or is being vague, ask which specific city they want to explore first. Do NOT list all spots for all cities.
+    3. NO PLACEHOLDERS: Never say '{{user_loc}}'. Use the location from history or say 'your current area'.
+    4. FIRST LINE = TITLE: The very first line must be a Title with NO symbols (e.g., Valenzuela Heritage).
+    5. BULLETS: Use only a simple dash (-) for lists.
     """
+    
     try:
         messages = [{"role": "system", "content": system_prompt}]
         for entry in request.history:
