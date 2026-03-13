@@ -265,32 +265,36 @@
     function formatMessage(text) {
     if (text.includes('<div class="response-container"')) return text;
 
-    // 1. CONVERT BOLDING: This turns **Text** into <strong>Text</strong>
+    // 1. Convert Bolding and Strip all other markdown symbols
     let cleanText = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-
-    // 2. CLEANUP: Remove any stray single asterisks
     cleanText = cleanText.replace(/\*/g, '').trim();
 
     let lines = cleanText.split('\n').filter(line => line.trim() !== '');
     if (lines.length === 0) return text;
 
-    // The AI's first line is Bold Title
+    // 2. Identify Structure
     let header = lines[0].trim(); 
-    let bodyText = lines.slice(1).join('\n').trim();
+    let bodyLines = lines.slice(1);
     let footer = "";
 
-    // 3. DETECT FOOTER: Handles 'Related Spots' or follow-up questions
+    // 3. Extract Footer
     const footerKeywords = ["Related Spots:", "Other Heritage Spots:", "Gusto mo ba", "Would you like"];
-    for (let keyword of footerKeywords) {
-        if (bodyText.includes(keyword)) {
-            let parts = bodyText.split(keyword);
-            bodyText = parts[0].trim();
-            footer = keyword + parts[1];
-            break;
+    for (let i = 0; i < bodyLines.length; i++) {
+        let line = bodyLines[i].trim();
+        for (let keyword of footerKeywords) {
+            // Changed to check if the line STARTS with the keyword for better accuracy
+            if (line.startsWith(keyword)) {
+                footer = bodyLines.slice(i).join(' ');
+                bodyLines = bodyLines.slice(0, i);
+                break;
+            }
         }
+        if (footer) break; // Exit outer loop if footer found
     }
 
-    // 4. CONVERT DASHES TO LISTS: Replaces the dash bullets with clean HTML
+    let bodyText = bodyLines.join('\n').trim();
+
+    // 4. Convert dashes to lists
     if (bodyText.includes('- ')) {
         let items = bodyText.split('- ').map(i => i.trim()).filter(i => i);
         bodyText = `<ul>${items.map(i => `<li>${i}</li>`).join('')}</ul>`;
