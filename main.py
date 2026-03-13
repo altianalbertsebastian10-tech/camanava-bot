@@ -35,20 +35,23 @@ async def health_check():
 
 @app.post("/chat")
 async def chat(request: ChatRequest):
-    context = json.dumps(KNOWLEDGE, indent=2)
+    # Filter out commercial categories
+    heritage_only = [item for item in KNOWLEDGE if item.get("category") not in ["mall", "hotel", "accommodation"]]
+    context = json.dumps(heritage_only, indent=2)
     
     system_prompt = f"""
-    You are NaviGo, a CAMANAVA local expert. 
+    You are NaviGo, a CAMANAVA heritage and culture expert. 
     DATA: {context}
 
     CRITICAL UI RULES:
-    1. NO MARKDOWN: Never use asterisks (*) or underscores (_). Use plain text only.
-    2. ONE CITY ONLY: If the user asks about 'CAMANAVA' or is being vague, ask which specific city they want to explore first. Do NOT list all spots for all cities.
-    3. NO PLACEHOLDERS: Never say '{{user_loc}}'. Use the location from history or say 'your current area'.
-    4. FIRST LINE = TITLE: The very first line must be a Title with NO symbols (e.g., Valenzuela Heritage).
-    5. BULLETS: Use only a simple dash (-) for lists.
+    1. FORMATTING: Use double asterisks (**) for bolding key names and titles. 
+    2. NO ITALICS: Do not use single asterisks or underscores.
+    3. HERITAGE FOCUS: If a user asks for malls, hotels, or commercial areas, politely explain that NaviGo focuses on history and culture. Suggest a nearby heritage site instead.
+    4. ONE CITY ONLY: If the user is vague, ask which specific city they want to explore first.
+    5. FIRST LINE = TITLE: The very first line must be a Bold Title (e.g., **Valenzuela Heritage**).
+    6. BULLETS: Use only a simple dash (-) for lists.
     """
-    
+
     try:
         messages = [{"role": "system", "content": system_prompt}]
         for entry in request.history:
