@@ -272,14 +272,21 @@
     function formatMessage(text) {
     if (text.includes('<div class="response-container"')) return text;
 
-    // CLEANER
-    let cleanText = text.replace(/\*\*/g, '').trim();
+    // 1. CONVERT BOLDING: This turns **Text** into <strong>Text</strong>
+    let cleanText = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
 
-    let lines = cleanText.split('\n');
+    // 2. CLEANUP: Remove any stray single asterisks
+    cleanText = cleanText.replace(/\*/g, '').trim();
+
+    let lines = cleanText.split('\n').filter(line => line.trim() !== '');
+    if (lines.length === 0) return text;
+
+    // The AI's first line is Bold Title
     let header = lines[0].trim(); 
     let bodyText = lines.slice(1).join('\n').trim();
     let footer = "";
 
+    // 3. DETECT FOOTER: Handles 'Related Spots' or follow-up questions
     const footerKeywords = ["Related Spots:", "Other Heritage Spots:", "Gusto mo ba", "Would you like"];
     for (let keyword of footerKeywords) {
         if (bodyText.includes(keyword)) {
@@ -290,10 +297,9 @@
         }
     }
 
-    // Support for both dashes (-) and dots (•) as bullets
-    if (bodyText.includes('- ') || bodyText.includes('• ')) {
-        let delimiter = bodyText.includes('- ') ? '- ' : '• ';
-        let items = bodyText.split(delimiter).map(i => i.trim()).filter(i => i);
+    // 4. CONVERT DASHES TO LISTS: Replaces the dash bullets with clean HTML
+    if (bodyText.includes('- ')) {
+        let items = bodyText.split('- ').map(i => i.trim()).filter(i => i);
         bodyText = `<ul>${items.map(i => `<li>${i}</li>`).join('')}</ul>`;
     } else {
         bodyText = bodyText.replace(/\n/g, '<br>');
@@ -307,7 +313,6 @@
         </div>
     `;
 }
-
     function toggleTheme() {
         const body = document.body;
         const btn = document.querySelector('.theme-btn');

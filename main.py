@@ -50,6 +50,7 @@ async def chat(request: ChatRequest):
     4. ONE CITY ONLY: If the user is vague, ask which specific city they want to explore first.
     5. FIRST LINE = TITLE: The very first line must be a Bold Title (e.g., **Valenzuela Heritage**).
     6. BULLETS: Use only a simple dash (-) for lists.
+    7. NO PLACEHOLDERS: Never output '{{user_loc}}'. Use 'your location' or the specific place if mentioned in history.
     """
 
     try:
