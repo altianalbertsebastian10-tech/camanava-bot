@@ -265,16 +265,21 @@
     function formatMessage(text) {
     if (text.includes('<div class="response-container"')) return text;
 
-    // 1. Convert Bolding and Strip all other markdown symbols
     let cleanText = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
     cleanText = cleanText.replace(/\*/g, '').trim();
 
     let lines = cleanText.split('\n').filter(line => line.trim() !== '');
     if (lines.length === 0) return text;
 
-    // 2. Identify Structure
     let header = lines[0].trim(); 
     let bodyLines = lines.slice(1);
+
+    // NUCLEAR OPTION: If the very first line of the body starts with a dash, 
+    // it's likely the "stubborn bullet" on the intro. Strip it here.
+    if (bodyLines[0].trim().startsWith('- ')) {
+        bodyLines[0] = bodyLines[0].trim().replace(/^- /, '');
+    }
+
     let footer = "";
 
     // 3. Extract Footer
