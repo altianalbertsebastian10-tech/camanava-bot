@@ -35,9 +35,8 @@ async def health_check():
 
 @app.post("/chat")
 async def chat(request: ChatRequest):
-    # Filter out commercial categories
-    heritage_only = [item for item in KNOWLEDGE if item.get("category") not in ["mall", "hotel", "accommodation"]]
-    context = json.dumps(heritage_only, indent=2)
+    # Pass the whole dictionary to ensure the AI sees all city data
+    context = json.dumps(KNOWLEDGE, indent=2)
     
     system_prompt = f"""
     You are NaviGo, a CAMANAVA heritage expert. 
@@ -52,20 +51,19 @@ async def chat(request: ChatRequest):
     STRICT RULES:
     1. NO ITALICS: Never use single asterisks or underscores.
     2. NO PLACEHOLDERS: Never say '{{user_loc}}'. Use 'your location'.
-    3. ONE CITY ONLY: If the user is vague, ask which city (Caloocan, Malabon, Navotas, Valenzuela) they want.
-    4. NO BULLET ASTERISKS: Use ONLY dashes (-) for lists.
+    3. ONE CITY ONLY: If the user is vague, ask which city they want to explore.
     """
 
     try:
-        messages = [{"role": "system", "content": system_prompt}]
-        for entry in request.history:
-            messages.append({"role": entry["role"], "content": entry["content"]})
-        messages.append({"role": "user", "content": request.message})
-
         completion = client.chat.completions.create(
             model="llama-3.1-8b-instant",
-            messages=messages,
-            temperature=0.2
+            messages=[
+                {"role": "system", "content": system_prompt},
+                *request.history, # Simplifies passing the history
+                {"role": "user", "content": request.message}
+            ],
+            temperature=0.2,
+            max_tokens=600
         )
         
         response = completion.choices[0].message.content
@@ -76,6 +74,7 @@ async def chat(request: ChatRequest):
         
         return {"response": response, "history": updated_history}
     except Exception as e:
+        print(f"Server Error: {e}") # This helps you see the error in Render Logs
         return {"response": f"System Error: {str(e)}", "history": request.history}
     
 @app.get("/", response_class=HTMLResponse)

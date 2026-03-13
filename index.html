@@ -322,40 +322,49 @@
     }
 
     async function send() {
-        const input = document.getElementById('input');
-        const msg = input.value.trim();
-        if (!msg) return;
+    const input = document.getElementById('input');
+    const msg = input.value.trim();
+    if (!msg) return;
 
-        const chat = document.getElementById('chat');
-        chat.innerHTML += `<div class="msg user-msg">${msg}</div>`;
-        input.value = '';
-        chat.scrollTop = chat.scrollHeight;
+    const chat = document.getElementById('chat');
+    chat.innerHTML += `<div class="msg user-msg">${msg}</div>`;
+    input.value = '';
+    chat.scrollTop = chat.scrollHeight;
 
-        const loadingId = "loading-" + Date.now();
-        chat.innerHTML += `<div class="msg bot-msg" id="${loadingId}" style="opacity: 0.6">NaviGo is typing...</div>`;
-        chat.scrollTop = chat.scrollHeight;
+    const loadingId = "loading-" + Date.now();
+    chat.innerHTML += `<div class="msg bot-msg" id="${loadingId}" style="opacity: 0.6">NaviGo is typing...</div>`;
+    chat.scrollTop = chat.scrollHeight;
 
-        try {
-            const res = await fetch('https://camanava-bot.onrender.com/chat', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({message: msg, history: history})
-            });
-            
-            const data = await res.json();
-            document.getElementById(loadingId).remove();
-            
-            const botHTML = formatMessage(data.response);
-            chat.innerHTML += `<div class="msg bot-msg">${botHTML}</div>`;
-            
-            history = data.history;
-            chat.scrollTop = chat.scrollHeight;
-        } catch (error) {
-            if(document.getElementById(loadingId)) document.getElementById(loadingId).remove();
-            chat.innerHTML += `<div class="msg bot-msg" style="border: 1px solid #ff4444; color: #ff4444;">System encountered a connection blip. Please try again!</div>`;
-            chat.scrollTop = chat.scrollHeight;
+    try {
+        const res = await fetch('https://camanava-bot.onrender.com/chat', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify({ message: msg, history: history })
+        });
+
+        if (!res.ok) {
+            // This will show if the error is 404 (Not Found) or 500 (Server Error)
+            throw new Error(`HTTP Error ${res.status}`);
         }
+        
+        const data = await res.json();
+        document.getElementById(loadingId).remove();
+        
+        const botHTML = formatMessage(data.response);
+        chat.innerHTML += `<div class="msg bot-msg">${botHTML}</div>`;
+        
+        history = data.history;
+        chat.scrollTop = chat.scrollHeight;
+    } catch (error) {
+        if(document.getElementById(loadingId)) document.getElementById(loadingId).remove();
+        // This will display the EXACT error code to help us debug
+        chat.innerHTML += `<div class="msg bot-msg" style="border: 1px solid #ff4444; color: #ff4444;">Debug: ${error.message}</div>`;
+        chat.scrollTop = chat.scrollHeight;
     }
+}
 </script>
 
 </body>
