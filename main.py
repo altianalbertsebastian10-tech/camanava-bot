@@ -35,8 +35,17 @@ async def health_check():
 
 @app.post("/chat")
 async def chat(request: ChatRequest):
-    # Pass the whole dictionary to ensure the AI sees all city data
-    context = json.dumps(KNOWLEDGE, indent=2)
+    # Pass ONLY the data for the city mentioned to save memory
+    user_msg = request.message.lower()
+    relevant_data = KNOWLEDGE
+    
+    # Simple logic to only send the specific city data if mentioned
+    for city in ["caloocan", "malabon", "navotas", "valenzuela"]:
+        if city in user_msg:
+            relevant_data = {city: KNOWLEDGE[city]}
+            break
+
+    context = json.dumps(relevant_data, indent=2)
     
     system_prompt = f"""
     You are NaviGo, a compassionate and friendly Heritage and Culture Expert for CAMANAVA. Capable of being helpful and friendly to whoever needs you. Assists them, have a kind aura to them.
