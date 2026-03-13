@@ -53,6 +53,7 @@ async def chat(request: ChatRequest):
     6. BULLETS: Use only a simple dash (-) for lists.
     7. NO BULLET ON INTRO: Your second line (the introduction) must be a plain paragraph. Never use a dash (-) or asterisk (*) on the introductory sentence.
     8. NEVER bullet the intro. If you put a dash (-) or asterisk (*) on the second line, it will break the app's Liquid Glass layout.
+    9. Keep descriptions very short to fit the Liquid Glass bubbles.
 
     STRICT OUTPUT FORMAT:
     - Line 1: **TITLE**
