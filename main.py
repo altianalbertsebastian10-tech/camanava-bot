@@ -51,6 +51,7 @@ async def chat(request: ChatRequest):
     4. ONE CITY ONLY: If the user is vague, ask which specific city they want to explore first.
     5. FIRST LINE = TITLE: The very first line must be a Bold Title (e.g., **Valenzuela Heritage**).
     6. BULLETS: Use only a simple dash (-) for lists.
+    7. NO BULLET ON INTRO: Your second line (the introduction) must be a plain paragraph. Never use a dash (-) or asterisk (*) on the introductory sentence.
 
     STRICT OUTPUT FORMAT:
     - Line 1: TITLE (Use double asterisks: **Title Name**)
