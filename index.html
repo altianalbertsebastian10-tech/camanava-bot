@@ -7,7 +7,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Poppins:wght@600;700&display=swap" rel="stylesheet">
     
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+    /* Import Poppins with various weights */
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap');
 
     :root {
         --primary-blue: #0071e3;
@@ -19,48 +20,15 @@
         --bg-scaffold: #f5f5f7;
         --transition-speed: 0.4s;
         
-        --font-header: 'Inter', sans-serif;
-        --font-body: 'OPPOSans', 'One Sans', sans-serif;
-    }
-
-    /* CSS for the Welcome Screen */
-    #welcome-screen {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        padding-left: 10px;
-        transition: opacity 0.3s ease;
-    }
-
-    .welcome-title {
-        font-family: var(--font-header);
-        font-size: 2.8rem;
-        font-weight: 800;
-        background: linear-gradient(to right, #0071e3, #00d2ff, #ff0096);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        margin: 0;
-        letter-spacing: -1px;
-    }
-
-    .welcome-sub {
-        font-size: 1.8rem;
-        color: var(--text-sub);
-        font-weight: 600;
-        margin-top: 5px;
-        opacity: 0.8;
-    }
-
-    .dark-mode .welcome-sub {
-        color: #a1a1a6;
+        /* Unified Poppins Font System */
+        --font-main: 'Poppins', sans-serif;
     }
 
     body.dark-mode {
         --glass-bg: rgba(28, 28, 30, 0.65);
         --glass-border: rgba(255, 255, 255, 0.15);
         --text-header: #ffffff;
-        --text-sub: #a1a1a6; /* FIXED: Visibility for "Smart Tourism Guide" */
+        --text-sub: #a1a1a6;
         --bot-bubble: rgba(44, 44, 46, 0.85);
         --bg-scaffold: #000000;
     }
@@ -69,7 +37,6 @@
         margin: 0;
         background-color: var(--bg-scaffold);
         transition: background-color var(--transition-speed) ease;
-        /* FIXED: Brighter radial blobs so glass has something to blur */
         background-image: 
             radial-gradient(at 0% 0%, rgba(0, 113, 227, 0.25) 0px, transparent 50%),
             radial-gradient(at 100% 100%, rgba(0, 210, 255, 0.2) 0px, transparent 50%),
@@ -78,16 +45,57 @@
         display: flex;
         justify-content: center;
         align-items: center;
-        font-family: var(--font-body);
+        font-family: var(--font-main); /* Applied Poppins globally */
         overflow: hidden;
     }
+
+     /* CSS for the Welcome Screen */
+    #welcome-screen {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        padding-left: 20px;
+        transition: opacity 0.3s ease;
+        animation: fadeInWelcome 0.8s ease-out;
+    }
+
+    .welcome-title {
+        font-family: var(--font-main);
+        font-size: 3rem;
+        font-weight: 800; /* Extra Bold for Gemini effect */
+        background: linear-gradient(to right, #0071e3, #00d2ff, #ff0096);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin: 0;
+        letter-spacing: -1.5px;
+    }
+
+    .welcome-sub {
+        font-size: 1.8rem;
+        color: var(--text-sub);
+        font-weight: 600;
+        margin-top: 5px;
+        opacity: 0.8;
+        letter-spacing: -0.5px;
+    }
+
+    .dark-mode .welcome-sub {
+        color: #a1a1a6;
+    }
+
+    @keyframes fadeInWelcome {
+        from { opacity: 0; transform: translateY(15px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
 
     .chat-shell {
         width: 480px;
         height: 90dvh;
         max-height: 850px;
         background: var(--glass-bg);
-        backdrop-filter: blur(40px) saturate(200%); /* High saturation for Liquid feel */
+        backdrop-filter: blur(40px) saturate(200%);
         -webkit-backdrop-filter: blur(40px) saturate(200%);
         display: flex;
         flex-direction: column;
@@ -109,10 +117,9 @@
     }
 
     header h1 {
-        font-family: var(--font-header);
-        font-weight: 800;
-        font-size: 1.6rem;
-        letter-spacing: -0.6px;
+        font-weight: 700;
+        font-size: 1.5rem;
+        letter-spacing: -0.5px;
         margin: 0;
         color: var(--text-header);
     }
@@ -152,13 +159,12 @@
 
     /* Bouncy Liquid Bubble */
     .msg {
-        max-width: 82%;
-        padding: 15px 20px;
+        max-width: 85%;
+        padding: 14px 18px;
         font-size: 0.95rem;
-        line-height: 1.6;
-        border-radius: 24px;
-        opacity: 0;
-        transform: scale(0.85) translateY(20px);
+        font-weight: 400; /* Regular weight for messages */
+        line-height: 1.5;
+        border-radius: 22px;
         animation: bubblePop 0.45s cubic-bezier(0.15, 0.9, 0.3, 1.1) forwards;
     }
 
@@ -196,14 +202,13 @@
     input {
         flex: 1;
         background: var(--bot-bubble);
-        backdrop-filter: blur(10px);
         border: 1.5px solid var(--glass-border);
         color: var(--text-header);
+        font-family: var(--font-main);
         padding: 14px 22px;
         border-radius: 25px;
         outline: none;
         font-size: 1rem;
-        transition: 0.3s;
     }
 
     input::placeholder { color: var(--text-sub); opacity: 0.6; }
@@ -227,14 +232,10 @@
 
     /* Internal Header/Title for Bot Messages */
     .resp-header {
-        font-family: var(--font-header);
-        font-weight: 800;
+        font-weight: 700;
         font-size: 1.1rem;
         color: var(--primary-blue);
-        margin-bottom: 10px;
-        letter-spacing: -0.3px;
-        border-bottom: 1px solid rgba(0,0,0,0.05);
-        padding-bottom: 8px;
+        margin-bottom: 8px;
     }
 
     .dark-mode .resp-header {
@@ -299,7 +300,7 @@
     let history = [];
 
     function formatMessage(text) {
-    if (text.includes('<div class="response-container"')) return text;
+    if (!text || text.includes('<div class="response-container"')) return text;
 
     let cleanText = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
     cleanText = cleanText.replace(/\*/g, '').trim();
@@ -310,9 +311,8 @@
     let header = lines[0].trim(); 
     let bodyLines = lines.slice(1);
 
-    // NUCLEAR OPTION: If the very first line of the body starts with a dash, 
-    // it's likely the "stubborn bullet" on the intro. Strip it here.
-    if (bodyLines[0].trim().startsWith('- ')) {
+    // 🔥 FIXED: Added check for bodyLines.length to prevent the "undefined" error
+    if (bodyLines.length > 0 && bodyLines[0].trim().startsWith('- ')) {
         bodyLines[0] = bodyLines[0].trim().replace(/^- /, '');
     }
 
