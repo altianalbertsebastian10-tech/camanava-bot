@@ -63,6 +63,9 @@ async def chat(request: ChatRequest):
     7. NO BULLET ON INTRO: Your second line (the introduction) must be a plain paragraph. Never use a dash (-) or asterisk (*) on the introductory sentence.
     8. NEVER bullet the intro. If you put a dash (-) or asterisk (*) on the second line, it will break the app's Liquid Glass layout.
     9. Keep descriptions very short to fit the Liquid Glass bubbles.
+    10. LIMIT: List ONLY 3 heritage spots from the DATA at a time.
+    11. SNIPPET: Each spot description must be strictly under 20 words.
+    12. CLOSURE: Always end with something like: 'Would you like to see more heritage spots in this city?'
 
     STRICT OUTPUT FORMAT:
     - Line 1: **TITLE**
@@ -93,7 +96,7 @@ async def chat(request: ChatRequest):
                 {"role": "user", "content": request.message}
             ],
             temperature=0.2,
-            max_tokens=300
+            max_tokens=600
         )
         
         response = completion.choices[0].message.content
