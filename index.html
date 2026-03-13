@@ -23,6 +23,39 @@
         --font-body: 'OPPOSans', 'One Sans', sans-serif;
     }
 
+    /* CSS for the Welcome Screen */
+    #welcome-screen {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        padding-left: 10px;
+        transition: opacity 0.3s ease;
+    }
+
+    .welcome-title {
+        font-family: var(--font-header);
+        font-size: 2.8rem;
+        font-weight: 800;
+        background: linear-gradient(to right, #0071e3, #00d2ff, #ff0096);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin: 0;
+        letter-spacing: -1px;
+    }
+
+    .welcome-sub {
+        font-size: 1.8rem;
+        color: var(--text-sub);
+        font-weight: 600;
+        margin-top: 5px;
+        opacity: 0.8;
+    }
+
+    .dark-mode .welcome-sub {
+        color: #a1a1a6;
+    }
+
     body.dark-mode {
         --glass-bg: rgba(28, 28, 30, 0.65);
         --glass-border: rgba(255, 255, 255, 0.15);
@@ -248,7 +281,10 @@
     </header>
     
     <div id="chat">
-        <div class="msg bot-msg">Welcome! I'm NaviGo. Ready to explore the hidden gems of Caloocan, Malabon, Navotas, or Valenzuela? 🏝️</div>
+        <div id="welcome-screen">
+            <h2 class="welcome-title">Hi User</h2>
+            <p class="welcome-sub">What can I help you today?</p>
+        </div>
     </div>
 
     <div class="input-bar">
