@@ -326,10 +326,22 @@
         if (e.key === 'Enter') send();
     }
 
+    // logic to hide welcome screen on first message
+    function hideWelcome() {
+        const welcome = document.getElementById('welcome-screen');
+        if (welcome) {
+            welcome.style.opacity = '0';
+            setTimeout(() => welcome.remove(), 300);
+        }
+    }
+
     async function send() {
     const input = document.getElementById('input');
     const msg = input.value.trim();
     if (!msg) return;
+
+    // Hide the Gemini-style welcome screen
+        hideWelcome();
 
     const chat = document.getElementById('chat');
     chat.innerHTML += `<div class="msg user-msg">${msg}</div>`;
