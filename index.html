@@ -45,17 +45,17 @@
         display: flex;
         justify-content: center;
         align-items: center;
-        font-family: var(--font-main); /* Applied Poppins globally */
+        font-family: var(--font-main);
         overflow: hidden;
     }
 
-     /* CSS for the Welcome Screen */
+    /* CSS for the Welcome Screen */
     #welcome-screen {
         flex: 1;
         display: flex;
         flex-direction: column;
         justify-content: center;
-        padding-left: 20px;
+        padding: 0 40px; /* Adjusted for better side breathing room */
         transition: opacity 0.3s ease;
         animation: fadeInWelcome 0.8s ease-out;
     }
@@ -63,21 +63,23 @@
     .welcome-title {
         font-family: var(--font-main);
         font-size: 3rem;
-        font-weight: 800; /* Extra Bold for Gemini effect */
+        font-weight: 800;
         background: linear-gradient(to right, #0071e3, #00d2ff, #ff0096);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         margin: 0;
         letter-spacing: -1.5px;
+        line-height: 1.1;
     }
 
     .welcome-sub {
         font-size: 1.8rem;
         color: var(--text-sub);
         font-weight: 600;
-        margin-top: 5px;
+        margin-top: 10px;
         opacity: 0.8;
         letter-spacing: -0.5px;
+        line-height: 1.2;
     }
 
     .dark-mode .welcome-sub {
@@ -88,7 +90,6 @@
         from { opacity: 0; transform: translateY(15px); }
         to { opacity: 1; transform: translateY(0); }
     }
-
 
     .chat-shell {
         width: 480px;
@@ -106,7 +107,28 @@
         transition: background-color var(--transition-speed), border var(--transition-speed);
     }
 
-    @media (max-width: 600px) { .chat-shell { width: 100%; height: 100dvh; border-radius: 0; } }
+    /* MOBILE RESPONSIVENESS FIXES */
+    @media (max-width: 600px) { 
+        .chat-shell { 
+            width: 100%; 
+            height: 100dvh; 
+            border-radius: 0; 
+        } 
+        .welcome-title {
+            font-size: 2.2rem;
+            letter-spacing: -1px;
+        }
+        .welcome-sub {
+            font-size: 1.35rem;
+        }
+        #welcome-screen {
+            padding: 0 25px;
+        }
+        .input-bar {
+            padding: 16px 20px !important;
+            padding-bottom: env(safe-area-inset-bottom, 16px) !important;
+        }
+    }
 
     header {
         padding: 24px 28px;
@@ -128,17 +150,16 @@
         font-size: 0.85rem;
         color: var(--text-sub);
         font-weight: 500;
-        display: block; /* Ensures it stays under h1 */
+        display: block;
     }
 
-    /* FIXED: Liquid Glass Pill Toggle */
     .theme-btn {
         background: var(--glass-bg);
         backdrop-filter: blur(10px);
         -webkit-backdrop-filter: blur(10px);
         border: 1.5px solid var(--glass-border);
         padding: 6px 22px;
-        border-radius: 30px; /* Pill Shape */
+        border-radius: 30px;
         cursor: pointer;
         font-size: 1.2rem;
         transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -165,14 +186,11 @@
         font-weight: 400;
         line-height: 1.5;
         border-radius: 22px;
-
-    /* Ensure animation is here */
         opacity: 0;
         transform: scale(0.85) translateY(20px);
         animation: bubblePop 0.45s cubic-bezier(0.15, 0.9, 0.3, 1.1) forwards;
     }
 
-    /* Ensure the formatted response also inherits the clean look */
     .response-container {
         width: 100%;
         display: flex;
@@ -241,7 +259,6 @@
 
     .send-pill:hover { transform: scale(1.1) rotate(5deg); }
 
-    /* Internal Header/Title for Bot Messages */
     .resp-header {
         font-weight: 700;
         font-size: 1.1rem;
@@ -267,7 +284,6 @@
         margin-bottom: 6px;
     }
 
-    /* Internal Footer for Related Spots */
     .resp-footer {
         font-size: 0.82rem;
         color: var(--text-sub);
@@ -280,6 +296,7 @@
         border-top: 1px solid rgba(255,255,255,0.1);
     }
 </style>
+
 </head>
 <body>
 
