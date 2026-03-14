@@ -66,6 +66,9 @@ async def chat(request: ChatRequest):
     10. LIMIT: List ONLY 3 heritage spots from the DATA at a time.
     11. SNIPPET: Each spot description must be strictly under 20 words.
     12. CLOSURE: Always end with something like: 'Would you like to see more heritage spots in this city?'
+    13. IRRELEVANT QUESTION: If the user's message does not mention Caloocan, Malabon, Navotas, or Valenzuela,
+    do NOT provide heritage data. Instead, stay in character and politely ask:'Which city in CAMANAVA are we exploring today, traveler?' or try to respond
+    politely and shift his intentions to other topics such as heritage.
 
     STRICT OUTPUT FORMAT:
     - Line 1: **TITLE**
