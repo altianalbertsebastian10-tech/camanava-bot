@@ -1,3 +1,38 @@
+import os
+import json
+from groq import Groq
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
+from pydantic import BaseModel
+from typing import List, Dict
+
+client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
+
+app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Load Knowledge Base from separate JSON file
+def load_knowledge():
+    with open("knowledge.json", "r", encoding="utf-8") as f:
+        return json.load(f)
+
+KNOWLEDGE = load_knowledge()
+
+class ChatRequest(BaseModel):
+    message: str
+    history: List[Dict[str, str]] = []
+
+@app.get("/health")
+async def health_check():
+    return {"status": "alive", "mode": "JSON_RAG"}
+
 @app.post("/chat")
 async def chat(request: ChatRequest):
     user_msg = request.message.lower()
@@ -108,3 +143,8 @@ async def chat(request: ChatRequest):
     except Exception as e:
         print(f"Server Error: {e}") 
         return {"response": f"System Error: {str(e)}", "history": request.history}
+    
+@app.get("/", response_class=HTMLResponse)
+async def get_gui():
+    with open("index.html", "r", encoding="utf-8") as f:
+        return f.read()
