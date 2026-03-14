@@ -67,10 +67,11 @@
         flex: 1;
         display: flex;
         flex-direction: column;
-        justify-content: center; /* Centers vertically */
-        align-items: flex-start; /* Keeps text left-aligned */
-        padding: 0 40px;
-}
+        justify-content: center; /* Vertical center */
+        align-items: flex-start; /* Left align */
+        padding: 0 40px; /* Strong left-side breathing room */
+        animation: fadeInWelcome 0.8s ease-out;
+    }
 
     .welcome-title {
         font-size: clamp(2.5rem, 10vw, 3.5rem);
@@ -92,13 +93,25 @@
         letter-spacing: -0.5px;
     }
 
-    @media (max-width: 600px) {
-        .welcome-title {
-            font-size: 2.5rem; /* Smaller so it doesn't wrap weirdly */
-            margin-bottom: 5px;
+    @media (max-width: 600px) { 
+        .chat-shell {
+            height: 100dvh;
+            max-height: 100dvh;
+            border-radius: 0;
         }
-        .welcome-sub {
-            font-size: 1.4rem;
+        #welcome-screen {
+            padding: 0 30px; /* Balanced for small screens */
+        }
+        .input-bar {
+            padding: 16px 20px !important;
+            padding-bottom: calc(env(safe-area-inset-bottom) + 16px) !important;
+        }
+    }
+
+    @media(max-width: 320px){
+        .send-pill {
+            width: auto;
+            height: 30px;
         }
     }
 
@@ -126,13 +139,14 @@
     #chat::-webkit-scrollbar { display: none; }
 
     .input-bar {
-        padding: 16px 20px;
+        padding: 24px;
         display: flex;
         align-items: center;
         gap: 12px;
-        width: 100%;
-        box-sizing: border-box; /* Ensures padding doesn't add to width */
-}
+        border-top: 1px solid var(--glass-border);
+        background: rgba(255, 255, 255, 0.05);
+        flex-shrink: 0;
+    }
 
     input {
         flex: 1;
@@ -147,18 +161,18 @@
     }
 
     .send-pill {
-    width: 50px;
-    height: 50px;
-    min-width: 50px; /* Forces it to stay 50px wide */
-    min-height: 50px; /* Forces it to stay 50px tall */
-    border-radius: 50%;
-    background: var(--primary-blue);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0; /* THE MAGIC FIX: Prevents the input from squishing it */
-    border: none;
-}
+        background: var(--primary-blue);
+        color: white;
+        border: none;
+        width: auto;
+        height: 52px;
+        border-radius: 50%;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 8px 20px rgba(0, 113, 227, 0.4);
+    }
 
     /* Message Styles */
     .msg {
