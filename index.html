@@ -108,12 +108,7 @@
         }
     }
 
-    @media(max-width: 320px){
-        .send-pill {
-            width: auto;
-            height: 30px;
-        }
-    }
+
 
     header {
         padding: 24px 28px;
@@ -161,18 +156,26 @@
     }
 
     .send-pill {
-        background: var(--primary-blue);
-        color: white;
-        border: none;
-        width: auto;
-        height: 52px;
-        border-radius: 50%;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        box-shadow: 0 8px 20px rgba(0, 113, 227, 0.4);
-    }
+    background: var(--primary-blue);
+    color: white;
+    border: none;
+    
+    /* Use 'min-width' and 'aspect-ratio' to force a circle */
+    width: 52px;
+    height: 52px;
+    min-width: 52px; /* Prevents it from being squeezed horizontally */
+    min-height: 52px; /* Prevents it from being squeezed vertically */
+    
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0; /* CRITICAL: Tells the container NOT to squish this button */
+    
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 8px 20px rgba(0, 113, 227, 0.4);
+}
 
     /* Message Styles */
     .msg {
