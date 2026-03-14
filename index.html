@@ -73,23 +73,25 @@
     }
 
     .welcome-title {
-        font-size: clamp(2.5rem, 10vw, 3.5rem);
-        font-weight: 800;
+        /* Reduced from 2.5rem-3.5rem to 1.8rem-2.4rem */
+        font-size: clamp(1.8rem, 8vw, 2.4rem);
+        font-weight: 600; /* Changed from 800 (Extra Bold) to Semibold */
         background: linear-gradient(to right, #0071e3, #5595f5);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         margin: 0;
-        letter-spacing: -2px;
-        line-height: 1.1;
+        letter-spacing: -1px; /* Less aggressive letter spacing */
+        line-height: 1.2;
     }
 
     .welcome-sub {
-        font-size: clamp(1.4rem, 6vw, 2rem);
+        /* Reduced from 1.4rem-2rem to 1.1rem-1.3rem */
+        font-size: clamp(1.1rem, 5vw, 1.3rem);
         color: var(--text-sub);
-        font-weight: 600;
-        margin-top: 10px;
-        opacity: 0.8;
-        letter-spacing: -0.5px;
+        font-weight: 400; /* Changed from 600 to Regular */
+        margin-top: 8px;
+        opacity: 0.7; /* Slightly more muted to prevent the 'flashbang' effect */
+        letter-spacing: -0.2px;
     }
 
     @media (max-width: 600px) { 
