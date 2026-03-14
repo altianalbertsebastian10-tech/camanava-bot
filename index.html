@@ -150,16 +150,16 @@
         border-radius: 25px;
         outline: none;
         font-size: 1rem;
-        min-width: 0; /* Prevents input from squishing button */
+        min-width: 0;
     }
 
-    /* 🔥 FIXED SEND PILL: Circle with Liquid Glass Style */
+    /* 🔥 UPDATED SEND PILL: Blue Background, White Icon, Glass Glow Effect */
     .send-pill {
-        background: var(--glass-bg);
+        background: var(--primary-blue);
         backdrop-filter: blur(10px);
         -webkit-backdrop-filter: blur(10px);
-        border: 1.5px solid var(--glass-border);
-        color: var(--primary-blue);
+        border: 1.5px solid rgba(255, 255, 255, 0.3);
+        color: #ffffff;
         width: 52px;
         height: 52px;
         min-width: 52px;
@@ -170,11 +170,17 @@
         align-items: center;
         justify-content: center;
         flex-shrink: 0;
-        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.05);
+        /* Subtle base glow */
+        box-shadow: 0 0 10px rgba(0, 113, 227, 0.2);
         transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
-    .send-pill:hover { transform: scale(1.05); background: var(--glass-border); }
+    /* Hover & Mobile Active Glow Effect */
+    .send-pill:hover, .send-pill:active { 
+        transform: scale(1.08); 
+        box-shadow: 0 0 20px rgba(0, 113, 227, 0.6), 0 0 40px rgba(0, 113, 227, 0.2);
+        filter: brightness(1.1);
+    }
 
     /* Message Styles */
     .msg {
@@ -220,7 +226,7 @@
     <div class="input-bar">
         <input id="input" type="text" placeholder="Where do you want to go?" onkeypress="handleKeyPress(event)" autocomplete="off">
         <button class="send-pill" onclick="send()" aria-label="Send Message">
-            <svg width="28" height="28" viewBox="0 0 512 512" fill="var(--primary-blue)" xmlns="http://www.w3.org/2000/svg">
+            <svg width="28" height="28" viewBox="0 0 512 512" fill="#ffffff" xmlns="http://www.w3.org/2000/svg">
                 <path d="M494.8 214.8L66.7 15.6c-41.3-19-86.4 20.3-71.1 61.3l57 154.5c2.6 7 9.4 11.6 16.9 11.6H240c8.8 0 16 7.2 16 16s-7.2 16-16 16H69.4c-7.5 0-14.3 4.6-16.9 11.6l-57 154.5c-15.3 41 29.8 80.3 71.1 61.3l428.1-199.2c34.3-16 34.3-64.7 0-80.7z"/>
             </svg>
         </button>
