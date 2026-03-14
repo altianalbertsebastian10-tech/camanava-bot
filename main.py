@@ -111,6 +111,7 @@ async def chat(request: ChatRequest):
     - Only provide information found in the provided DATA. 
     - If a user asks for something NOT in the DATA (like 'Navotas Travelodge'), do not invent it. State that you don't have information on that spot.
     - NO PLACEHOLDERS: Never output '{{user_loc}}'. Use 'your location' or the city from history.
+    - GEOGRAPHIC HONESTY: If the DATA does not explicitly state that two places are "near" each other or in the same barangay, DO NOT claim they are close. Never invent distances or travel times. If unsure, just say: "I recommend checking a map for the exact distance between these two spots."
 
     CRITICAL SAFETY & FIRST AID RULES:
     1. MENTAL HEALTH CRISIS: If a user expresses a breakdown or self-harm, stay empathetic. 
