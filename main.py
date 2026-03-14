@@ -1,52 +1,27 @@
-import os
-import json
-from groq import Groq
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
-from pydantic import BaseModel
-from typing import List, Dict
-
-client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
-
-app = FastAPI()
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# Load Knowledge Base from separate JSON file
-def load_knowledge():
-    with open("knowledge.json", "r", encoding="utf-8") as f:
-        return json.load(f)
-
-KNOWLEDGE = load_knowledge()
-
-class ChatRequest(BaseModel):
-    message: str
-    history: List[Dict[str, str]] = []
-
-@app.get("/health")
-async def health_check():
-    return {"status": "alive", "mode": "JSON_RAG"}
-
 @app.post("/chat")
 async def chat(request: ChatRequest):
-    # Pass ONLY the data for the city mentioned to save memory
     user_msg = request.message.lower()
-    relevant_data = KNOWLEDGE
     
-    # Simple logic to only send the specific city data if mentioned
+    # --- STEP 1: START EMPTY (Privacy Shield) ---
+    # We remove 'relevant_data = KNOWLEDGE' so it doesn't see everything by default.
+    relevant_data = {}
+    found_city = False
+    
+    # --- STEP 2: ONLY FILL DATA IF CITY IS NAMED ---
     for city in ["caloocan", "malabon", "navotas", "valenzuela"]:
         if city in user_msg:
-            relevant_data = {city: KNOWLEDGE[city]}
+            relevant_data = {city: KNOWLEDGE.get(city)}
+            found_city = True
             break
 
-    context = json.dumps(relevant_data, indent=2)
+    # --- STEP 3: DEFINE THE CONTEXT ---
+    if not found_city:
+        # We tell the AI it has NO DATA yet. This forces it to ask "Where are you?"
+        context = "NO CITY DATA LOADED. The user has not specified a city yet. Do NOT suggest places. Ask for the city first."
+    else:
+        context = json.dumps(relevant_data, indent=2)
     
+    # --- STEP 4: YOUR ORIGINAL SYSTEM PROMPT (Untouched Rules) ---
     system_prompt = f"""
     You are NaviGo, a compassionate and friendly Heritage and Culture Expert for CAMANAVA. Capable of being helpful and friendly to whoever needs you. Assists them, have a kind aura to them.
     DATA: {context}
@@ -116,7 +91,7 @@ async def chat(request: ChatRequest):
             model="llama-3.1-8b-instant",
             messages=[
                 {"role": "system", "content": system_prompt},
-                *request.history, # Simplifies passing the history
+                *request.history, 
                 {"role": "user", "content": request.message}
             ],
             temperature=0.2,
@@ -131,10 +106,5 @@ async def chat(request: ChatRequest):
         
         return {"response": response, "history": updated_history}
     except Exception as e:
-        print(f"Server Error: {e}") # This helps you see the error in Render Logs
+        print(f"Server Error: {e}") 
         return {"response": f"System Error: {str(e)}", "history": request.history}
-    
-@app.get("/", response_class=HTMLResponse)
-async def get_gui():
-    with open("index.html", "r", encoding="utf-8") as f:
-        return f.read()
