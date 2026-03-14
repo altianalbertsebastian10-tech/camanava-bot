@@ -62,14 +62,13 @@
         transition: all 0.4s ease;
     }
 
-    /* --- THE FIX FOR THAT SCREENSHOT --- */
     #welcome-screen {
         flex: 1;
         display: flex;
         flex-direction: column;
-        justify-content: center; /* Vertical center */
-        align-items: flex-start; /* Left align */
-        padding: 0 40px; /* Strong left-side breathing room */
+        justify-content: center; 
+        align-items: flex-start; 
+        padding: 0 40px; 
         animation: fadeInWelcome 0.8s ease-out;
     }
 
@@ -100,18 +99,11 @@
             border-radius: 0;
         }
         #welcome-screen {
-            padding: 0 30px; /* Balanced for small screens */
+            padding: 0 30px; 
         }
         .input-bar {
             padding: 16px 20px !important;
             padding-bottom: calc(env(safe-area-inset-bottom) + 16px) !important;
-        }
-    }
-
-    @media(max-width: 320px){
-        .send-pill {
-            width: auto;
-            height: 30px;
         }
     }
 
@@ -158,21 +150,31 @@
         border-radius: 25px;
         outline: none;
         font-size: 1rem;
+        min-width: 0; /* Prevents input from squishing button */
     }
 
+    /* 🔥 FIXED SEND PILL: Circle with Liquid Glass Style */
     .send-pill {
-        background: var(--primary-blue);
-        color: white;
-        border: none;
-        width: auto;
+        background: var(--glass-bg);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        border: 1.5px solid var(--glass-border);
+        color: var(--primary-blue);
+        width: 52px;
         height: 52px;
+        min-width: 52px;
+        min-height: 52px;
         border-radius: 50%;
         cursor: pointer;
         display: flex;
         align-items: center;
         justify-content: center;
-        box-shadow: 0 8px 20px rgba(0, 113, 227, 0.4);
+        flex-shrink: 0;
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.05);
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
+
+    .send-pill:hover { transform: scale(1.05); background: var(--glass-border); }
 
     /* Message Styles */
     .msg {
@@ -218,7 +220,9 @@
     <div class="input-bar">
         <input id="input" type="text" placeholder="Where do you want to go?" onkeypress="handleKeyPress(event)" autocomplete="off">
         <button class="send-pill" onclick="send()" aria-label="Send Message">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+            <svg width="28" height="28" viewBox="0 0 512 512" fill="var(--primary-blue)" xmlns="http://www.w3.org/2000/svg">
+                <path d="M494.8 214.8L66.7 15.6c-41.3-19-86.4 20.3-71.1 61.3l57 154.5c2.6 7 9.4 11.6 16.9 11.6H240c8.8 0 16 7.2 16 16s-7.2 16-16 16H69.4c-7.5 0-14.3 4.6-16.9 11.6l-57 154.5c-15.3 41 29.8 80.3 71.1 61.3l428.1-199.2c34.3-16 34.3-64.7 0-80.7z"/>
+            </svg>
         </button>
     </div>
 </div>
@@ -238,31 +242,27 @@
     let header = lines[0].trim(); 
     let bodyLines = lines.slice(1);
 
-    // 🔥 FIXED: Added check for bodyLines.length to prevent the "undefined" error
     if (bodyLines.length > 0 && bodyLines[0].trim().startsWith('- ')) {
         bodyLines[0] = bodyLines[0].trim().replace(/^- /, '');
     }
 
     let footer = "";
 
-    // 3. Extract Footer
     const footerKeywords = ["Related Spots:", "Other Heritage Spots:", "Gusto mo ba", "Would you like"];
     for (let i = 0; i < bodyLines.length; i++) {
         let line = bodyLines[i].trim();
         for (let keyword of footerKeywords) {
-            // Changed to check if the line STARTS with the keyword for better accuracy
             if (line.startsWith(keyword)) {
                 footer = bodyLines.slice(i).join(' ');
                 bodyLines = bodyLines.slice(0, i);
                 break;
             }
         }
-        if (footer) break; // Exit outer loop if footer found
+        if (footer) break; 
     }
 
     let bodyText = bodyLines.join('\n').trim();
 
-    // 4. Convert dashes to lists
     if (bodyText.includes('- ')) {
         let items = bodyText.split('- ').map(i => i.trim()).filter(i => i);
         bodyText = `<ul>${items.map(i => `<li>${i}</li>`).join('')}</ul>`;
@@ -289,7 +289,6 @@
         if (e.key === 'Enter') send();
     }
 
-    // logic to hide welcome screen on first message
     function hideWelcome() {
         const welcome = document.getElementById('welcome-screen');
         if (welcome) {
@@ -303,7 +302,6 @@
     const msg = input.value.trim();
     if (!msg) return;
 
-    // Hide the Gemini-style welcome screen
         hideWelcome();
 
     const chat = document.getElementById('chat');
@@ -326,7 +324,6 @@
         });
 
         if (!res.ok) {
-            // This will show if the error is 404 (Not Found) or 500 (Server Error)
             throw new Error(`HTTP Error ${res.status}`);
         }
         
@@ -340,7 +337,6 @@
         chat.scrollTop = chat.scrollHeight;
     } catch (error) {
         if(document.getElementById(loadingId)) document.getElementById(loadingId).remove();
-        // This will display the EXACT error code to help us debug
         chat.innerHTML += `<div class="msg bot-msg" style="border: 1px solid #ff4444; color: #ff4444;">Debug: ${error.message}</div>`;
         chat.scrollTop = chat.scrollHeight;
     }
