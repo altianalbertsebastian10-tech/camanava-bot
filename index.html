@@ -215,12 +215,12 @@
             <h1>NaviGo AI</h1>
             <span>Smart Tourism Guide</span>
         </div>
-        <button class="theme-btn" onclick="toggleTheme()" aria-label="Toggle Dark Mode">🌙</button>
+        <button class="theme-btn" onclick="toggleTheme()" aria-label="Toggle Dark Mode">⏾</button>
     </header>
     
     <div id="chat">
         <div id="welcome-screen">
-            <h2 class="welcome-title">Hi User</h2>
+            <h2 class="welcome-title">Hi!</h2>
             <p class="welcome-sub">What can I help you today?</p>
         </div>
     </div>
@@ -290,7 +290,7 @@
         const body = document.body;
         const btn = document.querySelector('.theme-btn');
         body.classList.toggle('dark-mode');
-        btn.innerHTML = body.classList.contains('dark-mode') ? "☀️" : "🌙";
+        btn.innerHTML = body.classList.contains('dark-mode') ? "☀︎" : "⏾";
     }
 
     function handleKeyPress(e) {
