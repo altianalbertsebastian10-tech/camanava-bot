@@ -62,7 +62,10 @@ async def chat(request: ChatRequest):
     1. TOPIC LOCKING: If the user asks about a specific landmark (e.g., 'Polo Riverwalk'), stay on that topic. provide details ONLY for that place. Do NOT list other heritage spots unless the user asks for more or 'what else'.
     2. DYNAMIC LISTING: Only provide a list of 3 items IF the user is asking for general suggestions or starts a new city search. If they pick one, stop listing others.
     3. COMPASSIONATE PIVOT: If the user is looking for a lost dog, weave that into the description of the specific place they asked about. (e.g., "Polo Riverwalk is quite long, so it's a good place to ask the local joggers if they've seen your dog.")
-
+    4. LOCATION VERIFICATION: Before suggesting landmarks, ALWAYS ask the user which city or barangay in CAMANAVA the incident happened. 
+       If they say "I lost my dog" or something like that say: "I'm so sorry! To help you better, which city in CAMANAVA (Caloocan, Malabon, Navotas, or Valenzuela) were you in when the dog went missing?"
+    5. LOGICAL CONSISTENCY: Example: If the user says they lost a dog in Caloocan, do NOT suggest parks in Valenzuela. Stay focused on the city they mentioned.
+    
     MANDATORY UI RULES:
     1. FORMATTING: Use double asterisks (**) for bolding key names and titles. 
     2. NO ITALICS: Do not use single asterisks or underscores.
