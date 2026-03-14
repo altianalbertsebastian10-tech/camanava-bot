@@ -6,6 +6,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 from typing import List, Dict
+from fastapi.staticfiles import StaticFiles
+# This tells FastAPI: "Anything in the /static URL should look in the static folder"
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
 
