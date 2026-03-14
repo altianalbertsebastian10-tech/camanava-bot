@@ -67,11 +67,10 @@
         flex: 1;
         display: flex;
         flex-direction: column;
-        justify-content: center; /* Vertical center */
-        align-items: flex-start; /* Left align */
-        padding: 0 40px; /* Strong left-side breathing room */
-        animation: fadeInWelcome 0.8s ease-out;
-    }
+        justify-content: center; /* Centers vertically */
+        align-items: flex-start; /* Keeps text left-aligned */
+        padding: 0 40px;
+}
 
     .welcome-title {
         font-size: clamp(2.5rem, 10vw, 3.5rem);
@@ -93,22 +92,15 @@
         letter-spacing: -0.5px;
     }
 
-    @media (max-width: 600px) { 
-        .chat-shell {
-            height: 100dvh;
-            max-height: 100dvh;
-            border-radius: 0;
+    @media (max-width: 600px) {
+        .welcome-title {
+            font-size: 2.5rem; /* Smaller so it doesn't wrap weirdly */
+            margin-bottom: 5px;
         }
-        #welcome-screen {
-            padding: 0 30px; /* Balanced for small screens */
-        }
-        .input-bar {
-            padding: 16px 20px !important;
-            padding-bottom: calc(env(safe-area-inset-bottom) + 16px) !important;
+        .welcome-sub {
+            font-size: 1.4rem;
         }
     }
-
-
 
     header {
         padding: 24px 28px;
@@ -134,14 +126,13 @@
     #chat::-webkit-scrollbar { display: none; }
 
     .input-bar {
-        padding: 24px;
+        padding: 16px 20px;
         display: flex;
         align-items: center;
         gap: 12px;
-        border-top: 1px solid var(--glass-border);
-        background: rgba(255, 255, 255, 0.05);
-        flex-shrink: 0;
-    }
+        width: 100%;
+        box-sizing: border-box; /* Ensures padding doesn't add to width */
+}
 
     input {
         flex: 1;
@@ -156,25 +147,17 @@
     }
 
     .send-pill {
-    background: var(--primary-blue);
-    color: white;
-    border: none;
-    
-    /* Use 'min-width' and 'aspect-ratio' to force a circle */
-    width: 52px;
-    height: 52px;
-    min-width: 52px; /* Prevents it from being squeezed horizontally */
-    min-height: 52px; /* Prevents it from being squeezed vertically */
-    
+    width: 50px;
+    height: 50px;
+    min-width: 50px; /* Forces it to stay 50px wide */
+    min-height: 50px; /* Forces it to stay 50px tall */
     border-radius: 50%;
-    cursor: pointer;
+    background: var(--primary-blue);
     display: flex;
     align-items: center;
     justify-content: center;
-    flex-shrink: 0; /* CRITICAL: Tells the container NOT to squish this button */
-    
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: 0 8px 20px rgba(0, 113, 227, 0.4);
+    flex-shrink: 0; /* THE MAGIC FIX: Prevents the input from squishing it */
+    border: none;
 }
 
     /* Message Styles */
