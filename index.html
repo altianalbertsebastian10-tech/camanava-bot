@@ -177,6 +177,35 @@
         transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
+    /* Typing Indicator Styles */
+    .typing-bubble {
+        align-self: flex-start;
+        background: var(--bot-bubble);
+        padding: 12px 20px;
+        border-radius: 20px;
+        border-bottom-left-radius: 4px;
+        display: none; /* Hidden by default */
+        align-items: center;
+        gap: 4px;
+        border: 1px solid var(--glass-border);
+    }
+
+    .dot {
+        width: 6px;
+        height: 6px;
+        background: var(--text-sub);
+        border-radius: 50%;
+        animation: bounce 1.4s infinite ease-in-out both;
+    }
+
+    .dot:nth-child(1) { animation-delay: -0.32s; }
+    .dot:nth-child(2) { animation-delay: -0.16s; }
+
+    @keyframes bounce {
+        0%, 80%, 100% { transform: scale(0); }
+        40% { transform: scale(1.0); }
+    }
+
     /* Hover & Mobile Active Glow Effect */
     .send-pill:hover, .send-pill:active { 
         transform: scale(1.08); 
@@ -222,6 +251,14 @@
         <div id="welcome-screen">
             <h2 class="welcome-title">Hi!</h2>
             <p class="welcome-sub">What can I help you today?</p>
+        </div>
+    </div>
+
+    <div id="chat">
+        <div id="typing-indicator" class="typing-bubble">
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
         </div>
     </div>
 
@@ -310,15 +347,24 @@
     const msg = input.value.trim();
     if (!msg) return;
 
-        hideWelcome();
+    hideWelcome();
 
     const chat = document.getElementById('chat');
+    
+    // 1. Add User Message
     chat.innerHTML += `<div class="msg user-msg">${msg}</div>`;
     input.value = '';
     chat.scrollTop = chat.scrollHeight;
 
-    const loadingId = "loading-" + Date.now();
-    chat.innerHTML += `<div class="msg bot-msg" id="${loadingId}" style="opacity: 0.6">NaviGo is typing...</div>`;
+    // 2. Create the Animated Typing Bubble
+    const typingId = "typing-" + Date.now();
+    const typingHTML = `
+        <div class="msg bot-msg typing-bubble" id="${typingId}">
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
+        </div>`;
+    chat.innerHTML += typingHTML;
     chat.scrollTop = chat.scrollHeight;
 
     try {
@@ -331,24 +377,31 @@
             body: JSON.stringify({ message: msg, history: history })
         });
 
-        if (!res.ok) {
-            throw new Error(`HTTP Error ${res.status}`);
-        }
+        if (!res.ok) throw new Error(`HTTP Error ${res.status}`);
         
         const data = await res.json();
-        document.getElementById(loadingId).remove();
         
+        // 3. Remove the Typing Bubble once data arrives
+        const indicator = document.getElementById(typingId);
+        if (indicator) indicator.remove();
+        
+        // 4. Add the actual Bot Response
         const botHTML = formatMessage(data.response);
         chat.innerHTML += `<div class="msg bot-msg">${botHTML}</div>`;
         
         history = data.history;
         chat.scrollTop = chat.scrollHeight;
+
     } catch (error) {
-        if(document.getElementById(loadingId)) document.getElementById(loadingId).remove();
+        // Remove typing indicator on error
+        const indicator = document.getElementById(typingId);
+        if (indicator) indicator.remove();
+        
         chat.innerHTML += `<div class="msg bot-msg" style="border: 1px solid #ff4444; color: #ff4444;">Debug: ${error.message}</div>`;
         chat.scrollTop = chat.scrollHeight;
     }
 }
+
 </script>
 
 </body>
