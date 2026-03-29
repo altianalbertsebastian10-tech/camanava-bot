@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>NaviGo AI | Explore CAMANAVA</title>
-
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap');
 
@@ -37,7 +36,6 @@
             radial-gradient(at 0% 0%, rgba(0, 113, 227, 0.25) 0px, transparent 50%),
             radial-gradient(at 100% 100%, rgba(0, 210, 255, 0.2) 0px, transparent 50%),
             radial-gradient(at 100% 0%, rgba(255, 0, 150, 0.15) 0px, transparent 50%);
-        height: 100vh;
         height: 100dvh;
         display: flex;
         justify-content: center;
@@ -49,7 +47,6 @@
     .chat-shell {
         width: 100%;
         max-width: 480px;
-        height: 90vh;
         height: 90dvh;
         display: flex;
         flex-direction: column;
@@ -65,7 +62,7 @@
     }
 
     header {
-        padding: 24px 28px;
+        padding: 20px 28px;
         border-bottom: 1px solid var(--glass-border);
         display: flex;
         justify-content: space-between;
@@ -73,54 +70,23 @@
         flex-shrink: 0;
     }
 
-    header h1 { font-weight: 700; font-size: 1.5rem; margin: 0; color: var(--text-header); }
-    .logo-area span { font-size: 0.85rem; color: var(--text-sub); font-weight: 500; display: block; }
+    header h1 { font-weight: 700; font-size: 1.4rem; margin: 0; color: var(--text-header); }
+    .logo-area span { font-size: 0.8rem; color: var(--text-sub); font-weight: 500; display: block; }
 
     #chat {
         flex: 1;
-        padding: 24px;
+        padding: 20px;
         overflow-y: auto;
         display: flex;
         flex-direction: column;
         gap: 16px;
         scrollbar-width: none;
         position: relative;
-        /* Ensure content is never clipped */
-        min-height: 0; 
     }
 
     #chat::-webkit-scrollbar { display: none; }
 
-    #welcome-screen {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        justify-content: center; 
-        align-items: flex-start; 
-        padding: 0 40px; 
-        animation: fadeInWelcome 0.8s ease-out forwards;
-    }
-
-    .welcome-title {
-        font-size: clamp(1.8rem, 8vw, 2.4rem);
-        font-weight: 600;
-        background: linear-gradient(to right, #0071e3, #5595f5);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        margin: 0;
-        letter-spacing: -1px;
-        line-height: 1.2;
-    }
-
-    .welcome-sub {
-        font-size: clamp(1.1rem, 5vw, 1.3rem);
-        color: var(--text-sub);
-        font-weight: 400;
-        margin-top: 8px;
-        opacity: 0.7;
-    }
-
-    /* 🔥 TYPING ANIMATION DOTS */
+    /* TYPING DOTS ANIMATION */
     .typing-bubble {
         display: flex !important;
         align-items: center;
@@ -147,7 +113,6 @@
         40% { transform: scale(1.0); }
     }
 
-    /* 🔥 MESSAGE STYLES */
     .msg {
         max-width: 85%;
         padding: 14px 18px;
@@ -155,23 +120,26 @@
         line-height: 1.5;
         border-radius: 22px;
         opacity: 0;
-        transform: translateY(15px);
-        animation: bubblePop 0.4s cubic-bezier(0.15, 0.9, 0.3, 1.1) forwards;
+        transform: translateY(10px);
+        animation: bubblePop 0.4s ease-out forwards;
         word-wrap: break-word;
-        position: relative;
-        z-index: 5;
     }
 
     .bot-msg { align-self: flex-start; background: var(--bot-bubble); color: var(--text-header); border: 1px solid var(--glass-border); border-bottom-left-radius: 6px; }
-    .user-msg { align-self: flex-end; background: var(--primary-blue); color: white; border-bottom-right-radius: 6px; box-shadow: 0 4px 15px rgba(0, 113, 227, 0.2); }
+    .user-msg { align-self: flex-end; background: var(--primary-blue); color: white; border-bottom-right-radius: 6px; }
 
+    /* FORMATTING STYLES */
+    .response-container { width: 100%; }
+    .resp-header { font-weight: 700; color: var(--primary-blue); margin-bottom: 6px; font-size: 1rem; }
+    .resp-body { font-size: 0.95rem; }
+    strong { color: var(--primary-blue); font-weight: 700; }
+    ul { padding-left: 18px; margin: 8px 0; }
+    
     .input-bar {
-        padding: 24px;
+        padding: 20px;
         display: flex;
-        align-items: center;
         gap: 12px;
         border-top: 1px solid var(--glass-border);
-        background: rgba(255, 255, 255, 0.05);
         flex-shrink: 0;
     }
 
@@ -180,8 +148,7 @@
         background: var(--bot-bubble);
         border: 1.5px solid var(--glass-border);
         color: var(--text-header);
-        font-family: var(--font-main);
-        padding: 14px 22px;
+        padding: 12px 20px;
         border-radius: 25px;
         outline: none;
         font-size: 1rem;
@@ -189,24 +156,25 @@
 
     .send-pill {
         background: var(--primary-blue);
-        border: 1.5px solid rgba(255, 255, 255, 0.3);
-        color: #ffffff;
-        width: 52px; height: 52px;
-        min-width: 52px; min-height: 52px;
+        color: white;
+        width: 48px; height: 48px;
         border-radius: 50%;
+        border: none;
         cursor: pointer;
         display: flex; align-items: center; justify-content: center;
-        flex-shrink: 0;
-        transition: all 0.3s ease;
+        transition: transform 0.2s;
     }
 
-    .send-pill:hover { transform: scale(1.05); box-shadow: 0 0 15px var(--primary-blue); }
+    /* MOBILE S (320px) FIX */
+    @media (max-width: 320px) {
+        .chat-shell { height: 100dvh; border-radius: 0; }
+        .input-bar { padding: 12px !important; gap: 8px; }
+        .send-pill { width: 40px; height: 40px; min-width: 40px; }
+        header { padding: 15px 20px; }
+    }
 
-    /* Keyframes */
     @keyframes bubblePop { to { opacity: 1; transform: translateY(0); } }
-    @keyframes fadeInWelcome { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-
-    .theme-btn { background: var(--glass-bg); border: 1.5px solid var(--glass-border); padding: 6px 20px; border-radius: 30px; cursor: pointer; color: var(--text-header); }
+    .theme-btn { background: var(--glass-bg); border: 1.5px solid var(--glass-border); padding: 5px 15px; border-radius: 20px; cursor: pointer; color: var(--text-header); }
 </style>
 </head>
 <body>
@@ -217,7 +185,7 @@
             <h1>NaviGo AI</h1>
             <span>Your CAMANAVA Guide</span>
         </div>
-        <button class="theme-btn" onclick="toggleTheme()" aria-label="Toggle Dark Mode">⏾</button>
+        <button class="theme-btn" onclick="toggleTheme()">⏾</button>
     </header>
     
     <div id="chat">
@@ -229,8 +197,8 @@
 
     <div class="input-bar">
         <input id="input" type="text" placeholder="Where do you want to go?" onkeypress="handleKeyPress(event)" autocomplete="off">
-        <button class="send-pill" onclick="send()" aria-label="Send Message">
-            <svg width="24" height="24" viewBox="0 0 512 512" fill="white"><path d="M494.8 214.8L66.7 15.6c-41.3-19-86.4 20.3-71.1 61.3l57 154.5c2.6 7 9.4 11.6 16.9 11.6H240c8.8 0 16 7.2 16 16s-7.2 16-16 16H69.4c-7.5 0-14.3 4.6-16.9 11.6l-57 154.5c-15.3 41 29.8 80.3 71.1 61.3l428.1-199.2c34.3-16 34.3-64.7 0-80.7z"/></svg>
+        <button class="send-pill" onclick="send()">
+            <svg width="20" height="20" viewBox="0 0 512 512" fill="white"><path d="M494.8 214.8L66.7 15.6c-41.3-19-86.4 20.3-71.1 61.3l57 154.5c2.6 7 9.4 11.6 16.9 11.6H240c8.8 0 16 7.2 16 16s-7.2 16-16 16H69.4c-7.5 0-14.3 4.6-16.9 11.6l-57 154.5c-15.3 41 29.8 80.3 71.1 61.3l428.1-199.2c34.3-16 34.3-64.7 0-80.7z"/></svg>
         </button>
     </div>
 </div>
@@ -238,21 +206,37 @@
 <script>
     let history = [];
 
+    function formatMessage(text) {
+        if (!text) return "";
+        // Convert **bold** to <strong> and remove stray stars
+        let formatted = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\*/g, '').trim();
+        let lines = formatted.split('\n').filter(l => l.trim() !== '');
+        
+        if (lines.length <= 1) {
+            return `<div class="response-container"><div class="resp-body">${formatted}</div></div>`;
+        }
+
+        let title = lines[0];
+        let bodyHTML = lines.slice(1).map(line => {
+            if (line.trim().startsWith('- ')) return `<li>${line.trim().substring(2)}</li>`;
+            return line + "<br>";
+        }).join('');
+
+        if (bodyHTML.includes('<li>')) bodyHTML = `<ul>${bodyHTML}</ul>`;
+
+        return `<div class="response-container"><div class="resp-header">${title}</div><div class="resp-body">${bodyHTML}</div></div>`;
+    }
+
     function toggleTheme() {
-        const body = document.body;
-        const btn = document.querySelector('.theme-btn');
-        body.classList.toggle('dark-mode');
-        btn.innerHTML = body.classList.contains('dark-mode') ? "☀︎" : "⏾";
+        document.body.classList.toggle('dark-mode');
+        document.querySelector('.theme-btn').innerHTML = document.body.classList.contains('dark-mode') ? "☀︎" : "⏾";
     }
 
     function handleKeyPress(e) { if (e.key === 'Enter') send(); }
 
     function hideWelcome() {
         const welcome = document.getElementById('welcome-screen');
-        if (welcome) {
-            welcome.style.opacity = '0';
-            setTimeout(() => welcome.remove(), 300);
-        }
+        if (welcome) welcome.remove();
     }
 
     async function send() {
@@ -262,19 +246,12 @@
 
         hideWelcome();
         const chat = document.getElementById('chat');
-        
-        // 1. User Message
         chat.innerHTML += `<div class="msg user-msg">${msg}</div>`;
         input.value = '';
         chat.scrollTop = chat.scrollHeight;
 
-        // 2. Inject Typing Dots
         const typingId = "typing-" + Date.now();
-        const typingHTML = `
-            <div class="msg bot-msg typing-bubble" id="${typingId}">
-                <div class="dot"></div><div class="dot"></div><div class="dot"></div>
-            </div>`;
-        chat.innerHTML += typingHTML;
+        chat.innerHTML += `<div class="msg bot-msg typing-bubble" id="${typingId}"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>`;
         chat.scrollTop = chat.scrollHeight;
 
         try {
@@ -283,20 +260,31 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ message: msg, history: history })
             });
-
             const data = await res.json();
             
-            // 3. Remove Dots & Show Response
-            const indicator = document.getElementById(typingId);
-            if (indicator) indicator.remove();
+            document.getElementById(typingId).remove();
             
-            chat.innerHTML += `<div class="msg bot-msg">${data.response}</div>`;
+            // TYPEWRITER EFFECT
+            const botMsgDiv = document.createElement('div');
+            botMsgDiv.className = 'msg bot-msg';
+            chat.appendChild(botMsgDiv);
+            
+            const fullHTML = formatMessage(data.response);
+            let index = 0;
+            const typewriter = setInterval(() => {
+                if (index < fullHTML.length) {
+                    botMsgDiv.innerHTML = fullHTML.slice(0, index + 1);
+                    index++;
+                    chat.scrollTop = chat.scrollHeight;
+                } else {
+                    clearInterval(typewriter);
+                }
+            }, 10); // Speed: 10ms per char
+
             history = data.history;
-            chat.scrollTop = chat.scrollHeight;
         } catch (error) {
-            const indicator = document.getElementById(typingId);
-            if (indicator) indicator.remove();
-            chat.innerHTML += `<div class="msg bot-msg" style="color:red">Error! Check connection.</div>`;
+            if(document.getElementById(typingId)) document.getElementById(typingId).remove();
+            chat.innerHTML += `<div class="msg bot-msg" style="color:red">Connection Error.</div>`;
         }
     }
 </script>
