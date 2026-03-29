@@ -122,14 +122,17 @@
     .logo-area span { font-size: 0.85rem; color: var(--text-sub); font-weight: 500; display: block; }
 
     #chat {
-        flex: 1;
+        flex: 1; /* This tells the chat to take up all available space between header and input */
         padding: 24px;
-        overflow-y: auto;
+        overflow-y: auto; /* Ensures you can scroll when messages get long */
         display: flex;
         flex-direction: column;
         gap: 16px;
         scrollbar-width: none;
+        height: auto; /* Prevents a forced height from cutting off bubbles */
+        min-height: 0; /* Important for flexbox overflow */
     }
+
     #chat::-webkit-scrollbar { display: none; }
 
     .input-bar {
@@ -220,10 +223,20 @@
         font-size: 0.95rem;
         line-height: 1.5;
         border-radius: 22px;
+        height: auto;
         opacity: 0;
         transform: scale(0.9) translateY(10px);
         animation: bubblePop 0.4s cubic-bezier(0.15, 0.9, 0.3, 1.1) forwards;
+        word-wrap: break-word;
     }
+
+    .response-container {
+    display: block;
+    width: 100%;
+    height: auto;
+    overflow: visible;
+    }
+    
     @keyframes bubblePop { to { opacity: 1; transform: scale(1) translateY(0); } }
     @keyframes fadeInWelcome { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
