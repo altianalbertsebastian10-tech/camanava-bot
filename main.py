@@ -30,6 +30,8 @@ class ChatRequest(BaseModel):
     history: List[Dict[str, str]] = []
 
 @app.get("/health")
+@app.head("/health")
+@app.post("/health")
 async def health_check():
     return {"status": "alive", "mode": "JSON_RAG"}
 
