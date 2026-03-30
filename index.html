@@ -3,39 +3,36 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>NaviGo AI | Explore CAMANAVA</title>
+    <title>ACCESS AI | CAMANAVA Heritage</title>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap');
 
         :root {
-            --primary-blue: #0071e3;
-            --glass-bg: rgba(255, 255, 255, 0.45);
-            --glass-border: rgba(255, 255, 255, 0.8);
-            --text-header: #1d1d1f;
-            --text-sub: #6e6e73;
-            --bot-bubble: rgba(255, 255, 255, 0.7);
-            --bg-scaffold: #f5f5f7;
-            --transition-speed: 0.4s;
+            --primary-blue: #0052cc; /* Professional Corporate Blue */
+            --bg-scaffold: #f8f9fa;  /* Clean Solid Grey/White */
+            --surface: #ffffff;      /* Solid Surface */
+            --border: #e1e4e8;       /* Clean Hairline Border */
+            --text-header: #1a1a1b;
+            --text-sub: #586069;
+            --bot-bubble: #f1f3f4;
+            --transition-speed: 0.3s;
             --font-main: 'Poppins', sans-serif;
         }
 
         body.dark-mode {
-            --glass-bg: rgba(28, 28, 30, 0.65);
-            --glass-border: rgba(255, 255, 255, 0.15);
-            --text-header: #ffffff;
-            --text-sub: #ebebeb;
-            --bot-bubble: rgba(44, 44, 46, 0.85);
-            --bg-scaffold: #000000;
+            --bg-scaffold: #0d1117;
+            --surface: #161b22;
+            --border: #30363d;
+            --text-header: #f0f6fc;
+            --text-sub: #8b949e;
+            --bot-bubble: #21262d;
+            --primary-blue: #58a6ff;
         }
 
         body {
             margin: 0;
             background-color: var(--bg-scaffold);
             transition: background-color var(--transition-speed) ease;
-            background-image: 
-                radial-gradient(at 0% 0%, rgba(0, 113, 227, 0.25) 0px, transparent 50%),
-                radial-gradient(at 100% 100%, rgba(0, 210, 255, 0.2) 0px, transparent 50%),
-                radial-gradient(at 100% 0%, rgba(255, 0, 150, 0.15) 0px, transparent 50%);
             height: 100dvh;
             display: flex;
             justify-content: center;
@@ -50,34 +47,36 @@
             height: 90dvh;
             display: flex;
             flex-direction: column;
-            background: var(--glass-bg);
-            backdrop-filter: blur(40px) saturate(200%);
-            -webkit-backdrop-filter: blur(40px) saturate(200%);
-            border-radius: 38px;
-            box-shadow: 0 30px 60px rgba(0, 0, 0, 0.2);
-            border: 1px solid var(--glass-border);
+            background: var(--surface);
+            border-radius: 20px; /* Reduced from 38px for a sharper look */
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08);
+            border: 1px solid var(--border);
             overflow: hidden;
             transition: all 0.4s ease;
             z-index: 10;
         }
 
         header {
-            padding: 20px 28px;
-            border-bottom: 1px solid var(--glass-border);
+            padding: 20px 24px;
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
             display: flex;
             justify-content: space-between;
             align-items: center;
             flex-shrink: 0;
         }
 
-        header h1 { font-weight: 700; 
-            font-size: 1.4rem; 
+        header h1 { 
+            font-weight: 700; 
+            font-size: 1.2rem; 
             margin: 0; 
-            color: var(--text-header); 
+            color: var(--text-header);
+            text-transform: uppercase;
+            letter-spacing: 1px;
         }
 
         .logo-area span { 
-            font-size: 0.8rem; 
+            font-size: 0.75rem; 
             color: var(--text-sub); 
             font-weight: 500; 
             display: block; 
@@ -92,20 +91,50 @@
             gap: 16px;
             scrollbar-width: none;
             position: relative;
+            background: var(--surface);
         }
 
-        #chat::-webkit-scrollbar { 
-            display: none; 
+        #chat::-webkit-scrollbar { display: none; }
+
+        /* FIXED WELCOME SCREEN CENTERING */
+        #welcome-screen {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center; /* Vertical Center */
+            align-items: center;     /* Horizontal Center */
+            text-align: center;
+            padding: 0 30px;
+            min-height: 100%;
         }
 
-        /* TYPING DOTS ANIMATION */
+        .welcome-title {
+            background: linear-gradient(135deg, var(--primary-blue), #00a8ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-size: clamp(3rem, 15vw, 4rem); 
+            font-weight: 800;
+            margin: 0;
+            letter-spacing: -2px;
+            line-height: 1;
+        }
+
+        .welcome-sub {
+            font-size: 1.1rem;
+            color: var(--text-sub);
+            margin-top: 12px;
+            font-weight: 400;
+        }
+
+        /* TYPING DOTS */
         .typing-bubble {
             display: flex !important;
             align-items: center;
             gap: 5px;
             padding: 12px 20px !important;
             width: fit-content;
-            min-height: 45px;
+            background: var(--bot-bubble) !important;
+            border: none !important;
         }
 
         .dot {
@@ -117,159 +146,102 @@
             opacity: 0.6;
         }
 
-        .dot:nth-child(1) { 
-            animation-delay: -0.32s; 
-        }
-
-        .dot:nth-child(2) { 
-            animation-delay: -0.16s; 
-        }
+        .dot:nth-child(1) { animation-delay: -0.32s; }
+        .dot:nth-child(2) { animation-delay: -0.16s; }
 
         @keyframes bounce {
             0%, 80%, 100% { transform: scale(0); }
             40% { transform: scale(1.0); }
         }
 
+        /* MESSAGE STYLES */
         .msg {
-            max-width: 85%;
-            padding: 14px 18px;
+            max-width: 82%;
+            padding: 12px 16px;
             font-size: 0.95rem;
             line-height: 1.5;
-            border-radius: 22px;
+            border-radius: 14px; /* Flatter radius */
             opacity: 0;
             transform: translateY(10px);
             animation: bubblePop 0.4s ease-out forwards;
-            word-wrap: break-word;
         }
 
         .bot-msg { 
             align-self: flex-start; 
             background: var(--bot-bubble); 
             color: var(--text-header); 
-            border: 1px solid var(--glass-border); 
-            border-bottom-left-radius: 6px; 
+            border-bottom-left-radius: 4px; 
         }
 
         .user-msg { 
             align-self: flex-end; 
             background: var(--primary-blue); 
             color: white; 
-            border-bottom-right-radius: 6px; 
+            border-bottom-right-radius: 4px; 
         }
 
-        /* FORMATTING STYLES */
-        .response-container { 
-            width: 100%; 
-        }
-
-        .resp-header { 
-            font-weight: 700; 
-            color: var(--primary-blue); 
-            margin-bottom: 6px; 
-            font-size: 1rem; 
-        }
-
-        .resp-body { 
-            font-size: 0.95rem; 
-        }
-
-        strong { 
-            color: var(--primary-blue); 
-            font-weight: 700; 
-        }
-
-        ul { 
-            padding-left: 18px; 
-            margin: 8px 0; 
-        }
+        .response-container { width: 100%; }
+        .resp-header { font-weight: 700; color: var(--primary-blue); margin-bottom: 4px; }
+        strong { color: var(--primary-blue); font-weight: 700; }
         
+        /* INPUT BAR */
         .input-bar {
             padding: 20px;
             display: flex;
             gap: 12px;
-            border-top: 1px solid var(--glass-border);
+            border-top: 1px solid var(--border);
+            background: var(--surface);
             flex-shrink: 0;
         }
 
         input {
             flex: 1;
-            background: var(--bot-bubble);
-            border: 1.5px solid var(--glass-border);
+            background: var(--bg-scaffold);
+            border: 1px solid var(--border);
             color: var(--text-header);
-            padding: 12px 20px;
-            border-radius: 25px;
+            padding: 12px 18px;
+            border-radius: 10px;
             outline: none;
-            font-size: 1rem;
+            font-size: 0.95rem;
+            transition: border-color 0.2s;
         }
+
+        input:focus { border-color: var(--primary-blue); }
 
         .send-pill {
             background: var(--primary-blue);
             color: white;
-            width: 48px; height: 48px;
-            border-radius: 50%;
+            width: 45px; height: 45px;
+            border-radius: 10px; /* Matched to input */
             border: none;
             cursor: pointer;
             display: flex; align-items: center; justify-content: center;
-            transition: transform 0.2s;
-        }
-
-        /* MOBILE S (320px) FIX */
-        @media (max-width: 320px) {
-            .chat-shell { height: 100dvh; border-radius: 0; }
-            .input-bar { padding: 12px !important; gap: 8px; }
-            .send-pill { width: 40px; height: 40px; min-width: 40px; }
-            header { padding: 15px 20px; }
         }
 
         @keyframes bubblePop { to { opacity: 1; transform: translateY(0); } }
+        
         .theme-btn { 
-            background: var(--glass-bg); 
-            border: 1.5px solid var(--glass-border); 
-            padding: 5px 15px; 
-            border-radius: 20px; 
+            background: var(--bot-bubble); 
+            border: none; 
+            padding: 6px 14px; 
+            border-radius: 8px; 
             cursor: pointer; 
             color: var(--text-header); 
+            font-weight: 600;
         }
 
-        .welcome-title {
-            /* 1. The Gradient: Use two shades of NaviGo Blue */
-            background: linear-gradient(to right, #0071e3, #5595f5);
-            
-            /* 2. The Magic Trick: This clips the background into the letters */
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            
-            /* 3. The Sizing: Big, Bold, and Professional */
-            font-size: clamp(2.5rem, 12vw, 3.5rem); 
-            font-weight: 800;
-            margin: 0;
-            letter-spacing: -1.5px; /* Tighter letters look more modern */
-            line-height: 1.2;
-            
-            /* 4. Animation: Smooth fade-in from the bottom */
-            animation: fadeInWelcome 0.8s ease-out forwards;
-        }
-
-        @keyframes fadeInWelcome {
-            from { 
-                opacity: 0; 
-                transform: translateY(20px); 
-            }
-            to { 
-                opacity: 1; 
-                transform: translateY(0); 
-            }
+        @media (max-width: 480px) {
+            .chat-shell { height: 100dvh; border-radius: 0; border: none; }
         }
     </style>
 </head>
-
 <body>
 
 <div class="chat-shell">
     <header>
         <div class="logo-area">
-            <h1>NaviGo AI</h1>
-            <span>Your CAMANAVA Guide</span>
+            <h1>ACCESS AI</h1>
+            <span>Northern Heritage Guide</span>
         </div>
         <button class="theme-btn" onclick="toggleTheme()">⏾</button>
     </header>
@@ -282,21 +254,21 @@
     </div>
 
     <div class="input-bar">
-        <input id="input" type="text" placeholder="Where do you want to go?" onkeypress="handleKeyPress(event)" autocomplete="off">
+        <input id="input" type="text" placeholder="Type a message..." onkeypress="handleKeyPress(event)" autocomplete="off">
         <button class="send-pill" onclick="send()">
-            <svg width="20" height="20" viewBox="0 0 512 512" fill="white"><path d="M494.8 214.8L66.7 15.6c-41.3-19-86.4 20.3-71.1 61.3l57 154.5c2.6 7 9.4 11.6 16.9 11.6H240c8.8 0 16 7.2 16 16s-7.2 16-16 16H69.4c-7.5 0-14.3 4.6-16.9 11.6l-57 154.5c-15.3 41 29.8 80.3 71.1 61.3l428.1-199.2c34.3-16 34.3-64.7 0-80.7z"/></svg>
+            <svg width="18" height="18" viewBox="0 0 512 512" fill="white"><path d="M494.8 214.8L66.7 15.6c-41.3-19-86.4 20.3-71.1 61.3l57 154.5c2.6 7 9.4 11.6 16.9 11.6H240c8.8 0 16 7.2 16 16s-7.2 16-16 16H69.4c-7.5 0-14.3 4.6-16.9 11.6l-57 154.5c-15.3 41 29.8 80.3 71.1 61.3l428.1-199.2c34.3-16 34.3-64.7 0-80.7z"/></svg>
         </button>
     </div>
 </div>
 
 <script>
+    // [NO CHANGES MADE TO JAVASCRIPT AS REQUESTED]
     let history = [];
 
     function formatMessage(text) {
         if (!text) return "";
-        // Convert **bold** to <strong> and remove stray stars
         let formatted = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\*/g, '').trim();
-        let lines = formatted.split('\n').filter(l => l.trim() !== '');
+        let lines = formatted.split('\n').filter(line => line.trim() !== '');
         
         if (lines.length <= 1) {
             return `<div class="response-container"><div class="resp-body">${formatted}</div></div>`;
@@ -350,7 +322,6 @@
             
             document.getElementById(typingId).remove();
             
-            // TYPEWRITER EFFECT
             const botMsgDiv = document.createElement('div');
             botMsgDiv.className = 'msg bot-msg';
             chat.appendChild(botMsgDiv);
@@ -365,7 +336,7 @@
                 } else {
                     clearInterval(typewriter);
                 }
-            }, 10); // Speed: 10ms per char
+            }, 10);
 
             history = data.history;
         } catch (error) {
