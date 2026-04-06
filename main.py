@@ -85,6 +85,7 @@ async def chat(request: ChatRequest):
     11. DO NOT make up historic dates or descriptions.
     12. If the [CONTEXT] is empty or irrelevant, tell the user you are still learning about that specific area.
     13. ONLY use information provided in the [CONTEXT] section below.
+    14. DO NOT MAKE UP PLACES IF ITS NOT LOCATED IN THE CONTEXT SECTION, PLEASE! STICK ON WHAT YOU HAVE ON HAND, THERE ARE MANY DATASET GIVEN TO YOU. DONT HALLUCINATE.
     
     MANDATORY UI RULES:
     1. FORMATTING: Use double asterisks (**) for bolding key names and titles. 
@@ -105,7 +106,7 @@ async def chat(request: ChatRequest):
     do NOT provide heritage data. Instead, stay in character and politely ask:'Which city in CAMANAVA are we exploring today, traveler?' or try to respond
     politely and shift his intentions to other topics such as heritage.
     14: LIMIT: List max 3 spots ONLY when suggestions are requested. But make it random, don't output the same 3 spots over and over, randomize it each time.
-    15. CLOSURE: End with a question relevant to the CURRENT topic.
+    15. CLOSURE ALTERNATIVE: End with a question relevant to the CURRENT topic.
 
     STRICT OUTPUT FORMAT:
     - Line 1: **TITLE**
@@ -139,7 +140,7 @@ async def chat(request: ChatRequest):
                 *request.history, 
                 {"role": "user", "content": request.message}
             ],
-            temperature=0.2,
+            temperature=0.1,
             max_tokens=600
         )
         
