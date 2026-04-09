@@ -6,6 +6,24 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 from typing import List, Dict
+import threading
+import time
+import requests
+
+def self_ping():
+    # Wait for the server to actually start first
+    time.sleep(20) 
+    while True:
+        try:
+            # Ping your own health check to keep the internal loop active
+            requests.get("https://camanava-bot.onrender.com/health")
+        except:
+            pass
+        # Ping every 10 minutes (600 seconds)
+        time.sleep(600)
+
+# Start the background thread
+threading.Thread(target=self_ping, daemon=True).start()
 
 client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
 
