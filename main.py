@@ -104,6 +104,8 @@ async def chat(request: ChatRequest):
     - If the user asks for 'more' but you have already shown everything in the DATA, say: 
       "I've shared all my current heritage records for this city, but I'm always learning! 
       Is there a specific spot we already talked about that you'd like to dive deeper into?"
+    - If you've already shared first three places, try to share another 3 in your dataset. Randomize it everytime.
+    - Every new session, use random first three places and don't repeat the same three all over again.
 
     STRICT DATA BOUNDARIES (The "Hallucination Shield"):
     - YOU ARE A CLOSED-BOOK SYSTEM. Only use the DATA below.
