@@ -145,31 +145,40 @@ async def chat(request: ChatRequest):
     """
 
     try:
+        # 1. SANITIZE HISTORY (CRITICAL: Groq will crash if history has extra keys)
+        # We only keep 'role' and 'content'
+        clean_history = [
+            {"role": h["role"], "content": h["content"]} 
+            for h in request.history if "role" in h and "content" in h
+        ]
+
+        # 2. CALL GROQ (Using the most stable model ID)
         completion = client.chat.completions.create(
-            model="llama-3.1-8b-instant",
+            model="llama-3.1-8b-instant", 
             messages=[
                 {"role": "system", "content": system_prompt},
-                *request.history, 
-                {"role": "user", "content": request.message}
+                *clean_history[-5:], # Keep it lean to prevent timeouts
+                {"role": "user", "content": user_msg}
             ],
-            temperature=0.1, # Keep this low
+            temperature=0.1,
             max_tokens=500
         )
         
-        response = completion.choices[0].message.content
-        # Ensure the AI didn't hallucinate a placeholder
-        response = response.replace("{{user_loc}}", "your area")
+        response_text = completion.choices[0].message.content
 
-        updated_history = request.history + [
-            {"role": "user", "content": request.message},
-            {"role": "assistant", "content": response}
-        ]
-        
-        return {"response": response, "history": updated_history[-10:]} # Keep history lean
+        # 3. UNIFY THE KEYS (Use 'reply' for consistency)
+        return {
+            "reply": response_text, 
+            "history": (request.history + [
+                {"role": "user", "content": user_msg},
+                {"role": "assistant", "content": response_text}
+            ])[-10:]
+        }
+
     except Exception as e:
-        # This will force the error to appear in your Render "Logs" tab
+        # This will print the EXACT error in your Render Logs
         print(f"DEBUG ERROR: {type(e).__name__} - {str(e)}") 
-        return {"reply": f"Developer Error: {str(e)}", "history": request.history}
+        return {"reply": f"Internal Error: {str(e)}", "history": request.history}
     
 @app.get("/", response_class=HTMLResponse)
 async def get_gui():
