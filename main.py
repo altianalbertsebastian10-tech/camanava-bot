@@ -1,4 +1,5 @@
 import os
+import random
 import json
 from groq import Groq
 from fastapi import FastAPI
@@ -78,16 +79,20 @@ async def chat(request: ChatRequest):
             if target_city: break
 
     # --- STEP 2: CONTEXT BUILDING ---
+    # --- STEP 2: CONTEXT BUILDING ---
     if not target_city:
-        # The "Kill Switch" to prevent hallucinations
         context = "CRITICAL: DATABASE IS EMPTY. User has NOT selected a city. You are FORBIDDEN from suggesting places. You MUST ask which city in CAMANAVA they want to explore."
     else:
-        # Load real data from your JSON
+        # Load real data from your JSON with a fallback to an empty list
         city_data = KNOWLEDGE.get(target_city, [])
-        # We only show 3 random spots to avoid "Walls of Text"
-        import random
-        selected_spots = random.sample(city_data, min(len(city_data), 3))
-        context = json.dumps({target_city: selected_spots}, indent=2)
+        
+        if city_data:
+            # Safer sampling: ensures it never tries to pull more than exists
+            count = min(len(city_data), 3)
+            selected_spots = random.sample(city_data, count)
+            context = json.dumps({target_city: selected_spots}, indent=2)
+        else:
+            context = f"I'm sorry, I don't have records for {target_city} yet. Ask the user for another city."
 
     # --- STEP 3: TRIVIA LOGIC ---
     if "trivia" in user_msg and not target_city:
