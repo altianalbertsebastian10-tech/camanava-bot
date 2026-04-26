@@ -167,7 +167,9 @@ async def chat(request: ChatRequest):
         
         return {"response": response, "history": updated_history[-10:]} # Keep history lean
     except Exception as e:
-        return {"response": "I'm having trouble accessing my records. Try again?", "history": request.history}
+        # This will force the error to appear in your Render "Logs" tab
+        print(f"DEBUG ERROR: {type(e).__name__} - {str(e)}") 
+        return {"reply": f"Developer Error: {str(e)}", "history": request.history}
     
 @app.get("/", response_class=HTMLResponse)
 async def get_gui():
