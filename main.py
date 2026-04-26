@@ -57,45 +57,44 @@ async def health_check():
 async def chat(request: ChatRequest):
     user_msg = request.message.lower()
     
-    # --- STEP 1: SMART RETRIEVAL (Fixes the 'Another' problem) ---
-    # We check the message OR the last history item to keep the city context
-    relevant_data = {}
+    # --- STEP 1: SMART RETRIEVAL ---
     target_city = None
     
-    # Check if a city is in the current message
-    for city in ["caloocan", "malabon", "navotas", "valenzuela"]:
-        if city in user_msg:
+    # Check for city in current message (Fuzzy Match: first 4 letters)
+    cities = ["caloocan", "malabon", "navotas", "valenzuela"]
+    for city in cities:
+        if city in user_msg or user_msg.startswith(city[:4]):
             target_city = city
             break
             
-    # If no city in current msg, check history to see what city we were talking about
+    # If no city in current msg, check history context
     if not target_city and request.history:
         for entry in reversed(request.history):
             content = entry['content'].lower()
-            for city in ["caloocan", "malabon", "navotas", "valenzuela"]:
+            for city in cities:
                 if city in content:
                     target_city = city
                     break
             if target_city: break
 
-    if target_city:
-        relevant_data = {target_city: KNOWLEDGE.get(target_city, [])}
-        context = json.dumps(relevant_data, indent=2)
+    # --- STEP 2: CONTEXT BUILDING ---
+    if not target_city:
+        # The "Kill Switch" to prevent hallucinations
+        context = "CRITICAL: DATABASE IS EMPTY. User has NOT selected a city. You are FORBIDDEN from suggesting places. You MUST ask which city in CAMANAVA they want to explore."
     else:
-        context = "NO DATA LOADED. Ask the user which city in CAMANAVA they want to explore."
+        # Load real data from your JSON
+        city_data = KNOWLEDGE.get(target_city, [])
+        # We only show 3 random spots to avoid "Walls of Text"
+        import random
+        selected_spots = random.sample(city_data, min(len(city_data), 3))
+        context = json.dumps({target_city: selected_spots}, indent=2)
 
-    if not found_city:
-        # Instead of a vague warning, give a "Kill Switch" instruction
-        context = "CRITICAL: DATABASE IS EMPTY. User has NOT selected a city. You are FORBIDDEN from suggesting places or giving trivia. You MUST ask: 'Which city in CAMANAVA should we look up trivia for?'"
-    else:
+    # --- STEP 3: TRIVIA LOGIC ---
+    if "trivia" in user_msg and not target_city:
+        context += " | SPECIAL INSTRUCTION: User wants trivia but hasn't picked a city. Do not guess. Ask them which city they are interested in first."
 
-    # If the user asks for trivia but hasn't picked a city, don't let the AI guess.
-    if "trivia" in user_msg and not found_city:
-        # Logic to stay friendly but firm
-        pass
+    # ... Proceed to call Groq/AI with this context ...
 
-    # --- STEP 2: SHARPER SYSTEM PROMPT ---
-    # Move the most important rules to the TOP.
     system_prompt = f"""
     You are Navi, a warm, compassionate, and friendly Heritage Expert for CAMANAVA. 
     Your goal is to make users feel welcome while sharing the beautiful history of our local cities. 
