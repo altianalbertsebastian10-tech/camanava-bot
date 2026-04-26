@@ -1,5 +1,4 @@
 import os
-import random
 import json
 from groq import Groq
 from fastapi import FastAPI
@@ -58,48 +57,35 @@ async def health_check():
 async def chat(request: ChatRequest):
     user_msg = request.message.lower()
     
-    # --- STEP 1: SMART RETRIEVAL ---
+    # --- STEP 1: SMART RETRIEVAL (Fixes the 'Another' problem) ---
+    # We check the message OR the last history item to keep the city context
+    relevant_data = {}
     target_city = None
     
-    # Check for city in current message (Fuzzy Match: first 4 letters)
-    cities = ["caloocan", "malabon", "navotas", "valenzuela"]
-    for city in cities:
-        if city in user_msg or user_msg.startswith(city[:4]):
+    # Check if a city is in the current message
+    for city in ["caloocan", "malabon", "navotas", "valenzuela"]:
+        if city in user_msg:
             target_city = city
             break
             
-    # If no city in current msg, check history context
+    # If no city in current msg, check history to see what city we were talking about
     if not target_city and request.history:
         for entry in reversed(request.history):
             content = entry['content'].lower()
-            for city in cities:
+            for city in ["caloocan", "malabon", "navotas", "valenzuela"]:
                 if city in content:
                     target_city = city
                     break
             if target_city: break
 
-    # --- STEP 2: CONTEXT BUILDING ---
-    # --- STEP 2: CONTEXT BUILDING ---
-    if not target_city:
-        context = "CRITICAL: DATABASE IS EMPTY. User has NOT selected a city. You are FORBIDDEN from suggesting places. You MUST ask which city in CAMANAVA they want to explore."
+    if target_city:
+        relevant_data = {target_city: KNOWLEDGE.get(target_city, [])}
+        context = json.dumps(relevant_data, indent=2)
     else:
-        # Load real data from your JSON with a fallback to an empty list
-        city_data = KNOWLEDGE.get(target_city, [])
-        
-        if city_data:
-            # Safer sampling: ensures it never tries to pull more than exists
-            count = min(len(city_data), 3)
-            selected_spots = random.sample(city_data, count)
-            context = json.dumps({target_city: selected_spots}, indent=2)
-        else:
-            context = f"I'm sorry, I don't have records for {target_city} yet. Ask the user for another city."
+        context = "NO DATA LOADED. Ask the user which city in CAMANAVA they want to explore."
 
-    # --- STEP 3: TRIVIA LOGIC ---
-    if "trivia" in user_msg and not target_city:
-        context += " | SPECIAL INSTRUCTION: User wants trivia but hasn't picked a city. Do not guess. Ask them which city they are interested in first."
-
-    # ... Proceed to call Groq/AI with this context ...
-
+    # --- STEP 2: SHARPER SYSTEM PROMPT ---
+    # Move the most important rules to the TOP.
     system_prompt = f"""
     You are Navi, a warm, compassionate, and friendly Heritage Expert for CAMANAVA. 
     Your goal is to make users feel welcome while sharing the beautiful history of our local cities. 
@@ -145,40 +131,29 @@ async def chat(request: ChatRequest):
     """
 
     try:
-        # 1. SANITIZE HISTORY (CRITICAL: Groq will crash if history has extra keys)
-        # We only keep 'role' and 'content'
-        clean_history = [
-            {"role": h["role"], "content": h["content"]} 
-            for h in request.history if "role" in h and "content" in h
-        ]
-
-        # 2. CALL GROQ (Using the most stable model ID)
         completion = client.chat.completions.create(
-            model="llama-3.1-8b-instant", 
+            model="llama-3.1-8b-instant",
             messages=[
                 {"role": "system", "content": system_prompt},
-                *clean_history[-5:], # Keep it lean to prevent timeouts
-                {"role": "user", "content": user_msg}
+                *request.history, 
+                {"role": "user", "content": request.message}
             ],
-            temperature=0.1,
+            temperature=0.1, # Keep this low
             max_tokens=500
         )
         
-        response_text = completion.choices[0].message.content
+        response = completion.choices[0].message.content
+        # Ensure the AI didn't hallucinate a placeholder
+        response = response.replace("{{user_loc}}", "your area")
 
-        # 3. UNIFY THE KEYS (Use 'reply' for consistency)
-        return {
-            "reply": response_text, 
-            "history": (request.history + [
-                {"role": "user", "content": user_msg},
-                {"role": "assistant", "content": response_text}
-            ])[-10:]
-        }
-
+        updated_history = request.history + [
+            {"role": "user", "content": request.message},
+            {"role": "assistant", "content": response}
+        ]
+        
+        return {"response": response, "history": updated_history[-10:]} # Keep history lean
     except Exception as e:
-        # This will print the EXACT error in your Render Logs
-        print(f"DEBUG ERROR: {type(e).__name__} - {str(e)}") 
-        return {"reply": f"Internal Error: {str(e)}", "history": request.history}
+        return {"response": "I'm having trouble accessing my records. Try again?", "history": request.history}
     
 @app.get("/", response_class=HTMLResponse)
 async def get_gui():
