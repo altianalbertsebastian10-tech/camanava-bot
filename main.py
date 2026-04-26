@@ -84,6 +84,16 @@ async def chat(request: ChatRequest):
     else:
         context = "NO DATA LOADED. Ask the user which city in CAMANAVA they want to explore."
 
+    if not found_city:
+        # Instead of a vague warning, give a "Kill Switch" instruction
+        context = "CRITICAL: DATABASE IS EMPTY. User has NOT selected a city. You are FORBIDDEN from suggesting places or giving trivia. You MUST ask: 'Which city in CAMANAVA should we look up trivia for?'"
+    else:
+
+    # If the user asks for trivia but hasn't picked a city, don't let the AI guess.
+    if "trivia" in user_msg and not found_city:
+        # Logic to stay friendly but firm
+        pass
+
     # --- STEP 2: SHARPER SYSTEM PROMPT ---
     # Move the most important rules to the TOP.
     system_prompt = f"""
