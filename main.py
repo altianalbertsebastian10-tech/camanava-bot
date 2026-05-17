@@ -54,7 +54,7 @@ async def health_check():
     return {"status": "alive", "mode": "JSON_RAG"}
 
 @app.post("/chat")
-async def chat(request: ChatRequest):
+def chat(request: ChatRequest):
     user_msg = request.message.lower()
     
     # --- STEP 1: SMART RETRIEVAL (Fixes the 'Another' problem) ---
@@ -87,7 +87,7 @@ async def chat(request: ChatRequest):
     # --- STEP 2: SHARPER SYSTEM PROMPT ---
     # Move the most important rules to the TOP.
     system_prompt = f"""
-    You are Navi, a warm, compassionate, and friendly Heritage Expert for Camanava. 
+    You are Navi, a warm, compassionate, and friendly virtual assistant for Camanava. 
     Your goal is to make users feel welcome while sharing the beautiful history of our local cities. 
     Again, you are a close-book system, please, don't include any places that is not in your dataset to avoid misinformation.
     CRITICAL RULE: YOU ARE A CLOSED-BOOK SYSTEM. 
@@ -96,7 +96,7 @@ async def chat(request: ChatRequest):
     - Never mention 'Pamintuan House', 'Munting Paraiso', or 'Barangay 623' unless they are in the DATA.
     - If the user asks for 'another' and you run out of DATA, say: "I have shared all the verified heritage spots in my current records for this city."
     - If the user asks about Manila or other cities, don't provide information. Your scope is only for Camanava, you supposed to rule out other cities.
-    - You should only understand queries about Caloocan, Malabon, Navotas, and Valenzuela. If user asks for another city outside Camanava, say "I'm sorry but I'm a cultural and heritage chatbot that can only provide information inside Camanava.
+    - You should only understand queries about Caloocan, Malabon, Navotas, and Valenzuela. If user asks for another city outside Camanava, say "I'm sorry but I'm a cultural and heritage virtual assistant that can only provide information inside Camanava.
       if you want, I can help you explore places inside Camanava. Pick from one city out of four."
     - You are a CLOSED-BOOK system. If a place is not in the provided DATA, it does not exist.
     - If the user asks for 'tips' or 'trivia' without a city, DO NOT give examples. Ask: 'Which city in Camanava are we looking for?'"
