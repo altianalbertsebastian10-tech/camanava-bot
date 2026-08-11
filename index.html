@@ -1,0 +1,876 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>CamaNaviGo: Chat</title>
+    <link rel="icon" type="image/png" href="https://raw.githubusercontent.com/altianalbertsebastian10-tech/camanava-bot/main/navi_avatar.png">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Instrument+Serif:ital@0;1&display=swap');
+
+        :root {
+            --primary-blue: #0066cc;
+            --bg-scaffold: #ffffff;
+            --surface: #ffffff;
+            --border: #e2e2e7;
+            --text-header: #1c1c1e;
+            --text-sub: #8e8e93;
+            --bot-bubble: #e5e5ea;
+            --input-bg: #e5e5ea;
+            --font-main: 'Instrument Sans', sans-serif;
+            --font-serif: 'Instrument Serif', serif;
+            --badge-bg: #e5e5ea;
+        }
+
+        body.dark-mode {
+            --bg-scaffold: #1c1c1e;
+            --surface: #1c1c1e;
+            --border: #2c2c2e;
+            --text-header: #f2f2f7;
+            --text-sub: #aeaeae;
+            --bot-bubble: #2c2c2e;
+            --input-bg: #2c2c2e;
+            --badge-bg: #2c2c2e;
+        }
+
+        body {
+            margin: 0;
+            background-color: #121212;
+            height: 100dvh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: var(--font-main);
+            overflow: hidden;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .chat-shell {
+            width: 100%;
+            max-width: 480px;
+            height: 100dvh;
+            display: flex;
+            flex-direction: column;
+            background: transparent;
+            position: relative;
+            overflow: hidden;
+            transition: background 0.3s ease;
+        }
+
+        .gradient-bg-wrapper {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            z-index: -2;
+            overflow: hidden;
+        }
+
+        #gradient-canvas {
+            width: 100%; height: 100%;
+            display: block;
+        }
+
+        .video-overlay {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            z-index: -1;
+            background: linear-gradient(to bottom, rgba(255,255,255,0.7) 0%, rgba(255,255,255,0.4) 40%, rgba(255,255,255,0.7) 100%);
+            transition: background 0.4s ease;
+            pointer-events: none;
+        }
+
+        body.dark-mode .video-overlay {
+            background: linear-gradient(to bottom, rgba(28,28,30,0.85) 0%, rgba(28,28,30,0.5) 40%, rgba(28,28,30,0.85) 100%);
+        }
+
+        .top-nav {
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 24px;
+            background: rgba(255, 255, 255, 0.6);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.4);
+            z-index: 200;
+            flex-shrink: 0;
+            transition: background 0.3s ease, border-bottom 0.3s ease;
+        }
+
+        body.dark-mode .top-nav {
+            background: rgba(28, 28, 30, 0.6);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .top-identity {
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            justify-content: flex-start;
+            gap: 12px;
+            width: auto;
+        }
+
+        .avatar-wrap {
+            position: relative;
+            width: 44px; height: 44px;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .avatar-wrap::before {
+            content: '';
+            position: absolute;
+            inset: -6px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(0,102,204,0.55) 0%, rgba(0,102,204,0) 70%);
+            opacity: 0;
+            transform: scale(0.7);
+            transition: opacity 0.3s ease;
+            pointer-events: none;
+        }
+
+        .avatar-wrap.navi-speaking::before {
+            opacity: 1;
+            animation: naviGlow 1.8s ease-in-out infinite;
+        }
+
+        @keyframes naviGlow {
+            0%   { transform: scale(0.85); opacity: 0.5; }
+            50%  { transform: scale(1.2);  opacity: 1; }
+            100% { transform: scale(0.85); opacity: 0.5; }
+        }
+
+        .avatar {
+            width: 44px; height: 44px;
+            flex-shrink: 0;
+            object-fit: contain;
+            position: relative;
+            z-index: 1;
+        }
+
+        .avatar-wrap.navi-speaking .avatar {
+            animation: naviBreath 1.8s ease-in-out infinite;
+        }
+
+        @keyframes naviBreath {
+            0%   { transform: scale(1); }
+            50%  { transform: scale(1.06); }
+            100% { transform: scale(1); }
+        }
+
+        .identity-badge {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 4px;
+        }
+
+        .name-tag {
+            color: var(--text-header);
+            font-size: 1rem;
+            font-weight: 700;
+            line-height: 1;
+            letter-spacing: -0.2px;
+            margin: 0;
+        }
+
+        .status-pill {
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            gap: 6px;
+            background: var(--badge-bg);
+            padding: 4px 12px;
+            border-radius: 12px;
+            transition: background 0.3s ease;
+        }
+
+        .status-dot {
+            width: 8px; height: 8px;
+            background-color: #00aa22;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .status-text {
+            font-size: 0.65rem;
+            font-weight: 600;
+            color: #555555;
+            line-height: 1;
+            white-space: nowrap;
+        }
+
+        body.dark-mode .status-text { color: #bbbbbb; }
+
+        .theme-toggle-btn {
+            width: 32px; height: 32px;
+            border-radius: 50%;
+            background: var(--bot-bubble);
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-header);
+            font-size: 0.9rem;
+            transition: background 0.3s ease;
+        }
+
+        #chat {
+            flex: 1;
+            padding: 130px 24px 24px 24px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            scrollbar-width: none;
+            position: relative;
+            z-index: 100;
+            box-sizing: border-box;
+            background: transparent;
+        }
+
+        #chat::-webkit-scrollbar { display: none; }
+
+        .welcome-spacer { flex: 1; }
+
+        .welcome-container {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 40px 30px;
+            margin: 20px;
+            margin-bottom: auto;
+            background: rgba(255, 255, 255, 0.3);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-radius: 28px;
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+            transition: opacity 0.2s ease, background 0.3s ease;
+            z-index: 105;
+        }
+
+        body.dark-mode .welcome-container {
+            background: rgba(28, 28, 30, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .welcome-title-large {
+            font-family: var(--font-serif);
+            font-size: 2.8rem;
+            font-weight: 400;
+            color: var(--text-header);
+            margin: 0;
+            line-height: 1.2;
+        }
+
+        .welcome-title-sub {
+            font-family: var(--font-serif);
+            font-size: 2.8rem;
+            font-weight: 400;
+            color: var(--text-header);
+            margin: 0;
+            line-height: 1.2;
+        }
+
+        .msg {
+            max-width: 80%;
+            padding: 16px 20px;
+            font-size: 1rem;
+            line-height: 1.45;
+            border-radius: 24px;
+            opacity: 0;
+            transform: translateY(10px);
+            animation: bubblePop 0.3s ease-out forwards;
+            position: relative;
+            z-index: 150;
+            box-sizing: border-box;
+        }
+
+        @keyframes bubblePop { to { opacity: 1; transform: translateY(0); } }
+
+        .bot-msg {
+            align-self: flex-start;
+            background: var(--bot-bubble);
+            color: var(--text-header);
+            border-top-left-radius: 4px;
+            transition: background 0.3s ease, color 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+
+        .user-msg {
+            align-self: flex-end;
+            background: var(--primary-blue);
+            color: white;
+            font-weight: 500;
+            border-top-right-radius: 4px;
+            box-shadow: 0 4px 15px rgba(0,102,204,0.2);
+        }
+
+        .typing-bubble {
+            display: flex !important;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            padding: 12px 20px !important;
+            width: 65px; height: 38px;
+            border-radius: 20px;
+        }
+
+        .dot {
+            width: 6px; height: 6px;
+            background: var(--text-header);
+            border-radius: 50%;
+            animation: bounce 1.4s infinite ease-in-out both;
+        }
+
+        .dot:nth-child(1) { animation-delay: -0.32s; }
+        .dot:nth-child(2) { animation-delay: -0.16s; }
+
+        @keyframes bounce {
+            0%, 80%, 100% { transform: scale(0.4); opacity: 0.3; }
+            40%            { transform: scale(1);   opacity: 1; }
+        }
+
+        .response-container { width: 100%; }
+        .resp-body { color: inherit; }
+        strong { font-weight: 700; color: inherit; }
+
+        .footer-container {
+            padding: 12px 16px 14px 16px;
+            background: rgba(255, 255, 255, 0.6);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-top: 1px solid rgba(255, 255, 255, 0.4);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            flex-shrink: 0;
+            z-index: 200;
+            transition: background 0.3s ease, border-top 0.3s ease;
+        }
+
+        body.dark-mode .footer-container {
+            background: rgba(28, 28, 30, 0.6);
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .input-bar {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            background: var(--input-bg);
+            border-radius: 30px;
+            padding: 6px 8px 6px 20px;
+            box-sizing: border-box;
+            transition: background 0.3s ease;
+        }
+
+        input {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: var(--text-header);
+            padding: 8px 0;
+            outline: none;
+            font-size: 1rem;
+            font-family: var(--font-main);
+        }
+
+        input::placeholder { color: var(--text-sub); opacity: 0.7; }
+
+        .send-pill {
+            background: #a1a1a6;
+            color: white;
+            width: 36px; height: 36px;
+            border-radius: 50%;
+            border: none;
+            cursor: not-allowed;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background-color 0.2s ease;
+            flex-shrink: 0;
+        }
+
+        .send-pill svg { fill: white; }
+
+        .disclaimer-text {
+            font-size: 0.75rem;
+            color: var(--text-sub);
+            font-weight: 500;
+            text-align: center;
+        }
+
+        @media (min-width: 481px) {
+            .chat-shell {
+                height: 88vh;
+                border-radius: 28px;
+                box-shadow: 0 20px 50px rgba(0,0,0,0.4);
+                border: 1px solid var(--border);
+            }
+            .top-nav { border-top-left-radius: 28px; border-top-right-radius: 28px; }
+        }
+
+        .bubble-tts-btn {
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            padding: 6px;
+            margin-top: 4px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0.45;
+            transition: opacity 0.2s, transform 0.1s ease;
+            border-radius: 50%;
+        }
+
+        .bubble-tts-btn:hover { opacity: 1; background: rgba(0,0,0,0.05); }
+        body.dark-mode .bubble-tts-btn:hover { background: rgba(255,255,255,0.08); }
+        .bubble-tts-btn:active { transform: scale(0.9); }
+        .bubble-tts-btn svg { fill: var(--text-header); transition: fill 0.2s ease; }
+        .bubble-tts-btn.playing-active { opacity: 1; }
+        .bubble-tts-btn.playing-active svg { fill: var(--primary-blue); }
+
+        .bot-msg-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+        }
+    </style>
+</head>
+<body class="dark-mode">
+
+<div class="chat-shell">
+    <div class="gradient-bg-wrapper">
+        <canvas id="gradient-canvas"></canvas>
+        <div class="video-overlay"></div>
+    </div>
+
+    <div class="top-nav">
+        <div class="top-identity">
+            <div class="avatar-wrap" id="navi-avatar-wrap">
+                <img src="https://raw.githubusercontent.com/altianalbertsebastian10-tech/camanava-bot/main/navi_avatar.png" class="avatar" id="navi-avatar" alt="Navi">
+            </div>
+            <div class="identity-badge">
+                <h1 class="name-tag">Navi</h1>
+                <div class="status-pill">
+                    <div class="status-dot"></div>
+                    <span id="status-tag" class="status-text">ready when you are</span>
+                </div>
+            </div>
+        </div>
+        <button class="theme-toggle-btn" onclick="toggleColorMode()">🌓</button>
+    </div>
+
+    <div id="chat">
+        <div class="welcome-spacer" id="welcome-spacer"></div>
+        <div class="welcome-container" id="welcome-container">
+            <h2 class="welcome-title-large">Navi here!</h2>
+            <p class="welcome-title-sub">What can I do for you today?</p>
+        </div>
+        <div class="welcome-spacer" id="welcome-spacer-bottom"></div>
+    </div>
+
+    <div class="footer-container">
+        <div class="input-bar">
+            <input id="input" type="text" placeholder="Where can I walk my dog?" onkeypress="handleKeyPress(event)" oninput="toggleSendButtonState()" autocomplete="off">
+            <button id="send-btn" class="send-pill" onclick="send()" disabled>
+                <svg width="18" height="18" viewBox="0 0 24 24"><path d="M4 12l1.41 1.41L11 7.83V20h2V7.83l5.58 5.59L20 12l-8-8-8 8z"/></svg>
+            </button>
+        </div>
+        <div class="disclaimer-text">Navi is an AI and can make mistakes</div>
+    </div>
+</div>
+
+<script>
+    // ── RADIAL GRADIENT CANVAS BACKGROUND ────────────────────
+    (function() {
+        const canvas = document.getElementById('gradient-canvas');
+        const ctx = canvas.getContext('2d');
+
+        // Color palettes per mode
+        const PALETTES = {
+            light: [
+                { r: 160, g: 210, b: 255 },
+                { r: 200, g: 170, b: 255 },
+                { r: 255, g: 200, b: 210 },
+                { r: 160, g: 235, b: 210 },
+                { r: 255, g: 230, b: 160 },
+            ],
+            dark: [
+                { r: 20,  g: 50,  b: 120 },
+                { r: 60,  g: 20,  b: 100 },
+                { r: 10,  g: 80,  b: 70  },
+                { r: 80,  g: 20,  b: 60  },
+                { r: 30,  g: 30,  b: 80  },
+            ]
+        };
+
+        let W, H;
+        let isTyping = false;
+
+        const ORBS = [
+            { x: 0.2, y: 0.3, vx: 0.0003, vy: 0.0002, r: 0.55, ci: 0 },
+            { x: 0.7, y: 0.2, vx: -0.0002, vy: 0.0004, r: 0.50, ci: 1 },
+            { x: 0.5, y: 0.7, vx: 0.0004, vy: -0.0003, r: 0.60, ci: 2 },
+            { x: 0.1, y: 0.8, vx: 0.0003, vy: -0.0002, r: 0.45, ci: 3 },
+            { x: 0.85, y: 0.6, vx: -0.0003, vy: 0.0003, r: 0.48, ci: 4 },
+        ];
+
+        const FAST_ORBS = [
+            { x: 0.3, y: 0.5, vx: 0.0012, vy: 0.0010, r: 0.35, ci: 1 },
+            { x: 0.65, y: 0.4, vx: -0.0014, vy: 0.0009, r: 0.30, ci: 3 },
+        ];
+
+        let typingAlpha = 0;
+        let lastTimestamp = 0;
+
+        // ── SMOOTH PALETTE LERP STATE ─────────────────────────
+        // currentPalette smoothly interpolates toward targetPalette
+        const currentPalette = PALETTES.dark.map(c => ({ ...c }));
+
+        function lerp(a, b, t) { return a + (b - a) * t; }
+
+        function lerpColor(from, to, t) {
+            return {
+                r: lerp(from.r, to.r, t),
+                g: lerp(from.g, to.g, t),
+                b: lerp(from.b, to.b, t),
+            };
+        }
+
+        function resize() {
+            W = canvas.width  = canvas.offsetWidth;
+            H = canvas.height = canvas.offsetHeight;
+        }
+
+        function getTargetPalette() {
+            return document.body.classList.contains('dark-mode') ? PALETTES.dark : PALETTES.light;
+        }
+
+        function drawOrbs(orbs, palette, alpha, speed) {
+            orbs.forEach(orb => {
+                orb.x += orb.vx * speed;
+                orb.y += orb.vy * speed;
+                if (orb.x < 0 || orb.x > 1) orb.vx *= -1;
+                if (orb.y < 0 || orb.y > 1) orb.vy *= -1;
+                orb.x = Math.max(0, Math.min(1, orb.x));
+                orb.y = Math.max(0, Math.min(1, orb.y));
+
+                const cx = orb.x * W;
+                const cy = orb.y * H;
+                const radius = orb.r * Math.min(W, H);
+                const c = palette[orb.ci];
+
+                const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
+                grad.addColorStop(0,   `rgba(${Math.round(c.r)},${Math.round(c.g)},${Math.round(c.b)},${0.55 * alpha})`);
+                grad.addColorStop(0.5, `rgba(${Math.round(c.r)},${Math.round(c.g)},${Math.round(c.b)},${0.20 * alpha})`);
+                grad.addColorStop(1,   `rgba(${Math.round(c.r)},${Math.round(c.g)},${Math.round(c.b)},0)`);
+
+                ctx.fillStyle = grad;
+                ctx.fillRect(0, 0, W, H);
+            });
+        }
+
+        function draw(timestamp) {
+            const dt = Math.min(timestamp - lastTimestamp, 50);
+            lastTimestamp = timestamp;
+
+            // Smoothly transition typing state
+            const targetAlpha = isTyping ? 1 : 0;
+            typingAlpha = lerp(typingAlpha, targetAlpha, 0.04);
+
+            // ── SMOOTH PALETTE TRANSITION ──────────────────────
+            // Fade speed: 0.008 = very slow and soothing (~8s to fully shift)
+            const target = getTargetPalette();
+            const fadeSpeed = 0.008;
+            for (let i = 0; i < currentPalette.length; i++) {
+                currentPalette[i] = lerpColor(currentPalette[i], target[i], fadeSpeed);
+            }
+
+            const isDark = document.body.classList.contains('dark-mode');
+
+            ctx.clearRect(0, 0, W, H);
+            ctx.fillStyle = isDark ? '#0f0f14' : '#f0f4ff';
+            ctx.fillRect(0, 0, W, H);
+
+            // Idle = gentle drift; typing = energetic burst, but color still fades smoothly
+            const burstCycle = (Math.sin(timestamp * 0.004) + 1) * 0.5;
+            const typingSpeed = lerp(2.5, 9, burstCycle);
+            const idleSpeed   = 1;
+            const speed = lerp(idleSpeed, typingSpeed, typingAlpha);
+
+            drawOrbs(ORBS, currentPalette, 1, speed);
+
+            if (typingAlpha > 0.01) {
+                // Fast-orb color indices change on beat, but the palette itself fades in softly
+                const beat = Math.floor(timestamp / 300) % 2;
+                FAST_ORBS[0].ci = beat === 0 ? 0 : 2;
+                FAST_ORBS[1].ci = beat === 0 ? 3 : 1;
+                drawOrbs(FAST_ORBS, currentPalette, typingAlpha, typingSpeed * 1.4);
+            }
+
+            requestAnimationFrame(draw);
+        }
+
+        resize();
+        window.addEventListener('resize', resize);
+        requestAnimationFrame(t => { lastTimestamp = t; requestAnimationFrame(draw); });
+
+        window.setNaviTyping = function(state) { isTyping = state; };
+    })();
+</script>
+
+<script>
+    let history = [];
+    let isNaviThinking = false;
+    let welcomeHidden = false;
+
+    const synth = window.speechSynthesis;
+    let currentActiveButton = null;
+
+    const ICON_SPEAK = `<svg width="16" height="16" viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>`;
+    const ICON_STOP  = `<svg width="16" height="16" viewBox="0 0 24 24"><path d="M6 6h12v12H6z"/></svg>`;
+
+    function waitForVoices() {
+        return new Promise(resolve => {
+            const voices = synth.getVoices();
+            if (voices.length > 0) { resolve(voices); return; }
+            if (synth.onvoiceschanged !== undefined) {
+                synth.onvoiceschanged = () => {
+                    const v = synth.getVoices();
+                    if (v.length > 0) resolve(v);
+                };
+            }
+            let attempts = 0;
+            const poll = setInterval(() => {
+                const v = synth.getVoices();
+                if (v.length > 0 || ++attempts >= 20) { clearInterval(poll); resolve(v); }
+            }, 100);
+        });
+    }
+
+    function pickBestVoice(voices) {
+        const has = (v, ...patterns) => patterns.every(p => p.test(v.name));
+        return (
+            voices.find(v => has(v, /siri/i, /voice/i, /2/i) && v.lang.startsWith('en')) ||
+            voices.find(v => has(v, /samantha/i, /enhanced/i)) ||
+            voices.find(v => /siri/i.test(v.name) && v.lang.startsWith('en')) ||
+            voices.find(v => /samantha/i.test(v.name)) ||
+            voices.find(v => has(v, /mark/i, /natural/i) && v.lang.startsWith('en')) ||
+            voices.find(v => /microsoft/i.test(v.name) && /mark/i.test(v.name) && v.lang.startsWith('en')) ||
+            voices.find(v => v.lang.startsWith('en') && v.localService && /female|woman|karen|moira|tessa|fiona|victoria/i.test(v.name)) ||
+            voices.find(v => v.lang.startsWith('en') && v.localService) ||
+            voices.find(v => v.lang.startsWith('en'))
+        );
+    }
+
+    function stripHTML(html) {
+        const tmp = document.createElement('div');
+        tmp.innerHTML = html;
+        return (tmp.textContent || tmp.innerText || '').trim();
+    }
+
+    function clearTTSState() {
+        document.getElementById('navi-avatar-wrap').classList.remove('navi-speaking');
+        if (currentActiveButton) {
+            currentActiveButton.classList.remove('playing-active');
+            currentActiveButton.innerHTML = ICON_SPEAK;
+            currentActiveButton = null;
+        }
+        updateStatusDisplay('idle');
+    }
+
+    function stopSpeech() {
+        if (synth.speaking || synth.pending) synth.cancel();
+        clearTTSState();
+    }
+
+    async function playNaviVoice(btn) {
+        const respBody = btn.closest('.bot-msg').querySelector('.resp-body');
+        const text = stripHTML(respBody ? respBody.innerHTML : '');
+        if (!text) return;
+        if (currentActiveButton === btn && synth.speaking) { stopSpeech(); return; }
+        stopSpeech();
+        const voices = await waitForVoices();
+        const utter = new SpeechSynthesisUtterance(text);
+        utter.rate  = 1.0;
+        utter.pitch = 1.0;
+        const chosen = pickBestVoice(voices);
+        if (chosen) utter.voice = chosen;
+        currentActiveButton = btn;
+        btn.classList.add('playing-active');
+        btn.innerHTML = ICON_STOP;
+        document.getElementById('navi-avatar-wrap').classList.add('navi-speaking');
+        updateStatusDisplay('speaking');
+        utter.onend   = clearTTSState;
+        utter.onerror = clearTTSState;
+        synth.speak(utter);
+    }
+
+    function formatMessage(text) {
+        if (!text) return '';
+        let formatted = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\*/g, '').trim();
+        let lines = formatted.split('\n').filter(l => l.trim() !== '');
+        let bodyHTML;
+        if (lines.length <= 1) {
+            bodyHTML = `<div class="resp-body">${formatted}</div>`;
+        } else {
+            const inner = lines.map(l =>
+                l.trim().startsWith('- ') ? `<li>${l.trim().substring(2)}</li>` : l + '<br>'
+            ).join('');
+            bodyHTML = `<div class="resp-body">${inner}</div>`;
+        }
+        const speakerBtn = `<button class="bubble-tts-btn" onclick="playNaviVoice(this)" title="Listen">${ICON_SPEAK}</button>`;
+        return `<div class="response-container">${bodyHTML}${speakerBtn}</div>`;
+    }
+
+    function toggleColorMode() {
+        document.body.classList.toggle('dark-mode');
+    }
+
+    function updateStatusDisplay(mode) {
+        const tag = document.getElementById('status-tag');
+        if      (mode === 'thinking') tag.innerHTML = 'typing...';
+        else if (mode === 'speaking') tag.innerHTML = 'speaking...';
+        else                          tag.innerHTML = 'ready when you are';
+    }
+
+    function handleKeyPress(e) {
+        if (e.key === 'Enter' && !document.getElementById('send-btn').disabled) send();
+    }
+
+    function toggleSendButtonState() {
+        const input   = document.getElementById('input');
+        const sendBtn = document.getElementById('send-btn');
+        if (isNaviThinking) return;
+        if (input.value.trim().length > 0) {
+            sendBtn.disabled = false;
+            sendBtn.style.backgroundColor = 'var(--primary-blue)';
+            sendBtn.style.cursor = 'pointer';
+        } else {
+            sendBtn.disabled = true;
+            sendBtn.style.backgroundColor = '#a1a1a6';
+            sendBtn.style.cursor = 'not-allowed';
+        }
+    }
+
+    function forceUIRefreshScroll() {
+        const chat = document.getElementById('chat');
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+            chat.scrollTop = chat.scrollHeight;
+        }));
+    }
+
+    document.querySelector('.chat-shell').addEventListener('wheel', (e) => {
+        const chat = document.getElementById('chat');
+        chat.scrollTop += e.deltaY;
+        e.preventDefault();
+    }, { passive: false });
+
+    function hideWelcome() {
+        if (welcomeHidden) return;
+        welcomeHidden = true;
+        const spacer       = document.getElementById('welcome-spacer');
+        const spacerBottom = document.getElementById('welcome-spacer-bottom');
+        const welcome      = document.getElementById('welcome-container');
+        if (welcome) { welcome.style.opacity = '0'; welcome.style.transition = 'opacity 0.15s ease'; }
+        if (spacer)       spacer.style.display = 'none';
+        if (spacerBottom) spacerBottom.style.display = 'none';
+        setTimeout(() => { welcome?.remove(); spacer?.remove(); spacerBottom?.remove(); }, 150);
+    }
+
+    function unlockChat() {
+        isNaviThinking = false;
+        if (window.setNaviTyping) window.setNaviTyping(false);
+        const input = document.getElementById('input');
+        input.disabled = false;
+        updateStatusDisplay('idle');
+        toggleSendButtonState();
+        input.focus();
+        forceUIRefreshScroll();
+    }
+
+    async function send() {
+        if (isNaviThinking) return;
+        stopSpeech();
+        const input   = document.getElementById('input');
+        const sendBtn = document.getElementById('send-btn');
+        const msg     = input.value.trim();
+        if (!msg) return;
+        isNaviThinking = true;
+        input.disabled = true;
+        sendBtn.disabled = true;
+        sendBtn.style.backgroundColor = '#a1a1a6';
+        sendBtn.style.cursor = 'not-allowed';
+        updateStatusDisplay('thinking');
+        if (window.setNaviTyping) window.setNaviTyping(true);
+        hideWelcome();
+        const chat = document.getElementById('chat');
+        const userMsgDiv = document.createElement('div');
+        userMsgDiv.className = 'msg user-msg';
+        userMsgDiv.innerText = msg;
+        chat.appendChild(userMsgDiv);
+        input.value = '';
+        forceUIRefreshScroll();
+        const typingId     = 'typing-' + Date.now();
+        const typingBubble = document.createElement('div');
+        typingBubble.className = 'msg bot-msg typing-bubble';
+        typingBubble.id = typingId;
+        typingBubble.innerHTML = `<div class="dot"></div><div class="dot"></div><div class="dot"></div>`;
+        chat.appendChild(typingBubble);
+        forceUIRefreshScroll();
+        try {
+            const res  = await fetch('https://camanava-bot.onrender.com/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: msg, history })
+            });
+            const data = await res.json();
+            document.getElementById(typingId)?.remove();
+            const wrapper = document.createElement('div');
+            wrapper.className = 'bot-msg-wrapper';
+            chat.appendChild(wrapper);
+            const botMsgDiv = document.createElement('div');
+            botMsgDiv.className = 'msg bot-msg';
+            wrapper.appendChild(botMsgDiv);
+            const fullHTML = formatMessage(data.response);
+            let index = 0;
+            const typewriter = setInterval(() => {
+                if (index < fullHTML.length) {
+                    if (fullHTML[index] === '<') {
+                        const tagEnd = fullHTML.indexOf('>', index);
+                        if (tagEnd !== -1) index = tagEnd;
+                    }
+                    botMsgDiv.innerHTML = fullHTML.slice(0, index + 1);
+                    index++;
+                    chat.scrollTop = chat.scrollHeight;
+                } else {
+                    clearInterval(typewriter);
+                    unlockChat();
+                }
+            }, 10);
+            history = data.history;
+        } catch (err) {
+            document.getElementById(typingId)?.remove();
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'msg bot-msg';
+            errorDiv.style.cssText = 'color:red;background:#ffebeb;';
+            errorDiv.innerText = 'Connection Error.';
+            chat.appendChild(errorDiv);
+            unlockChat();
+        }
+    }
+</script>
+</body>
+</html>
