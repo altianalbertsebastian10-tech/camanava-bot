@@ -148,7 +148,7 @@ def chat(request: ChatRequest):
 
     try:
         completion = client.chat.completions.create(
-            model="gpt-oss-20b",
+            model="openai/gpt-oss-20b",
             messages=[
                 {"role": "system", "content": system_prompt},
                 *request.history,
