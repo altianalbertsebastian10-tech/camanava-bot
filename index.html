@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>CamaNaviGo: Chat</title>
+    <title>CamaNaviGo: Chat (Test)</title>
     <link rel="icon" type="image/png" href="https://raw.githubusercontent.com/altianalbertsebastian10-tech/camanava-bot/main/navi_avatar.png">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Instrument+Serif:ital@0;1&display=swap');
@@ -439,6 +439,63 @@
             flex-direction: column;
             align-items: flex-start;
         }
+
+        /* 🌙 THEME TOGGLE SWITCH */
+        .theme-switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 32px;
+            flex-shrink: 0;
+            -webkit-tap-highlight-color: transparent; /* Removes blue tap highlight on mobile */
+        }
+
+        .theme-switch input {
+            display: none;
+        }
+
+        .switch-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: var(--bot-bubble); 
+            border: 1px solid var(--border);
+            transition: background-color 0.3s ease, border-color 0.3s ease;
+            border-radius: 34px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 8px;
+            box-sizing: border-box;
+        }
+
+        /* Background Icons (Sun and Moon) */
+        .switch-slider svg {
+            width: 14px;
+            height: 14px;
+            stroke: var(--text-sub);
+            z-index: 1;
+            transition: stroke 0.3s ease;
+        }
+
+        /* The Sliding Knob */
+        .switch-knob {
+            position: absolute;
+            height: 24px;
+            width: 24px;
+            left: 3px;
+            bottom: 3px;
+            background-color: var(--text-header);
+            border-radius: 50%;
+            transition: transform 0.4s cubic-bezier(0.4, 0.0, 0.2, 1), background-color 0.3s ease;
+            z-index: 2;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+        }
+
+        /* Move the knob to the right when checked (Dark Mode) */
+        .theme-switch input:checked + .switch-slider .switch-knob {
+            transform: translateX(28px);
+        }
     </style>
 </head>
 <body class="dark-mode">
@@ -462,7 +519,19 @@
                 </div>
             </div>
         </div>
-        <button class="theme-toggle-btn" onclick="toggleColorMode()">🌓</button>
+        <label class="theme-switch" aria-label="Toggle Dark Mode">
+    <input type="checkbox" id="theme-toggle" checked onchange="toggleColorMode()">
+    <div class="switch-slider">
+        <!-- Sun Icon (Left) -->
+        <svg class="sun-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+        
+        <!-- Moon Icon (Right) -->
+        <svg class="moon-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+        
+        <!-- Sliding White Circle -->
+        <div class="switch-knob"></div>
+    </div>
+</label>
     </div>
 
     <div id="chat">
