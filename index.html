@@ -238,39 +238,26 @@
 
         .welcome-spacer { flex: 1; }
 
+        /* UNBOXED WELCOME TEXT WITH SUBTLE TEXT SHADOW */
         .welcome-container {
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
             text-align: center;
-            padding: 40px 30px;
-            margin: 20px;
+            padding: 20px 0;
             margin-bottom: auto;
-            background: rgba(255, 255, 255, 0.3);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border-radius: 28px;
-            border: 1px solid rgba(255, 255, 255, 0.4);
-            box-shadow: 0 10px 30px rgba(0,0,0,0.05);
-            transition: opacity 0.2s ease, background 0.3s ease;
+            background: transparent;
+            transition: opacity 0.2s ease;
             z-index: 105;
         }
 
         body.dark-mode .welcome-container {
-            background: rgba(28, 28, 30, 0.4);
-            border: 1px solid rgba(255, 255, 255, 0.05);
+            background: transparent;
+            border: none;
         }
 
-        .welcome-title-large {
-            font-family: var(--font-serif);
-            font-size: 2.8rem;
-            font-weight: 400;
-            color: var(--text-header);
-            margin: 0;
-            line-height: 1.2;
-        }
-
+        .welcome-title-large,
         .welcome-title-sub {
             font-family: var(--font-serif);
             font-size: 2.8rem;
@@ -278,6 +265,12 @@
             color: var(--text-header);
             margin: 0;
             line-height: 1.2;
+            text-shadow: 0 4px 18px rgba(0, 0, 0, 0.22);
+        }
+
+        body.dark-mode .welcome-title-large,
+        body.dark-mode .welcome-title-sub {
+            text-shadow: 0 4px 20px rgba(0, 0, 0, 0.55);
         }
 
         .msg {
@@ -498,7 +491,6 @@
         const canvas = document.getElementById('gradient-canvas');
         const ctx = canvas.getContext('2d');
 
-        // Color palettes per mode
         const PALETTES = {
             light: [
                 { r: 160, g: 210, b: 255 },
@@ -535,8 +527,6 @@
         let typingAlpha = 0;
         let lastTimestamp = 0;
 
-        // ── SMOOTH PALETTE LERP STATE ─────────────────────────
-        // currentPalette smoothly interpolates toward targetPalette
         const currentPalette = PALETTES.dark.map(c => ({ ...c }));
 
         function lerp(a, b, t) { return a + (b - a) * t; }
@@ -586,12 +576,9 @@
             const dt = Math.min(timestamp - lastTimestamp, 50);
             lastTimestamp = timestamp;
 
-            // Smoothly transition typing state
             const targetAlpha = isTyping ? 1 : 0;
             typingAlpha = lerp(typingAlpha, targetAlpha, 0.04);
 
-            // ── SMOOTH PALETTE TRANSITION ──────────────────────
-            // Fade speed: 0.008 = very slow and soothing (~8s to fully shift)
             const target = getTargetPalette();
             const fadeSpeed = 0.008;
             for (let i = 0; i < currentPalette.length; i++) {
@@ -604,7 +591,6 @@
             ctx.fillStyle = isDark ? '#0f0f14' : '#f0f4ff';
             ctx.fillRect(0, 0, W, H);
 
-            // Idle = gentle drift; typing = energetic burst, but color still fades smoothly
             const burstCycle = (Math.sin(timestamp * 0.004) + 1) * 0.5;
             const typingSpeed = lerp(2.5, 9, burstCycle);
             const idleSpeed   = 1;
@@ -613,7 +599,6 @@
             drawOrbs(ORBS, currentPalette, 1, speed);
 
             if (typingAlpha > 0.01) {
-                // Fast-orb color indices change on beat, but the palette itself fades in softly
                 const beat = Math.floor(timestamp / 300) % 2;
                 FAST_ORBS[0].ci = beat === 0 ? 0 : 2;
                 FAST_ORBS[1].ci = beat === 0 ? 3 : 1;
