@@ -163,7 +163,7 @@ async def chat(request: ChatRequest):
 
         # --- GENERATE FREE NEURAL AUDIO ---
         # Pass the cleaned text to the voice generator, but keep the original 'response' for the UI!
-        audio_base64 = await generate_speech_base64(audio_text)
+        audio_base64 = await generate_speech_base64(audio_text, mood)
 
         updated_history = request.history + [
             {"role": "user", "content": request.message},
