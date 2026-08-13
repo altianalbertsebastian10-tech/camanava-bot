@@ -206,6 +206,30 @@
 
         body.dark-mode .status-text { color: #bbbbbb; }
 
+        .top-controls {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        /* 📞 CALL BUTTON */
+        .call-btn {
+            width: 36px; height: 36px;
+            border-radius: 50%;
+            background: rgba(0, 102, 204, 0.1);
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--primary-blue);
+            transition: background 0.2s ease, transform 0.1s ease;
+        }
+        body.dark-mode .call-btn {
+            background: rgba(0, 102, 204, 0.2);
+        }
+        .call-btn:active { transform: scale(0.9); }
+
         #chat {
             flex: 1;
             padding: 130px 24px 24px 24px;
@@ -235,11 +259,6 @@
             background: transparent;
             transition: opacity 0.2s ease;
             z-index: 105;
-        }
-
-        body.dark-mode .welcome-container {
-            background: transparent;
-            border: none;
         }
 
        .welcome-title-large {
@@ -301,24 +320,23 @@
             box-shadow: 0 4px 15px rgba(0,102,204,0.2);
         }
 
-        /* 🌟 NEW TYPING LOADER (STAR/PEGTOP) */
-        /* 🌟 NEW TYPING LOADER (STAR/PEGTOP) */
+        /* 🌟 TYPING LOADER */
         .typing-bubble {
             display: flex !important;
             align-items: center;
             justify-content: center;
             width: 75px; 
-            height: 60px; /* Slightly taller to give the stars room to bounce */
+            height: 60px;
             padding: 0 !important;
-            background: transparent !important; /* Removes the bot bubble background */
-            box-shadow: none !important; /* Removes the bubble shadow */
-            overflow: visible !important; /* Allows the glow to shine outside the box */
+            background: transparent !important;
+            box-shadow: none !important;
+            overflow: visible !important;
         }
 
         .loader {
-            --fill-color: var(--primary-blue); /* Updated to match theme blue */
-            --shine-color: rgba(0, 102, 204, 0.3); /* Updated glow to match */
-            transform: scale(0.35); /* Shrunk to fit neatly into the bubble */
+            --fill-color: var(--primary-blue);
+            --shine-color: rgba(0, 102, 204, 0.3);
+            transform: scale(0.35);
             width: 100px;
             height: 100px;
             position: relative;
@@ -326,33 +344,13 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            margin-top: -10px; /* Offset the bounce vertical height */
+            margin-top: -10px;
         }
 
-        .loader #pegtopone {
-            position: absolute;
-            animation: flowe-one 1s linear infinite;
-        }
-
-        .loader #pegtoptwo {
-            position: absolute;
-            opacity: 0;
-            transform: scale(0) translateY(-200px) translateX(-100px);
-            animation: flowe-two 1s linear infinite;
-            animation-delay: 0.3s;
-        }
-
-        .loader #pegtopthree {
-            position: absolute;
-            opacity: 0;
-            transform: scale(0) translateY(-200px) translateX(100px);
-            animation: flowe-three 1s linear infinite;
-            animation-delay: 0.6s;
-        }
-
-        .loader svg g path:first-child {
-            fill: var(--fill-color);
-        }
+        .loader #pegtopone { position: absolute; animation: flowe-one 1s linear infinite; }
+        .loader #pegtoptwo { position: absolute; opacity: 0; transform: scale(0) translateY(-200px) translateX(-100px); animation: flowe-two 1s linear infinite; animation-delay: 0.3s; }
+        .loader #pegtopthree { position: absolute; opacity: 0; transform: scale(0) translateY(-200px) translateX(100px); animation: flowe-three 1s linear infinite; animation-delay: 0.6s; }
+        .loader svg g path:first-child { fill: var(--fill-color); }
 
         @keyframes flowe-one {
             0%   { transform: scale(0.5) translateY(-200px); opacity: 0; }
@@ -449,16 +447,6 @@
             text-align: center;
         }
 
-        @media (min-width: 481px) {
-            .chat-shell {
-                height: 88vh;
-                border-radius: 28px;
-                box-shadow: 0 20px 50px rgba(0,0,0,0.4);
-                border: 1px solid var(--border);
-            }
-            .top-nav { border-top-left-radius: 28px; border-top-right-radius: 28px; }
-        }
-
         .bubble-tts-btn {
             background: transparent;
             border: none;
@@ -495,9 +483,7 @@
             flex-shrink: 0;
             -webkit-tap-highlight-color: transparent; 
         }
-
         .theme-switch input { display: none; }
-
         .switch-slider {
             position: absolute;
             cursor: pointer;
@@ -512,7 +498,6 @@
             padding: 0 8px;
             box-sizing: border-box;
         }
-
         .switch-slider svg {
             width: 14px;
             height: 14px;
@@ -520,7 +505,6 @@
             z-index: 1;
             transition: stroke 0.3s ease;
         }
-
         .switch-knob {
             position: absolute;
             height: 24px;
@@ -533,8 +517,93 @@
             z-index: 2;
             box-shadow: 0 2px 4px rgba(0,0,0,0.15);
         }
-
         .theme-switch input:checked + .switch-slider .switch-knob { transform: translateX(28px); }
+
+        /* 🎙️ LIVE CALL OVERLAY UI */
+        .call-overlay {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(18, 18, 18, 0.95);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.4s ease;
+        }
+        .call-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .call-orb-container {
+            position: relative;
+            width: 150px; height: 150px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 40px;
+        }
+        .call-orb {
+            width: 120px; height: 120px;
+            border-radius: 50%;
+            background: radial-gradient(circle, var(--primary-blue) 0%, rgba(0,102,204,0) 70%);
+            box-shadow: 0 0 30px rgba(0, 102, 204, 0.5);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        /* Orb Animations */
+        .call-orb.listening { animation: orbBreathe 2.5s infinite ease-in-out; }
+        .call-orb.thinking { animation: orbSpin 1.5s infinite linear; border: 2px dashed rgba(255,255,255,0.5); }
+        .call-orb.speaking { animation: orbPulse 0.4s infinite alternate; }
+
+        @keyframes orbBreathe {
+            0%, 100% { transform: scale(1); opacity: 0.8; }
+            50% { transform: scale(1.15); opacity: 1; box-shadow: 0 0 50px rgba(0, 102, 204, 0.8); }
+        }
+        @keyframes orbPulse {
+            0% { transform: scale(1); }
+            100% { transform: scale(1.2); box-shadow: 0 0 60px rgba(0, 102, 204, 1); }
+        }
+        @keyframes orbSpin {
+            100% { transform: rotate(360deg) scale(0.9); }
+        }
+
+        .call-status-text {
+            color: #ffffff;
+            font-size: 1.2rem;
+            font-weight: 500;
+            margin-bottom: 15px;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+        .call-transcript-text {
+            color: #aeaeae;
+            font-size: 1.1rem;
+            text-align: center;
+            max-width: 80%;
+            min-height: 3em;
+            font-style: italic;
+        }
+
+        .end-call-btn {
+            position: absolute;
+            bottom: 50px;
+            width: 60px; height: 60px;
+            border-radius: 50%;
+            background: #ff3b30;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 10px 20px rgba(255, 59, 48, 0.3);
+            transition: transform 0.2s;
+        }
+        .end-call-btn:active { transform: scale(0.9); }
     </style>
 </head>
 <body class="dark-mode">
@@ -543,6 +612,18 @@
     <div class="gradient-bg-wrapper">
         <canvas id="gradient-canvas"></canvas>
         <div class="video-overlay"></div>
+    </div>
+
+    <!-- 🎙️ CALL OVERLAY -->
+    <div id="call-overlay" class="call-overlay">
+        <div class="call-orb-container">
+            <div id="call-orb" class="call-orb"></div>
+        </div>
+        <div id="call-status" class="call-status-text">Connecting...</div>
+        <div id="call-transcript" class="call-transcript-text"></div>
+        <button class="end-call-btn" onclick="endCall()">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="white"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.6 13.2l-1.4 1.4L12 13.4l-3.2 3.2-1.4-1.4 3.2-3.2-3.2-3.2 1.4-1.4 3.2 3.2 3.2-3.2 1.4 1.4-3.2 3.2 3.2 3.2z"/></svg>
+        </button>
     </div>
 
     <div class="top-nav">
@@ -558,14 +639,20 @@
                 </div>
             </div>
         </div>
-        <label class="theme-switch" aria-label="Toggle Dark Mode">
-            <input type="checkbox" id="theme-toggle" checked onchange="toggleColorMode()">
-            <div class="switch-slider">
-                <svg class="sun-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
-                <svg class="moon-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
-                <div class="switch-knob"></div>
-            </div>
-        </label>
+        <div class="top-controls">
+            <!-- New Call Button -->
+            <button class="call-btn" onclick="startCall()" title="Voice Call">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+            </button>
+            <label class="theme-switch" aria-label="Toggle Dark Mode">
+                <input type="checkbox" id="theme-toggle" checked onchange="toggleColorMode()">
+                <div class="switch-slider">
+                    <svg class="sun-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+                    <svg class="moon-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+                    <div class="switch-knob"></div>
+                </div>
+            </label>
+        </div>
     </div>
 
     <div id="chat">
@@ -726,9 +813,14 @@
     const synth = window.speechSynthesis;
     let currentActiveButton = null;
 
+    // VOICE CALL VARIABLES
+    let speechRec;
+    let isCallActive = false;
+
     const ICON_SPEAK = `<svg width="16" height="16" viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>`;
     const ICON_STOP  = `<svg width="16" height="16" viewBox="0 0 24 24"><path d="M6 6h12v12H6z"/></svg>`;
 
+    // --- TTS HELPERS ---
     function waitForVoices() {
         return new Promise(resolve => {
             const voices = synth.getVoices();
@@ -768,6 +860,150 @@
         return (tmp.textContent || tmp.innerText || '').trim();
     }
 
+    function stopSpeech() {
+        if (synth.speaking || synth.pending) synth.cancel();
+    }
+
+    // --- LIVE CALL LOGIC ---
+    function setCallStatus(text, state) {
+        document.getElementById('call-status').innerText = text;
+        const orb = document.getElementById('call-orb');
+        orb.className = 'call-orb'; 
+        if (state) orb.classList.add(state);
+    }
+
+    function initSpeechRecognition() {
+        window.SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!window.SpeechRecognition) {
+            alert("Live calling is not supported in this browser yet.");
+            endCall();
+            return false;
+        }
+        speechRec = new SpeechRecognition();
+        speechRec.continuous = false; // Stop after a single thought
+        speechRec.interimResults = false;
+        
+        speechRec.onstart = () => {
+            if(isCallActive && !synth.speaking) setCallStatus("Listening...", "listening");
+        };
+        
+        speechRec.onresult = async (event) => {
+            if (!isCallActive) return;
+            const transcript = event.results[0][0].transcript;
+            document.getElementById('call-transcript').innerText = `"${transcript}"`;
+            setCallStatus("Thinking...", "thinking");
+            
+            // Send transcript directly to your backend
+            await sendCallMessage(transcript);
+        };
+        
+        speechRec.onerror = (event) => {
+            if (event.error === 'no-speech' && isCallActive && !synth.speaking) {
+                try { speechRec.start(); } catch(e){}
+            } else if (event.error === 'not-allowed') {
+                alert("Microphone access is required to call Navi.");
+                endCall();
+            }
+        };
+        
+        speechRec.onend = () => {
+            if (isCallActive && !synth.speaking && document.getElementById('call-status').innerText !== "Thinking...") {
+                try { speechRec.start(); } catch(e){}
+            }
+        };
+        return true;
+    }
+
+    async function startCall() {
+        isCallActive = true;
+        document.getElementById('call-overlay').classList.add('active');
+        document.getElementById('call-transcript').innerText = "Say hello to Navi...";
+        setCallStatus("Starting Audio...", "");
+        
+        if (!speechRec) {
+            const ready = initSpeechRecognition();
+            if(!ready) return;
+        }
+        try { speechRec.start(); } catch (e) {}
+    }
+
+    function endCall() {
+        isCallActive = false;
+        document.getElementById('call-overlay').classList.remove('active');
+        stopSpeech();
+        if (speechRec) {
+            try { speechRec.stop(); } catch(e) {}
+        }
+    }
+
+    async function playCallVoice(text) {
+        stopSpeech();
+        const voices = await waitForVoices();
+        const utter = new SpeechSynthesisUtterance(text);
+        const chosen = pickBestVoice(voices);
+        if (chosen) utter.voice = chosen;
+        
+        setCallStatus("Navi Speaking...", "speaking");
+        
+        utter.onend = () => {
+            if(isCallActive) {
+                document.getElementById('call-transcript').innerText = "";
+                setCallStatus("Listening...", "listening");
+                try { speechRec.start(); } catch(e){}
+            }
+        };
+        utter.onerror = utter.onend;
+        synth.speak(utter);
+    }
+
+    async function sendCallMessage(msg) {
+        // Silently add it to the background text chat history
+        hideWelcome();
+        appendUserMessageToDOM(msg);
+
+        try {
+            const res = await fetch('https://camanava-bot.onrender.com/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: msg, history })
+            });
+            const data = await res.json();
+            
+            // Add bot text to DOM in background
+            appendBotMessageToDOM(data.response);
+            history = data.history;
+
+            // Trigger Voice playback
+            if (isCallActive) {
+                playCallVoice(stripHTML(data.response));
+            }
+        } catch (err) {
+            if (isCallActive) playCallVoice("Sorry, I had a connection error.");
+        }
+    }
+
+    // --- STANDARD CHAT LOGIC ---
+    function appendUserMessageToDOM(msg) {
+        const chat = document.getElementById('chat');
+        const userMsgDiv = document.createElement('div');
+        userMsgDiv.className = 'msg user-msg';
+        userMsgDiv.innerText = msg;
+        chat.appendChild(userMsgDiv);
+        forceUIRefreshScroll();
+    }
+
+    function appendBotMessageToDOM(htmlContent) {
+        const chat = document.getElementById('chat');
+        const wrapper = document.createElement('div');
+        wrapper.className = 'bot-msg-wrapper';
+        chat.appendChild(wrapper);
+        const botMsgDiv = document.createElement('div');
+        botMsgDiv.className = 'msg bot-msg';
+        wrapper.appendChild(botMsgDiv);
+        botMsgDiv.innerHTML = formatMessage(htmlContent);
+        forceUIRefreshScroll();
+    }
+
     function clearTTSState() {
         document.getElementById('navi-avatar-wrap').classList.remove('navi-speaking');
         if (currentActiveButton) {
@@ -778,21 +1014,14 @@
         updateStatusDisplay('idle');
     }
 
-    function stopSpeech() {
-        if (synth.speaking || synth.pending) synth.cancel();
-        clearTTSState();
-    }
-
     async function playNaviVoice(btn) {
         const respBody = btn.closest('.bot-msg').querySelector('.resp-body');
         const text = stripHTML(respBody ? respBody.innerHTML : '');
         if (!text) return;
-        if (currentActiveButton === btn && synth.speaking) { stopSpeech(); return; }
+        if (currentActiveButton === btn && synth.speaking) { stopSpeech(); clearTTSState(); return; }
         stopSpeech();
         const voices = await waitForVoices();
         const utter = new SpeechSynthesisUtterance(text);
-        utter.rate  = 1.0;
-        utter.pitch = 1.0;
         const chosen = pickBestVoice(voices);
         if (chosen) utter.voice = chosen;
         currentActiveButton = btn;
@@ -903,13 +1132,11 @@
         updateStatusDisplay('thinking');
         if (window.setNaviTyping) window.setNaviTyping(true);
         hideWelcome();
-        const chat = document.getElementById('chat');
-        const userMsgDiv = document.createElement('div');
-        userMsgDiv.className = 'msg user-msg';
-        userMsgDiv.innerText = msg;
-        chat.appendChild(userMsgDiv);
+        
+        appendUserMessageToDOM(msg);
         input.value = '';
-        forceUIRefreshScroll();
+        
+        const chat = document.getElementById('chat');
         const typingId     = 'typing-' + Date.now();
         const typingBubble = document.createElement('div');
         typingBubble.className = 'msg bot-msg typing-bubble';
@@ -936,31 +1163,12 @@
               <path d="M63,37c-6.7-4-4-27-13-27s-6.3,23-13,27-27,4-27,13,20.3,9,27,13,4,27,13,27,6.3-23,13-27,27-4,27-13-20.3-9-27-13Z" fill="url(#gradient-5)"></path>
             </g>
           </svg>
-          <svg id="pegtoptwo" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 100 100">
-            <g>
-              <path d="M63,37c-6.7-4-4-27-13-27s-6.3,23-13,27-27,4-27,13,20.3,9,27,13,4,27,13,27,6.3-23,13-27,27-4,27-13-20.3-9-27-13Z" fill="currentColor"></path>
-              <path d="M63,37c-6.7-4-4-27-13-27s-6.3,23-13,27-27,4-27,13,20.3,9,27,13,4,27,13,27,6.3-23,13-27,27-4,27-13-20.3-9-27-13Z" fill="url(#gradient-1)"></path>
-              <path d="M63,37c-6.7-4-4-27-13-27s-6.3,23-13,27-27,4-27,13,20.3,9,27,13,4,27,13,27,6.3-23,13-27,27-4,27-13-20.3-9-27-13Z" fill="none" stroke="white" opacity="0.3" stroke-width="3" filter="url(#shine)" mask="url(#mask)"></path>
-              <path d="M63,37c-6.7-4-4-27-13-27s-6.3,23-13,27-27,4-27,13,20.3,9,27,13,4,27,13,27,6.3-23,13-27,27-4,27-13-20.3-9-27-13Z" fill="url(#gradient-2)"></path>
-              <path d="M63,37c-6.7-4-4-27-13-27s-6.3,23-13,27-27,4-27,13,20.3,9,27,13,4,27,13,27,6.3-23,13-27,27-4,27-13-20.3-9-27-13Z" fill="url(#gradient-3)"></path>
-              <path d="M63,37c-6.7-4-4-27-13-27s-6.3,23-13,27-27,4-27,13,20.3,9,27,13,4,27,13,27,6.3-23,13-27,27-4,27-13-20.3-9-27-13Z" fill="url(#gradient-4)"></path>
-              <path d="M63,37c-6.7-4-4-27-13-27s-6.3,23-13,27-27,4-27,13,20.3,9,27,13,4,27,13,27,6.3-23,13-27,27-4,27-13-20.3-9-27-13Z" fill="url(#gradient-5)"></path>
-            </g>
-          </svg>
-          <svg id="pegtopthree" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 100 100">
-            <g>
-              <path d="M63,37c-6.7-4-4-27-13-27s-6.3,23-13,27-27,4-27,13,20.3,9,27,13,4,27,13,27,6.3-23,13-27,27-4,27-13-20.3-9-27-13Z" fill="currentColor"></path>
-              <path d="M63,37c-6.7-4-4-27-13-27s-6.3,23-13,27-27,4-27,13,20.3,9,27,13,4,27,13,27,6.3-23,13-27,27-4,27-13-20.3-9-27-13Z" fill="url(#gradient-1)"></path>
-              <path d="M63,37c-6.7-4-4-27-13-27s-6.3,23-13,27-27,4-27,13,20.3,9,27,13,4,27,13,27,6.3-23,13-27,27-4,27-13-20.3-9-27-13Z" fill="none" stroke="white" opacity="0.3" stroke-width="3" filter="url(#shine)" mask="url(#mask)"></path>
-              <path d="M63,37c-6.7-4-4-27-13-27s-6.3,23-13,27-27,4-27,13,20.3,9,27,13,4,27,13,27,6.3-23,13-27,27-4,27-13-20.3-9-27-13Z" fill="url(#gradient-2)"></path>
-              <path d="M63,37c-6.7-4-4-27-13-27s-6.3,23-13,27-27,4-27,13,20.3,9,27,13,4,27,13,27,6.3-23,13-27,27-4,27-13-20.3-9-27-13Z" fill="url(#gradient-3)"></path>
-              <path d="M63,37c-6.7-4-4-27-13-27s-6.3,23-13,27-27,4-27,13,20.3,9,27,13,4,27,13,27,6.3-23,13-27,27-4,27-13-20.3-9-27-13Z" fill="url(#gradient-4)"></path>
-              <path d="M63,37c-6.7-4-4-27-13-27s-6.3,23-13,27-27,4-27,13,20.3,9,27,13,4,27,13,27,6.3-23,13-27,27-4,27-13-20.3-9-27-13Z" fill="url(#gradient-5)"></path>
-            </g>
-          </svg>
+          <svg id="pegtoptwo" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 100 100"><g><path d="M63,37c-6.7-4-4-27-13-27s-6.3,23-13,27-27,4-27,13,20.3,9,27,13,4,27,13,27,6.3-23,13-27,27-4,27-13-20.3-9-27-13Z" fill="currentColor"></path><path d="M63,37c-6.7-4-4-27-13-27s-6.3,23-13,27-27,4-27,13,20.3,9,27,13,4,27,13,27,6.3-23,13-27,27-4,27-13-20.3-9-27-13Z" fill="url(#gradient-1)"></path><path d="M63,37c-6.7-4-4-27-13-27s-6.3,23-13,27-27,4-27,13,20.3,9,27,13,4,27,13,27,6.3-23,13-27,27-4,27-13-20.3-9-27-13Z" fill="none" stroke="white" opacity="0.3" stroke-width="3" filter="url(#shine)" mask="url(#mask)"></path><path d="M63,37c-6.7-4-4-27-13-27s-6.3,23-13,27-27,4-27,13,20.3,9,27,13,4,27,13,27,6.3-23,13-27,27-4,27-13-20.3-9-27-13Z" fill="url(#gradient-2)"></path><path d="M63,37c-6.7-4-4-27-13-27s-6.3,23-13,27-27,4-27,13,20.3,9,27,13,4,27,13,27,6.3-23,13-27,27-4,27-13-20.3-9-27-13Z" fill="url(#gradient-3)"></path><path d="M63,37c-6.7-4-4-27-13-27s-6.3,23-13,27-27,4-27,13,20.3,9,27,13,4,27,13,27,6.3-23,13-27,27-4,27-13-20.3-9-27-13Z" fill="url(#gradient-4)"></path><path d="M63,37c-6.7-4-4-27-13-27s-6.3,23-13,27-27,4-27,13,20.3,9,27,13,4,27,13,27,6.3-23,13-27,27-4,27-13-20.3-9-27-13Z" fill="url(#gradient-5)"></path></g></svg>
+          <svg id="pegtopthree" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 100 100"><g><path d="M63,37c-6.7-4-4-27-13-27s-6.3,23-13,27-27,4-27,13,20.3,9,27,13,4,27,13,27,6.3-23,13-27,27-4,27-13-20.3-9-27-13Z" fill="currentColor"></path><path d="M63,37c-6.7-4-4-27-13-27s-6.3,23-13,27-27,4-27,13,20.3,9,27,13,4,27,13,27,6.3-23,13-27,27-4,27-13-20.3-9-27-13Z" fill="url(#gradient-1)"></path><path d="M63,37c-6.7-4-4-27-13-27s-6.3,23-13,27-27,4-27,13,20.3,9,27,13,4,27,13,27,6.3-23,13-27,27-4,27-13-20.3-9-27-13Z" fill="none" stroke="white" opacity="0.3" stroke-width="3" filter="url(#shine)" mask="url(#mask)"></path><path d="M63,37c-6.7-4-4-27-13-27s-6.3,23-13,27-27,4-27,13,20.3,9,27,13,4,27,13,27,6.3-23,13-27,27-4,27-13-20.3-9-27-13Z" fill="url(#gradient-2)"></path><path d="M63,37c-6.7-4-4-27-13-27s-6.3,23-13,27-27,4-27,13,20.3,9,27,13,4,27,13,27,6.3-23,13-27,27-4,27-13-20.3-9-27-13Z" fill="url(#gradient-3)"></path><path d="M63,37c-6.7-4-4-27-13-27s-6.3,23-13,27-27,4-27,13,20.3,9,27,13,4,27,13,27,6.3-23,13-27,27-4,27-13-20.3-9-27-13Z" fill="url(#gradient-4)"></path><path d="M63,37c-6.7-4-4-27-13-27s-6.3,23-13,27-27,4-27,13,20.3,9,27,13,4,27,13,27,6.3-23,13-27,27-4,27-13-20.3-9-27-13Z" fill="url(#gradient-5)"></path></g></svg>
         </div>`;
         chat.appendChild(typingBubble);
         forceUIRefreshScroll();
+        
         try {
             const res  = await fetch('https://camanava-bot.onrender.com/chat', {
                 method: 'POST',
@@ -969,12 +1177,14 @@
             });
             const data = await res.json();
             document.getElementById(typingId)?.remove();
+            
             const wrapper = document.createElement('div');
             wrapper.className = 'bot-msg-wrapper';
             chat.appendChild(wrapper);
             const botMsgDiv = document.createElement('div');
             botMsgDiv.className = 'msg bot-msg';
             wrapper.appendChild(botMsgDiv);
+            
             const fullHTML = formatMessage(data.response);
             let index = 0;
             const typewriter = setInterval(() => {
