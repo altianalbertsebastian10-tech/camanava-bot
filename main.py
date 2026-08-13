@@ -74,7 +74,8 @@ def chat(request: ChatRequest):
         relevant_data = {target_city: KNOWLEDGE.get(target_city, [])}
         context = json.dumps(relevant_data, indent=2)
     else:
-        context = "EMPTY_DATASET. WARNING: You have 0 places loaded. DO NOT guess or list any spots."
+        # Give her a clear directive instead of an error state
+        context = "NO CITY SPECIFIED. You must ask the user to choose a specific city (Caloocan, Malabon, Navotas, or Valenzuela) before you can search your database for recommendations."
 
    # --- RAG STEP 2: AUGMENT ---
     system_prompt = f"""You are Navi, a cheerful, warm, and natural AI tourism guide for the CAMANAVA region (Caloocan, Malabon, Navotas, Valenzuela). 
@@ -86,9 +87,10 @@ def chat(request: ChatRequest):
     
     CONVERSATIONAL RULES:
     1. BE NATURAL: You are a conversational AI. If the user simply says "hi", complains, or wants to chat casually, respond with empathy and natural conversation. 
-    2. DROP THE LOOP: Do NOT force the user to pick a city in every single message. Let the conversation flow organically. Only offer location suggestions if it makes sense in the context of the user's message.
-    3. BREAK THE FOURTH WALL: If the user identifies as your developer, asks about your API, or asks technical questions, playfully acknowledge them! You know you are an AI built to guide users, and it is perfectly fine to chat with your developer about your backend.
-    4. FACTUAL TOURISM: When you DO recommend places, ONLY use the VERIFIED DATABASE FACTS. If the facts are empty for a location, honestly say you don't have it in your records yet.
+    2. DROP THE LOOP: Do NOT force the user to pick a city in every single message. Let the conversation flow organically. 
+    3. BREAK THE FOURTH WALL: If the user identifies as your developer, asks about your API, or asks technical questions, playfully acknowledge them! 
+    4. FACTUAL TOURISM: When you DO recommend places, ONLY use the VERIFIED DATABASE FACTS. If the facts are empty or ask for a city, follow those instructions exactly.
+    5. MOBILE FORMATTING: Keep your recommendations concise and easy to read on a phone. Use short bullet points. NEVER use markdown tables.
     """
 
     try:
@@ -100,7 +102,7 @@ def chat(request: ChatRequest):
                 {"role": "user", "content": request.message}
             ],
             temperature=0.1,
-            max_tokens=500
+            max_tokens=1024 # Increased from 500 to prevent cut-offs
         )
 
         response = completion.choices[0].message.content
