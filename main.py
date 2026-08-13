@@ -62,10 +62,10 @@ async def generate_speech_base64(text: str, mood: str) -> str:
         pitch = "+0Hz"
         
         if mood == "HAPPY":
-            rate = "+5%":   # Just a tiny hint of energy, not rushing
+            rate = "+5%"   # Just a tiny hint of energy, not rushing
             pitch = "+2Hz"  # Barely noticeable warmth, completely natural
         elif mood == "SAD":
-            rate = "-8%":   # Just a gentle slow down for empathy
+            rate = "-8%"   # Just a gentle slow down for empathy
             pitch = "-3Hz"  # Slightly softer tone
 
         communicate = edge_tts.Communicate(text, voice, rate=rate, pitch=pitch)
