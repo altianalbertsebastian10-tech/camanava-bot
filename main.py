@@ -12,6 +12,7 @@ import threading
 import time
 import requests
 
+
 def self_ping():
     time.sleep(20)
     while True:
@@ -92,7 +93,6 @@ async def chat(request: ChatRequest):
         relevant_data = {target_city: KNOWLEDGE.get(target_city, [])}
         context = json.dumps(relevant_data, indent=2)
     else:
-        # This gives her a specific social script for when she is missing a city
         context = "SYSTEM OVERRIDE: NO CITY SPECIFIED. You have ZERO data loaded. You are STRICTLY FORBIDDEN from listing any spots. If the user mentions an interest or vibe (like food, culture, or nature), enthusiastically validate their choice, and then specifically ask them which of the 4 cities (Caloocan, Malabon, Navotas, Valenzuela) they want to do that activity in!"
 
    # --- RAG STEP 2: AUGMENT ---
@@ -120,7 +120,7 @@ async def chat(request: ChatRequest):
                 {"role": "user", "content": request.message}
             ],
             temperature=0.1,
-            max_tokens=1024 # Increased from 500 to prevent cut-offs
+            max_tokens=1024 
         )
 
         response = completion.choices[0].message.content
@@ -135,7 +135,7 @@ async def chat(request: ChatRequest):
         ]
 
         return {
-            "response": response, 
+            "response": response,
             "audio": audio_base64,
             "history": updated_history[-10:]
         }

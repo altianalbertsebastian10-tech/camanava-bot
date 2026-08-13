@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>CamaNaviGo: Chat (Test)</title>
+    <title>CamaNaviGo: Chat</title>
     <link rel="icon" type="image/png" href="https://raw.githubusercontent.com/altianalbertsebastian10-tech/camanava-bot/main/navi_avatar.png">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Instrument+Serif:ital@0;1&display=swap');
@@ -212,23 +212,6 @@
             gap: 12px;
         }
 
-        .call-btn {
-            width: 36px; height: 36px;
-            border-radius: 50%;
-            background: rgba(0, 102, 204, 0.1);
-            border: none;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: var(--primary-blue);
-            transition: background 0.2s ease, transform 0.1s ease;
-        }
-        body.dark-mode .call-btn {
-            background: rgba(0, 102, 204, 0.2);
-        }
-        .call-btn:active { transform: scale(0.9); }
-
         #chat {
             flex: 1;
             padding: 130px 24px 24px 24px;
@@ -319,6 +302,7 @@
             box-shadow: 0 4px 15px rgba(0,102,204,0.2);
         }
 
+        /* 🌟 TYPING LOADER */
         .typing-bubble {
             display: flex !important;
             align-items: center;
@@ -472,6 +456,7 @@
             align-items: flex-start;
         }
 
+        /* 🌙 THEME TOGGLE SWITCH */
         .theme-switch {
             position: relative;
             display: inline-block;
@@ -516,89 +501,15 @@
         }
         .theme-switch input:checked + .switch-slider .switch-knob { transform: translateX(28px); }
 
-        .call-overlay {
-            position: absolute;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(18, 18, 18, 0.95);
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
-            z-index: 9999;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            opacity: 0;
-            pointer-events: none;
-            transition: opacity 0.4s ease;
+        @media (min-width: 481px) {
+            .chat-shell {
+                height: 88vh;
+                border-radius: 28px;
+                box-shadow: 0 20px 50px rgba(0,0,0,0.4);
+                border: 1px solid var(--border);
+            }
+            .top-nav { border-top-left-radius: 28px; border-top-right-radius: 28px; }
         }
-        .call-overlay.active {
-            opacity: 1;
-            pointer-events: auto;
-        }
-        .call-orb-container {
-            position: relative;
-            width: 150px; height: 150px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-bottom: 40px;
-        }
-        .call-orb {
-            width: 120px; height: 120px;
-            border-radius: 50%;
-            background: radial-gradient(circle, var(--primary-blue) 0%, rgba(0,102,204,0) 70%);
-            box-shadow: 0 0 30px rgba(0, 102, 204, 0.5);
-            transition: transform 0.2s, box-shadow 0.2s;
-        }
-        
-        .call-orb.listening { animation: orbBreathe 2.5s infinite ease-in-out; }
-        .call-orb.thinking { animation: orbSpin 1.5s infinite linear; border: 2px dashed rgba(255,255,255,0.5); }
-        .call-orb.speaking { animation: orbPulse 0.4s infinite alternate; }
-
-        @keyframes orbBreathe {
-            0%, 100% { transform: scale(1); opacity: 0.8; }
-            50% { transform: scale(1.15); opacity: 1; box-shadow: 0 0 50px rgba(0, 102, 204, 0.8); }
-        }
-        @keyframes orbPulse {
-            0% { transform: scale(1); }
-            100% { transform: scale(1.2); box-shadow: 0 0 60px rgba(0, 102, 204, 1); }
-        }
-        @keyframes orbSpin {
-            100% { transform: rotate(360deg) scale(0.9); }
-        }
-
-        .call-status-text {
-            color: #ffffff;
-            font-size: 1.2rem;
-            font-weight: 500;
-            margin-bottom: 15px;
-            letter-spacing: 1px;
-            text-transform: uppercase;
-        }
-        .call-transcript-text {
-            color: #aeaeae;
-            font-size: 1.1rem;
-            text-align: center;
-            max-width: 80%;
-            min-height: 3em;
-            font-style: italic;
-        }
-
-        .end-call-btn {
-            position: absolute;
-            bottom: 50px;
-            width: 60px; height: 60px;
-            border-radius: 50%;
-            background: #ff3b30;
-            border: none;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 10px 20px rgba(255, 59, 48, 0.3);
-            transition: transform 0.2s;
-        }
-        .end-call-btn:active { transform: scale(0.9); }
     </style>
 </head>
 <body class="dark-mode">
@@ -607,18 +518,6 @@
     <div class="gradient-bg-wrapper">
         <canvas id="gradient-canvas"></canvas>
         <div class="video-overlay"></div>
-    </div>
-
-    <!-- CALL OVERLAY -->
-    <div id="call-overlay" class="call-overlay">
-        <div class="call-orb-container">
-            <div id="call-orb" class="call-orb"></div>
-        </div>
-        <div id="call-status" class="call-status-text">Connecting...</div>
-        <div id="call-transcript" class="call-transcript-text"></div>
-        <button class="end-call-btn" onclick="endCall()">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="white"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.6 13.2l-1.4 1.4L12 13.4l-3.2 3.2-1.4-1.4 3.2-3.2-3.2-3.2 1.4-1.4 3.2 3.2 3.2-3.2 1.4 1.4-3.2 3.2 3.2 3.2z"/></svg>
-        </button>
     </div>
 
     <div class="top-nav">
@@ -635,10 +534,6 @@
             </div>
         </div>
         <div class="top-controls">
-            <!-- Call Button -->
-            <button class="call-btn" onclick="startCall()" title="Voice Call">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
-            </button>
             <label class="theme-switch" aria-label="Toggle Dark Mode">
                 <input type="checkbox" id="theme-toggle" checked onchange="toggleColorMode()">
                 <div class="switch-slider">
@@ -671,6 +566,7 @@
 </div>
 
 <script>
+    // ── RADIAL GRADIENT CANVAS BACKGROUND ────────────────────
     (function() {
         const canvas = document.getElementById('gradient-canvas');
         const ctx = canvas.getContext('2d');
@@ -714,13 +610,8 @@
         const currentPalette = PALETTES.dark.map(c => ({ ...c }));
 
         function lerp(a, b, t) { return a + (b - a) * t; }
-
         function lerpColor(from, to, t) {
-            return {
-                r: lerp(from.r, to.r, t),
-                g: lerp(from.g, to.g, t),
-                b: lerp(from.b, to.b, t),
-            };
+            return { r: lerp(from.r, to.r, t), g: lerp(from.g, to.g, t), b: lerp(from.b, to.b, t) };
         }
 
         function resize() {
@@ -805,230 +696,11 @@
     let isNaviThinking = false;
     let welcomeHidden = false;
 
-    const synth = window.speechSynthesis;
     let currentActiveButton = null;
     let activeAudio = null;
 
-    // VOICE CALL VARIABLES
-    let speechRec;
-    let isCallActive = false;
-
     const ICON_SPEAK = `<svg width="16" height="16" viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>`;
     const ICON_STOP  = `<svg width="16" height="16" viewBox="0 0 24 24"><path d="M6 6h12v12H6z"/></svg>`;
-
-    // --- TTS HELPERS ---
-    function waitForVoices() {
-        return new Promise(resolve => {
-            const voices = synth.getVoices();
-            if (voices.length > 0) { resolve(voices); return; }
-            if (synth.onvoiceschanged !== undefined) {
-                synth.onvoiceschanged = () => {
-                    const v = synth.getVoices();
-                    if (v.length > 0) resolve(v);
-                };
-            }
-            let attempts = 0;
-            const poll = setInterval(() => {
-                const v = synth.getVoices();
-                if (v.length > 0 || ++attempts >= 20) { clearInterval(poll); resolve(v); }
-            }, 100);
-        });
-    }
-
-    function pickBestVoice(voices) {
-        const has = (v, ...patterns) => patterns.every(p => p.test(v.name));
-        return (
-            voices.find(v => has(v, /siri/i, /voice/i, /2/i) && v.lang.startsWith('en')) ||
-            voices.find(v => has(v, /samantha/i, /enhanced/i)) ||
-            voices.find(v => /siri/i.test(v.name) && v.lang.startsWith('en')) ||
-            voices.find(v => /samantha/i.test(v.name)) ||
-            voices.find(v => has(v, /mark/i, /natural/i) && v.lang.startsWith('en')) ||
-            voices.find(v => /microsoft/i.test(v.name) && /mark/i.test(v.name) && v.lang.startsWith('en')) ||
-            voices.find(v => v.lang.startsWith('en') && v.localService && /female|woman|karen|moira|tessa|fiona|victoria/i.test(v.name)) ||
-            voices.find(v => v.lang.startsWith('en') && v.localService) ||
-            voices.find(v => v.lang.startsWith('en'))
-        );
-    }
-
-    function stripHTML(html) {
-        const tmp = document.createElement('div');
-        tmp.innerHTML = html;
-        return (tmp.textContent || tmp.innerText || '').trim();
-    }
-
-    function stopSpeech() {
-        if (synth.speaking || synth.pending) synth.cancel();
-        if (activeAudio) {
-            activeAudio.pause();
-            activeAudio.currentTime = 0;
-            activeAudio = null;
-        }
-    }
-
-    // --- LIVE CALL LOGIC ---
-    function setCallStatus(text, state) {
-        document.getElementById('call-status').innerText = text;
-        const orb = document.getElementById('call-orb');
-        orb.className = 'call-orb'; 
-        if (state) orb.classList.add(state);
-    }
-
-    function initSpeechRecognition() {
-        window.SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (!window.SpeechRecognition) {
-            alert("Live calling is not supported in this browser yet.");
-            endCall();
-            return false;
-        }
-        speechRec = new SpeechRecognition();
-        speechRec.continuous = false; 
-        speechRec.interimResults = false;
-        
-        speechRec.onstart = () => {
-            if(isCallActive && !synth.speaking && !activeAudio) setCallStatus("Listening...", "listening");
-        };
-        
-        speechRec.onresult = async (event) => {
-            if (!isCallActive) return;
-            const transcript = event.results[0][0].transcript;
-            document.getElementById('call-transcript').innerText = `"${transcript}"`;
-            setCallStatus("Thinking...", "thinking");
-            
-            await sendCallMessage(transcript);
-        };
-        
-        speechRec.onerror = (event) => {
-            if (event.error === 'no-speech' && isCallActive && !synth.speaking && !activeAudio) {
-                try { speechRec.start(); } catch(e){}
-            } else if (event.error === 'not-allowed') {
-                alert("Microphone access is required to call Navi.");
-                endCall();
-            }
-        };
-        
-        speechRec.onend = () => {
-            if (isCallActive && !synth.speaking && !activeAudio && document.getElementById('call-status').innerText !== "Thinking...") {
-                try { speechRec.start(); } catch(e){}
-            }
-        };
-        return true;
-    }
-
-    async function startCall() {
-        isCallActive = true;
-
-        // 🔓 UNLOCK AUDIO ENGINES (Fixes the silent bug on mobile/Safari)
-        try {
-            const silentAudio = new Audio();
-            silentAudio.play().catch(e => {}); // Unlocks Edge-TTS
-            
-            const silentUtter = new SpeechSynthesisUtterance('');
-            silentUtter.volume = 0;
-            synth.speak(silentUtter); // Unlocks Fallback TTS
-        } catch (err) {}
-
-        document.getElementById('call-overlay').classList.add('active');
-        document.getElementById('call-transcript').innerText = "Say hello to Navi...";
-        setCallStatus("Starting Audio...", "");
-        
-        if (!speechRec) {
-            const ready = initSpeechRecognition();
-            if(!ready) return;
-        }
-        try { speechRec.start(); } catch (e) {}
-    }
-
-    function endCall() {
-        isCallActive = false;
-        document.getElementById('call-overlay').classList.remove('active');
-        stopSpeech();
-        if (speechRec) {
-            try { speechRec.stop(); } catch(e) {}
-        }
-    }
-
-    async function playCallVoice(base64Audio, fallbackText) {
-        stopSpeech();
-        
-        // Play Edge-TTS directly if it was generated
-        if (base64Audio) {
-            setCallStatus("Navi Speaking...", "speaking");
-            activeAudio = new Audio("data:audio/mp3;base64," + base64Audio);
-            
-            activeAudio.onended = () => {
-                if(isCallActive) {
-                    document.getElementById('call-transcript').innerText = "";
-                    setCallStatus("Listening...", "listening");
-                    try { speechRec.start(); } catch(e){}
-                }
-            };
-            
-            activeAudio.play();
-            return;
-        }
-
-        // Fallback to browser TTS if generation failed
-        setCallStatus("Navi Speaking...", "speaking");
-        const voices = await waitForVoices();
-        const utter = new SpeechSynthesisUtterance(fallbackText);
-        const chosen = pickBestVoice(voices);
-        if (chosen) utter.voice = chosen;
-        
-        utter.onend = () => {
-            if(isCallActive) {
-                document.getElementById('call-transcript').innerText = "";
-                setCallStatus("Listening...", "listening");
-                try { speechRec.start(); } catch(e){}
-            }
-        };
-        utter.onerror = utter.onend;
-        synth.speak(utter);
-    }
-
-    async function sendCallMessage(msg) {
-        hideWelcome();
-        appendUserMessageToDOM(msg);
-
-        try {
-            const res = await fetch('https://camanava-bot.onrender.com/chat', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message: msg, history })
-            });
-            const data = await res.json();
-            
-            appendBotMessageToDOM(data.response);
-            history = data.history;
-
-            if (isCallActive) {
-                playCallVoice(data.audio, stripHTML(data.response));
-            }
-        } catch (err) {
-            if (isCallActive) playCallVoice(null, "Sorry, I had a connection error.");
-        }
-    }
-
-    // --- STANDARD CHAT LOGIC ---
-    function appendUserMessageToDOM(msg) {
-        const chat = document.getElementById('chat');
-        const userMsgDiv = document.createElement('div');
-        userMsgDiv.className = 'msg user-msg';
-        userMsgDiv.innerText = msg;
-        chat.appendChild(userMsgDiv);
-        forceUIRefreshScroll();
-    }
-
-    function appendBotMessageToDOM(htmlContent) {
-        const chat = document.getElementById('chat');
-        const wrapper = document.createElement('div');
-        wrapper.className = 'bot-msg-wrapper';
-        chat.appendChild(wrapper);
-        const botMsgDiv = document.createElement('div');
-        botMsgDiv.className = 'msg bot-msg';
-        wrapper.appendChild(botMsgDiv);
-        botMsgDiv.innerHTML = formatMessage(htmlContent);
-        forceUIRefreshScroll();
-    }
 
     function clearTTSState() {
         document.getElementById('navi-avatar-wrap').classList.remove('navi-speaking');
@@ -1038,43 +710,59 @@
             currentActiveButton = null;
         }
         updateStatusDisplay('idle');
+        activeAudio = null;
     }
 
-    async function playNaviVoice(btn) {
-        const respBody = btn.closest('.bot-msg').querySelector('.resp-body');
-        const text = stripHTML(respBody ? respBody.innerHTML : '');
-        if (!text) return;
-        if (currentActiveButton === btn && synth.speaking) { stopSpeech(); clearTTSState(); return; }
-        stopSpeech();
-        const voices = await waitForVoices();
-        const utter = new SpeechSynthesisUtterance(text);
-        const chosen = pickBestVoice(voices);
-        if (chosen) utter.voice = chosen;
+    function playNaviVoice(btn) {
+        const base64Audio = btn.getAttribute('data-audio');
+        if (!base64Audio) return; 
+
+        // Stop if clicking the active button again
+        if (currentActiveButton === btn && activeAudio) {
+            activeAudio.pause();
+            activeAudio.currentTime = 0;
+            activeAudio = null;
+            clearTTSState();
+            return;
+        }
+
+        // Stop any currently playing audio
+        if (activeAudio) {
+            activeAudio.pause();
+            activeAudio.currentTime = 0;
+        }
+        clearTTSState();
+
         currentActiveButton = btn;
         btn.classList.add('playing-active');
         btn.innerHTML = ICON_STOP;
         document.getElementById('navi-avatar-wrap').classList.add('navi-speaking');
         updateStatusDisplay('speaking');
-        utter.onend   = clearTTSState;
-        utter.onerror = clearTTSState;
-        synth.speak(utter);
+
+        activeAudio = new Audio("data:audio/mp3;base64," + base64Audio);
+        
+        activeAudio.onended = () => { clearTTSState(); };
+        activeAudio.onerror = () => { clearTTSState(); };
+
+        activeAudio.play().catch(e => {
+            console.error("Audio error:", e);
+            clearTTSState();
+        });
     }
 
-    function formatMessage(text) {
+    // Only formats the visible body text (Button is attached later to fix typewriter bug)
+    function formatMessageHTML(text) {
         if (!text) return '';
         let formatted = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\*/g, '').trim();
         let lines = formatted.split('\n').filter(l => l.trim() !== '');
-        let bodyHTML;
         if (lines.length <= 1) {
-            bodyHTML = `<div class="resp-body">${formatted}</div>`;
+            return `<div class="resp-body">${formatted}</div>`;
         } else {
             const inner = lines.map(l =>
                 l.trim().startsWith('- ') ? `<li>${l.trim().substring(2)}</li>` : l + '<br>'
             ).join('');
-            bodyHTML = `<div class="resp-body">${inner}</div>`;
+            return `<div class="resp-body">${inner}</div>`;
         }
-        const speakerBtn = `<button class="bubble-tts-btn" onclick="playNaviVoice(this)" title="Listen">${ICON_SPEAK}</button>`;
-        return `<div class="response-container">${bodyHTML}${speakerBtn}</div>`;
     }
 
     function toggleColorMode() {
@@ -1145,7 +833,13 @@
 
     async function send() {
         if (isNaviThinking) return;
-        stopSpeech();
+        
+        if (activeAudio) {
+            activeAudio.pause();
+            activeAudio.currentTime = 0;
+            clearTTSState();
+        }
+        
         const input   = document.getElementById('input');
         const sendBtn = document.getElementById('send-btn');
         const msg     = input.value.trim();
@@ -1159,10 +853,14 @@
         if (window.setNaviTyping) window.setNaviTyping(true);
         hideWelcome();
         
-        appendUserMessageToDOM(msg);
-        input.value = '';
-        
         const chat = document.getElementById('chat');
+        const userMsgDiv = document.createElement('div');
+        userMsgDiv.className = 'msg user-msg';
+        userMsgDiv.innerText = msg;
+        chat.appendChild(userMsgDiv);
+        input.value = '';
+        forceUIRefreshScroll();
+        
         const typingId     = 'typing-' + Date.now();
         const typingBubble = document.createElement('div');
         typingBubble.className = 'msg bot-msg typing-bubble';
@@ -1209,21 +907,37 @@
             chat.appendChild(wrapper);
             const botMsgDiv = document.createElement('div');
             botMsgDiv.className = 'msg bot-msg';
+            
+            const innerHTMLContent = formatMessageHTML(data.response);
+            const containerDiv = document.createElement('div');
+            containerDiv.className = 'response-container';
+            botMsgDiv.appendChild(containerDiv);
             wrapper.appendChild(botMsgDiv);
             
-            const fullHTML = formatMessage(data.response);
             let index = 0;
             const typewriter = setInterval(() => {
-                if (index < fullHTML.length) {
-                    if (fullHTML[index] === '<') {
-                        const tagEnd = fullHTML.indexOf('>', index);
+                if (index < innerHTMLContent.length) {
+                    if (innerHTMLContent[index] === '<') {
+                        const tagEnd = innerHTMLContent.indexOf('>', index);
                         if (tagEnd !== -1) index = tagEnd;
                     }
-                    botMsgDiv.innerHTML = fullHTML.slice(0, index + 1);
+                    containerDiv.innerHTML = innerHTMLContent.slice(0, index + 1);
                     index++;
                     chat.scrollTop = chat.scrollHeight;
                 } else {
                     clearInterval(typewriter);
+                    
+                    // After typing finishes, append the TTS button with the Base64 data attached
+                    if (data.audio) {
+                        const btn = document.createElement('button');
+                        btn.className = 'bubble-tts-btn';
+                        btn.title = 'Listen';
+                        btn.innerHTML = ICON_SPEAK;
+                        btn.setAttribute('data-audio', data.audio);
+                        btn.onclick = function() { playNaviVoice(this); };
+                        containerDiv.appendChild(btn);
+                    }
+                    
                     unlockChat();
                 }
             }, 10);
