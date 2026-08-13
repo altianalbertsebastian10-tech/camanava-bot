@@ -212,7 +212,6 @@
             gap: 12px;
         }
 
-        /* 📞 CALL BUTTON */
         .call-btn {
             width: 36px; height: 36px;
             border-radius: 50%;
@@ -320,7 +319,6 @@
             box-shadow: 0 4px 15px rgba(0,102,204,0.2);
         }
 
-        /* 🌟 TYPING LOADER */
         .typing-bubble {
             display: flex !important;
             align-items: center;
@@ -474,7 +472,6 @@
             align-items: flex-start;
         }
 
-        /* 🌙 THEME TOGGLE SWITCH */
         .theme-switch {
             position: relative;
             display: inline-block;
@@ -519,7 +516,6 @@
         }
         .theme-switch input:checked + .switch-slider .switch-knob { transform: translateX(28px); }
 
-        /* 🎙️ LIVE CALL OVERLAY UI */
         .call-overlay {
             position: absolute;
             top: 0; left: 0; right: 0; bottom: 0;
@@ -555,7 +551,6 @@
             transition: transform 0.2s, box-shadow 0.2s;
         }
         
-        /* Orb Animations */
         .call-orb.listening { animation: orbBreathe 2.5s infinite ease-in-out; }
         .call-orb.thinking { animation: orbSpin 1.5s infinite linear; border: 2px dashed rgba(255,255,255,0.5); }
         .call-orb.speaking { animation: orbPulse 0.4s infinite alternate; }
@@ -614,7 +609,7 @@
         <div class="video-overlay"></div>
     </div>
 
-    <!-- 🎙️ CALL OVERLAY -->
+    <!-- CALL OVERLAY -->
     <div id="call-overlay" class="call-overlay">
         <div class="call-orb-container">
             <div id="call-orb" class="call-orb"></div>
@@ -640,7 +635,7 @@
             </div>
         </div>
         <div class="top-controls">
-            <!-- New Call Button -->
+            <!-- Call Button -->
             <button class="call-btn" onclick="startCall()" title="Voice Call">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
             </button>
@@ -812,6 +807,7 @@
 
     const synth = window.speechSynthesis;
     let currentActiveButton = null;
+    let activeAudio = null;
 
     // VOICE CALL VARIABLES
     let speechRec;
@@ -862,6 +858,11 @@
 
     function stopSpeech() {
         if (synth.speaking || synth.pending) synth.cancel();
+        if (activeAudio) {
+            activeAudio.pause();
+            activeAudio.currentTime = 0;
+            activeAudio = null;
+        }
     }
 
     // --- LIVE CALL LOGIC ---
@@ -880,11 +881,11 @@
             return false;
         }
         speechRec = new SpeechRecognition();
-        speechRec.continuous = false; // Stop after a single thought
+        speechRec.continuous = false; 
         speechRec.interimResults = false;
         
         speechRec.onstart = () => {
-            if(isCallActive && !synth.speaking) setCallStatus("Listening...", "listening");
+            if(isCallActive && !synth.speaking && !activeAudio) setCallStatus("Listening...", "listening");
         };
         
         speechRec.onresult = async (event) => {
@@ -893,12 +894,11 @@
             document.getElementById('call-transcript').innerText = `"${transcript}"`;
             setCallStatus("Thinking...", "thinking");
             
-            // Send transcript directly to your backend
             await sendCallMessage(transcript);
         };
         
         speechRec.onerror = (event) => {
-            if (event.error === 'no-speech' && isCallActive && !synth.speaking) {
+            if (event.error === 'no-speech' && isCallActive && !synth.speaking && !activeAudio) {
                 try { speechRec.start(); } catch(e){}
             } else if (event.error === 'not-allowed') {
                 alert("Microphone access is required to call Navi.");
@@ -907,7 +907,7 @@
         };
         
         speechRec.onend = () => {
-            if (isCallActive && !synth.speaking && document.getElementById('call-status').innerText !== "Thinking...") {
+            if (isCallActive && !synth.speaking && !activeAudio && document.getElementById('call-status').innerText !== "Thinking...") {
                 try { speechRec.start(); } catch(e){}
             }
         };
@@ -936,14 +936,32 @@
         }
     }
 
-    async function playCallVoice(text) {
+    async function playCallVoice(base64Audio, fallbackText) {
         stopSpeech();
+        
+        // Play Edge-TTS directly if it was generated
+        if (base64Audio) {
+            setCallStatus("Navi Speaking...", "speaking");
+            activeAudio = new Audio("data:audio/mp3;base64," + base64Audio);
+            
+            activeAudio.onended = () => {
+                if(isCallActive) {
+                    document.getElementById('call-transcript').innerText = "";
+                    setCallStatus("Listening...", "listening");
+                    try { speechRec.start(); } catch(e){}
+                }
+            };
+            
+            activeAudio.play();
+            return;
+        }
+
+        // Fallback to browser TTS if generation failed
+        setCallStatus("Navi Speaking...", "speaking");
         const voices = await waitForVoices();
-        const utter = new SpeechSynthesisUtterance(text);
+        const utter = new SpeechSynthesisUtterance(fallbackText);
         const chosen = pickBestVoice(voices);
         if (chosen) utter.voice = chosen;
-        
-        setCallStatus("Navi Speaking...", "speaking");
         
         utter.onend = () => {
             if(isCallActive) {
@@ -957,7 +975,6 @@
     }
 
     async function sendCallMessage(msg) {
-        // Silently add it to the background text chat history
         hideWelcome();
         appendUserMessageToDOM(msg);
 
@@ -969,16 +986,14 @@
             });
             const data = await res.json();
             
-            // Add bot text to DOM in background
             appendBotMessageToDOM(data.response);
             history = data.history;
 
-            // Trigger Voice playback
             if (isCallActive) {
-                playCallVoice(stripHTML(data.response));
+                playCallVoice(data.audio, stripHTML(data.response));
             }
         } catch (err) {
-            if (isCallActive) playCallVoice("Sorry, I had a connection error.");
+            if (isCallActive) playCallVoice(null, "Sorry, I had a connection error.");
         }
     }
 

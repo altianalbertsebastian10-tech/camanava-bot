@@ -1,5 +1,7 @@
 import os
 import json
+import base64
+import edge_tts
 from groq import Groq
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -48,8 +50,24 @@ class ChatRequest(BaseModel):
 async def health_check():
     return {"status": "alive", "mode": "JSON_RAG"}
 
+async def generate_speech_base64(text: str) -> str:
+    """Generates natural neural TTS audio without any API key."""
+    try:
+        # You can use "en-PH-RosaNeural" for local PH English, or "en-US-AriaNeural" for standard warm US English
+        communicate = edge_tts.Communicate(text, "en-US-AriaNeural")
+        
+        audio_bytes = b""
+        async for chunk in communicate.stream():
+            if chunk["type"] == "audio":
+                audio_bytes += chunk["data"]
+                
+        return base64.b64encode(audio_bytes).decode('utf-8')
+    except Exception as e:
+        print(f"Edge-TTS Error: {e}")
+        return ""
+
 @app.post("/chat")
-def chat(request: ChatRequest):
+async def chat(request: ChatRequest):
     user_msg = request.message.lower()
 
     relevant_data = {}
@@ -108,12 +126,19 @@ def chat(request: ChatRequest):
         response = completion.choices[0].message.content
         response = response.replace("{{user_loc}}", "your area")
 
+        # --- GENERATE FREE NEURAL AUDIO ---
+        audio_base64 = await generate_speech_base64(response)
+
         updated_history = request.history + [
             {"role": "user", "content": request.message},
             {"role": "assistant", "content": response}
         ]
 
-        return {"response": response, "history": updated_history[-10:]}
+        return {
+            "response": response, 
+            "audio": audio_base64,
+            "history": updated_history[-10:]
+        }
     except Exception as e:
         return {"response": "I'm having trouble accessing my records. Try again?", "history": request.history}
 
