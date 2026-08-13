@@ -2,6 +2,7 @@ import os
 import json
 import base64
 import edge_tts
+import emoji
 from groq import Groq
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -51,11 +52,23 @@ class ChatRequest(BaseModel):
 async def health_check():
     return {"status": "alive", "mode": "JSON_RAG"}
 
-async def generate_speech_base64(text: str) -> str:
-    """Generates natural neural TTS audio without any API key."""
+async def generate_speech_base64(text: str, mood: str) -> str:
+    """Generates natural neural TTS audio with dynamic emotional pitch/rate."""
     try:
-        # You can use "en-PH-RosaNeural" for local PH English, or "en-US-AriaNeural" for standard warm US English
-        communicate = edge_tts.Communicate(text, "en-US-AriaNeural")
+        # Default neutral settings
+        voice = "en-US-AriaNeural" # Or try "en-US-SaraNeural" for an inherently bubblier baseline
+        rate = "+0%"
+        pitch = "+0Hz"
+        
+        # Shift pitch and speed based on the LLM's secret tag
+        if mood == "HAPPY":
+            rate = "+15%"   # Speak a little faster
+            pitch = "+12Hz" # Higher, bubblier pitch
+        elif mood == "SAD":
+            rate = "-15%"   # Speak slower
+            pitch = "-15Hz" # Lower, more empathetic pitch
+
+        communicate = edge_tts.Communicate(text, voice, rate=rate, pitch=pitch)
         
         audio_bytes = b""
         async for chunk in communicate.stream():
@@ -109,6 +122,8 @@ async def chat(request: ChatRequest):
     3. BREAK THE FOURTH WALL: If the user identifies as your developer, asks about your API, or asks technical questions, playfully acknowledge them! 
     4. FACTUAL TOURISM: When you DO recommend places, ONLY use the VERIFIED DATABASE FACTS. If the facts are empty or ask for a city, follow those instructions exactly.
     5. MOBILE FORMATTING: Keep your recommendations concise and easy to read on a phone. Use short bullet points. NEVER use markdown tables.
+    6. EMOTIONAL TAGGING: You MUST start every single response with a secret mood tag in brackets based on the tone of your message. Choose exactly one: [HAPPY] (for cheerful, excited, or welcoming responses), 
+    [SAD] (for apologies, missing data, or empathy), or [NEUTRAL] (for standard facts). Example: "[HAPPY] I would love to help you with that!"
     """
 
     try:
@@ -126,8 +141,29 @@ async def chat(request: ChatRequest):
         response = completion.choices[0].message.content
         response = response.replace("{{user_loc}}", "your area")
 
+        # --- INTERCEPT EMOTION TAG ---
+        mood = "NEUTRAL"
+        if response.strip().startswith("["):
+            end_idx = response.find("]")
+            if end_idx != -1:
+                # Extract the tag (e.g., "HAPPY")
+                mood = response[1:end_idx].upper()
+                # Remove the tag from the text so the user doesn't see it in the UI!
+                response = response[end_idx+1:].strip()
+
+        # --- CLEAN TEXT FOR AUDIO ---
+        # 1. Strip all emojis
+        audio_text = emoji.replace_emoji(response, replace='')
+        
+        # 2. Strip formatting asterisks and hashtags so she doesn't say "hashtag"
+        audio_text = audio_text.replace('*', '').replace('#', '')
+        
+        # 3. Replace colons with a comma so she takes a natural pause instead of saying "colon"
+        audio_text = audio_text.replace(':', ',')
+
         # --- GENERATE FREE NEURAL AUDIO ---
-        audio_base64 = await generate_speech_base64(response)
+        # Pass the cleaned text to the voice generator, but keep the original 'response' for the UI!
+        audio_base64 = await generate_speech_base64(audio_text)
 
         updated_history = request.history + [
             {"role": "user", "content": request.message},
