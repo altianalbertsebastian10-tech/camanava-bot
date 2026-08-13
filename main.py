@@ -74,8 +74,7 @@ def chat(request: ChatRequest):
         relevant_data = {target_city: KNOWLEDGE.get(target_city, [])}
         context = json.dumps(relevant_data, indent=2)
     else:
-        # Give her a clear directive instead of an error state
-        context = "NO CITY SPECIFIED. You must ask the user to choose a specific city (Caloocan, Malabon, Navotas, or Valenzuela) before you can search your database for recommendations."
+        context = "EMPTY_DATASET. WARNING: You have 0 places loaded. DO NOT guess or list any spots."
 
    # --- RAG STEP 2: AUGMENT ---
     system_prompt = f"""You are Navi, a cheerful, warm, and natural AI tourism guide for the CAMANAVA region (Caloocan, Malabon, Navotas, Valenzuela). 
