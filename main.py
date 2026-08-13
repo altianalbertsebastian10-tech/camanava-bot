@@ -53,20 +53,20 @@ async def health_check():
     return {"status": "alive", "mode": "JSON_RAG"}
 
 async def generate_speech_base64(text: str, mood: str) -> str:
-    """Generates natural neural TTS audio with dynamic emotional pitch/rate."""
+    """Generates natural neural TTS audio with subtle, human-like pacing."""
     try:
-        # Default neutral settings
-        voice = "en-US-AriaNeural" # Or try "en-US-SaraNeural" for an inherently bubblier baseline
+        voice = "en-US-AriaNeural"
+        
+        # Subtle, natural adjustments that won't make her sound like a child
         rate = "+0%"
         pitch = "+0Hz"
         
-        # Shift pitch and speed based on the LLM's secret tag
         if mood == "HAPPY":
-            rate = "+15%"   # Speak a little faster
-            pitch = "+12Hz" # Higher, bubblier pitch
+            rate = "+5%":   # Just a tiny hint of energy, not rushing
+            pitch = "+2Hz"  # Barely noticeable warmth, completely natural
         elif mood == "SAD":
-            rate = "-15%"   # Speak slower
-            pitch = "-15Hz" # Lower, more empathetic pitch
+            rate = "-8%":   # Just a gentle slow down for empathy
+            pitch = "-3Hz"  # Slightly softer tone
 
         communicate = edge_tts.Communicate(text, voice, rate=rate, pitch=pitch)
         
@@ -139,7 +139,7 @@ async def chat(request: ChatRequest):
         )
 
         response = completion.choices[0].message.content
-        response = response.replace("{{user_loc}}", "your area")
+        response = response.replace("{{user_loc}}", "your area").replace("{user_loc}", "your area")
 
         # --- INTERCEPT EMOTION TAG ---
         mood = "NEUTRAL"
