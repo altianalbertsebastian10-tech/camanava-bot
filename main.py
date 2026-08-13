@@ -182,3 +182,5 @@ async def chat(request: ChatRequest):
 async def get_gui():
     with open("index.html", "r", encoding="utf-8") as f:
         return f.read()
+
+    #update
