@@ -74,7 +74,8 @@ def chat(request: ChatRequest):
         relevant_data = {target_city: KNOWLEDGE.get(target_city, [])}
         context = json.dumps(relevant_data, indent=2)
     else:
-        context = "EMPTY_DATASET. WARNING: You have 0 places loaded. DO NOT guess or list any spots."
+        # This gives her a specific social script for when she is missing a city
+        context = "SYSTEM OVERRIDE: NO CITY SPECIFIED. You have ZERO data loaded. You are STRICTLY FORBIDDEN from listing any spots. If the user mentions an interest or vibe (like food, culture, or nature), enthusiastically validate their choice, and then specifically ask them which of the 4 cities (Caloocan, Malabon, Navotas, Valenzuela) they want to do that activity in!"
 
    # --- RAG STEP 2: AUGMENT ---
     system_prompt = f"""You are Navi, a cheerful, warm, and natural AI tourism guide for the CAMANAVA region (Caloocan, Malabon, Navotas, Valenzuela). 
