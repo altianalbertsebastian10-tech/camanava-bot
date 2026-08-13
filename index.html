@@ -916,6 +916,17 @@
 
     async function startCall() {
         isCallActive = true;
+
+        // 🔓 UNLOCK AUDIO ENGINES (Fixes the silent bug on mobile/Safari)
+        try {
+            const silentAudio = new Audio();
+            silentAudio.play().catch(e => {}); // Unlocks Edge-TTS
+            
+            const silentUtter = new SpeechSynthesisUtterance('');
+            silentUtter.volume = 0;
+            synth.speak(silentUtter); // Unlocks Fallback TTS
+        } catch (err) {}
+
         document.getElementById('call-overlay').classList.add('active');
         document.getElementById('call-transcript').innerText = "Say hello to Navi...";
         setCallStatus("Starting Audio...", "");
