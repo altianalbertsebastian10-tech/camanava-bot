@@ -302,15 +302,17 @@
         }
 
         /* 🌟 NEW TYPING LOADER (STAR/PEGTOP) */
+        /* 🌟 NEW TYPING LOADER (STAR/PEGTOP) */
         .typing-bubble {
             display: flex !important;
             align-items: center;
             justify-content: center;
             width: 75px; 
-            height: 44px;
-            border-radius: 20px;
+            height: 60px; /* Slightly taller to give the stars room to bounce */
             padding: 0 !important;
-            overflow: hidden;
+            background: transparent !important; /* Removes the bot bubble background */
+            box-shadow: none !important; /* Removes the bubble shadow */
+            overflow: visible !important; /* Allows the glow to shine outside the box */
         }
 
         .loader {
