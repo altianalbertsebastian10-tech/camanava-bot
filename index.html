@@ -20,6 +20,10 @@
             --font-main: 'Instrument Sans', sans-serif;
             --font-serif: 'Instrument Serif', serif;
             --badge-bg: #e5e5ea;
+
+            --cube-bg: #1c1c1e;
+            --cube-glow: rgba(28, 28, 30, 0.4);
+            --cube-glow-strong: rgba(28, 28, 30, 0.6);
         }
 
         body.dark-mode {
@@ -31,6 +35,10 @@
             --bot-bubble: #2c2c2e;
             --input-bg: #2c2c2e;
             --badge-bg: #2c2c2e;
+
+            --cube-bg: var(--primary-blue);
+            --cube-glow: rgba(0, 102, 204, 0.5);
+            --cube-glow-strong: rgba(0, 102, 204, 0.8);
         }
 
         body {
@@ -337,28 +345,27 @@
         .cube {
             width: 35px;
             height: 35px;
-            background: linear-gradient(145deg, #00e4ff, #006aff);
+            background: var(--cube-bg);
             border-radius: 12px;
             box-shadow:
-                0 0 12px rgba(0, 228, 255, 0.6),
-                inset 0 0 8px rgba(0, 228, 255, 0.8),
-                inset 3px 3px 8px rgba(0, 50, 120, 0.4);
+                0 0 12px var(--cube-glow),
+                inset 0 0 8px var(--cube-glow-strong);
             animation: pulse 1.6s ease-in-out infinite;
-            transition: transform 0.4s ease;
+            transition: transform 0.4s ease, background 0.3s ease, box-shadow 0.3s ease;
         }
 
         @keyframes pulse {
             0%, 100% {
                 transform: scale(1);
                 box-shadow:
-                    0 0 15px rgba(0, 228, 255, 0.7),
-                    inset 0 0 8px rgba(0, 228, 255, 0.8);
+                    0 0 15px var(--cube-glow),
+                    inset 0 0 8px var(--cube-glow-strong);
             }
             50% {
                 transform: scale(1.3);
                 box-shadow:
-                    0 0 25px rgba(0, 228, 255, 1),
-                    inset 0 0 12px rgba(0, 228, 255, 1);
+                    0 0 25px var(--cube-glow-strong),
+                    inset 0 0 12px var(--cube-glow-strong);
             }
         }
 
