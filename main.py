@@ -3,8 +3,9 @@ import json
 import base64
 import edge_tts
 import emoji
+import tempfile
 from groq import Groq
-from fastapi import FastAPI
+from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
@@ -79,6 +80,30 @@ async def generate_speech_base64(text: str, mood: str) -> str:
     except Exception as e:
         print(f"Edge-TTS Error: {e}")
         return ""
+
+@app.post("/transcribe")
+async def transcribe_audio(file: UploadFile = File(...)):
+    try:
+        # Save the uploaded audio chunk to a temporary file
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".webm") as temp_audio:
+            temp_audio.write(await file.read())
+            temp_audio_path = temp_audio.name
+        
+        # Send it to Groq's Whisper model
+        with open(temp_audio_path, "rb") as audio_file:
+            transcription = client.audio.transcriptions.create(
+                file=(temp_audio_path, audio_file.read()),
+                model="whisper-large-v3",
+                language="en" # You can change to 'tl' for Tagalog if needed
+            )
+        
+        # Clean up the temp file
+        os.remove(temp_audio_path)
+        
+        return {"text": transcription.text}
+    except Exception as e:
+        print(f"Transcription Error: {e}")
+        return {"text": ""}
 
 @app.post("/chat")
 async def chat(request: ChatRequest):
