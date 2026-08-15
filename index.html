@@ -62,7 +62,6 @@
             overflow: hidden;
         }
 
-        /* Subtle radial background to match the "bottom-lit" aesthetic */
         .gradient-bg-wrapper {
             position: absolute;
             top: 0; left: 0; right: 0; bottom: 0;
@@ -70,7 +69,6 @@
             background: radial-gradient(1200px circle at 50% 120%, rgba(255,255,255,0.03), transparent 60%);
         }
 
-        /* Top Nav - Clean & Minimal */
         .top-nav {
             position: absolute;
             top: 0; left: 0; right: 0;
@@ -118,7 +116,6 @@
             margin: 0;
         }
 
-        /* Top Right Tech Stats */
         .tech-stats {
             display: flex;
             align-items: center;
@@ -212,7 +209,6 @@
             font-weight: 500;
         }
 
-        /* Lumen Edge Chat Bubbles */
         .msg {
             max-width: 85%;
             padding: 18px 22px;
@@ -221,13 +217,12 @@
             border-radius: var(--radius-box);
             opacity: 0;
             transform: translateY(10px);
-            animation: bubblePop 0.4s cubic-bezier(0.15, 0.83, 0.66, 1) forwards; /* Custom LE ease */
+            animation: bubblePop 0.4s cubic-bezier(0.15, 0.83, 0.66, 1) forwards;
             position: relative;
         }
 
         @keyframes bubblePop { to { opacity: 1; transform: translateY(0); } }
 
-        /* Bot Message - Radial Surface */
         .bot-msg {
             align-self: flex-start;
             background: radial-gradient(150% 100% at 50% 100%, var(--panel) 0%, var(--graph) 100%);
@@ -237,16 +232,14 @@
             box-shadow: var(--rim-inset), var(--horizon-glow);
         }
 
-        /* Horizon line glow effect */
         .bot-msg::after {
             content: "";
             position: absolute;
-            bottom: -1px; left: 15%; right: 15%; /* 70% horizon width */
+            bottom: -1px; left: 15%; right: 15%;
             height: 1px;
             background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
         }
 
-        /* User Message */
         .user-msg {
             align-self: flex-end;
             background-color: var(--slate);
@@ -256,7 +249,6 @@
             box-shadow: var(--rim-inset);
         }
 
-        /* Lumen Edge Loading Cubes (Sub-chromatic White/Grey) */
         .typing-bubble {
             display: flex !important;
             align-items: center;
@@ -268,7 +260,7 @@
             box-shadow: none !important;
         }
 
-        .typing-bubble::after { display: none; } /* Removes horizon glow from loader */
+        .typing-bubble::after { display: none; }
 
         .loading-container {
             display: flex; justify-content: center; align-items: center;
@@ -309,7 +301,6 @@
         .resp-body { color: inherit; }
         strong { font-family: var(--font-display); font-weight: 700; color: var(--fore); }
 
-        /* Footer & Lumen Input Form */
         .footer-container {
             padding: 16px 24px 20px;
             background: rgba(18, 19, 22, 0.9);
@@ -336,8 +327,8 @@
             gap: 12px;
             background-color: var(--graph);
             border: 1px solid var(--slate);
-            border-radius: var(--radius-box); /* 14px outer radius */
-            padding: 6px 6px 6px 18px; /* Tight on the right, generous on the left */
+            border-radius: var(--radius-box);
+            padding: 6px 6px 6px 18px;
             box-shadow: var(--rim-inset);
             transition: all 0.25s cubic-bezier(0.15, 0.83, 0.66, 1);
             box-sizing: border-box;
@@ -354,7 +345,7 @@
             background: transparent;
             border: none;
             color: var(--fore);
-            padding: 0; /* Let flexbox handle vertical centering */
+            padding: 0;
             margin: 0;
             outline: none;
             font-size: 0.95rem;
@@ -363,12 +354,11 @@
 
         input::placeholder { color: var(--muted); }
 
-        /* Lumen Luminous Action Button */
         .send-pill {
             background-color: var(--slate);
             color: var(--muted);
             width: 36px; height: 36px;
-            border-radius: 8px; /* Perfectly matches the outer curve minus the padding */
+            border-radius: 8px;
             border: 1px solid transparent;
             cursor: not-allowed;
             display: flex; align-items: center; justify-content: center;
@@ -388,7 +378,6 @@
         .send-pill.active:active { transform: scale(0.96); }
         .send-pill svg { width: 16px; height: 16px; fill: currentColor; }
 
-        /* TTS Secondary Button - "Specimen" style */
         .bubble-tts-btn {
             background-color: transparent;
             color: var(--muted);
@@ -414,16 +403,7 @@
             box-shadow: 0 0 15px rgba(255,255,255,0.15);
         }
 
-        @media (min-width: 481px) {
-            .chat-shell {
-                height: 90vh;
-                border-radius: 20px;
-                border: 1px solid var(--slate);
-                box-shadow: 0 40px 100px rgba(0,0,0,0.9), inset 0 1px 0 rgba(255,255,255,0.06);
-            }
-        }
-
-        /* Header Voice Button Style */
+        /* --- Header Voice Trigger --- */
         .header-mic-btn {
             background-color: var(--graph);
             color: var(--muted);
@@ -446,24 +426,139 @@
             border-color: var(--hairline);
         }
 
-        .header-mic-btn.listening {
-            background-color: var(--fore);
-            color: var(--void);
-            border-color: var(--fore);
-            box-shadow: 0 0 15px rgba(255,255,255,0.3);
-            animation: micPulse 1.5s infinite;
-        }
-
         .header-mic-btn svg {
             width: 12px; height: 12px;
             fill: none; stroke: currentColor; 
             stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
         }
 
-        @keyframes micPulse {
-            0% { box-shadow: 0 0 0 0 rgba(255,255,255,0.3); }
-            70% { box-shadow: 0 0 0 8px transparent; }
-            100% { box-shadow: 0 0 0 0 transparent; }
+        /* --- GEMINI LIVE OVERLAY --- */
+        #live-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(18, 19, 22, 0.98);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            z-index: 3000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.4s cubic-bezier(0.15, 0.83, 0.66, 1);
+        }
+
+        #live-overlay.is-active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .live-close-btn {
+            position: absolute;
+            top: 24px;
+            right: 24px;
+            background: transparent;
+            border: none;
+            color: var(--muted);
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+        .live-close-btn:hover { color: var(--fore); }
+
+        .live-orb-container {
+            position: relative;
+            width: 200px;
+            height: 200px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* The Luminous Orb */
+        .live-orb {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            background: var(--slate);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s cubic-bezier(0.15, 0.83, 0.66, 1);
+        }
+        
+        .live-orb svg { width: 32px; height: 32px; fill: var(--void); opacity: 0; transition: opacity 0.2s; }
+        .live-orb:hover svg { opacity: 0.5; }
+
+        /* Orb States */
+        .live-orb.state-listening {
+            background: var(--fore);
+            box-shadow: 0 0 30px rgba(255,255,255,0.2);
+            animation: orbListen 2s infinite ease-in-out;
+        }
+        .live-orb.state-thinking {
+            background: var(--panel);
+            animation: orbThink 1.5s infinite alternate ease-in-out;
+            pointer-events: none;
+        }
+        .live-orb.state-speaking {
+            background: var(--fore);
+            box-shadow: 0 0 40px rgba(255,255,255,0.4);
+            animation: orbSpeak 0.8s infinite alternate ease-in-out;
+            pointer-events: none;
+        }
+
+        @keyframes orbListen {
+            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255,255,255,0.2); }
+            50% { transform: scale(1.1); box-shadow: 0 0 0 20px rgba(255,255,255,0); }
+            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255,255,255,0); }
+        }
+        @keyframes orbThink {
+            0% { transform: scale(0.95); opacity: 0.7; }
+            100% { transform: scale(1.05); opacity: 1; }
+        }
+        @keyframes orbSpeak {
+            0% { transform: scale(1); box-shadow: 0 0 20px rgba(255,255,255,0.2); }
+            100% { transform: scale(1.15); box-shadow: 0 0 50px rgba(255,255,255,0.6); }
+        }
+
+        .live-status-text {
+            margin-top: 40px;
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            letter-spacing: 0.15em;
+            color: var(--muted);
+            text-transform: uppercase;
+        }
+
+        .live-transcript {
+            margin-top: 30px;
+            font-family: var(--font-display); 
+            font-size: 1.15rem;
+            line-height: 1.6;
+            color: var(--fore);
+            text-align: center;
+            max-width: 85%;
+            min-height: 30px;
+            max-height: 180px; 
+            overflow-y: auto; 
+            scrollbar-width: none; 
+            padding: 0 10px;
+        }
+
+        .live-transcript::-webkit-scrollbar {
+            display: none; 
+        }
+
+        @media (min-width: 481px) {
+            .chat-shell {
+                height: 90vh;
+                border-radius: 20px;
+                border: 1px solid var(--slate);
+                box-shadow: 0 40px 100px rgba(0,0,0,0.9), inset 0 1px 0 rgba(255,255,255,0.06);
+            }
+            #live-overlay { border-radius: 20px; }
         }
     </style>
 </head>
@@ -480,8 +575,8 @@
             <h1 class="name-tag">Navi</h1>
         </div>
         <div class="tech-stats">
-            <!-- NEW: Header Voice Trigger Button -->
-            <button id="mic-btn" class="header-mic-btn" onclick="toggleMic()" title="Tap to speak">
+            <!-- Voice Trigger for Gemini Live Mode -->
+            <button class="header-mic-btn" onclick="openLiveMode()" title="Start Live Session">
                 <svg viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="22"></line><line x1="8" y1="22" x2="16" y2="22"></line></svg>
                 <span>Voice</span>
             </button>
@@ -510,8 +605,24 @@
                 <svg viewBox="0 0 24 24"><path d="M4 12l1.41 1.41L11 7.83V20h2V7.83l5.58 5.59L20 12l-8-8-8 8z" fill="currentColor"/></svg>
             </button>
         </div>
-        <!-- Restored Disclaimer Text -->
         <div class="disclaimer-text">Navi is an AI and can make mistakes</div>
+    </div>
+
+    <!-- GEMINI LIVE STYLE OVERLAY -->
+    <div id="live-overlay">
+        <button class="live-close-btn" onclick="closeLiveMode()">
+            <svg viewBox="0 0 24 24" width="28" height="28" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+        
+        <div class="live-orb-container">
+            <div id="live-orb" class="live-orb" onclick="handleOrbTap()">
+                <!-- Stop Icon shown on hover during listening -->
+                <svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12"></rect></svg>
+            </div>
+        </div>
+        
+        <div id="live-status" class="live-status-text">INITIATING...</div>
+        <div id="live-transcript" class="live-transcript"></div>
     </div>
 </div>
 
@@ -533,7 +644,10 @@
             currentActiveButton = null;
         }
         updateStatusDisplay('idle');
-        activeAudio = null;
+        if (activeAudio) {
+            activeAudio.pause();
+            activeAudio = null;
+        }
     }
 
     function playNaviVoice(btn) {
@@ -541,17 +655,10 @@
         if (!base64Audio) return; 
 
         if (currentActiveButton === btn && activeAudio) {
-            activeAudio.pause();
-            activeAudio.currentTime = 0;
-            activeAudio = null;
             clearTTSState();
             return;
         }
 
-        if (activeAudio) {
-            activeAudio.pause();
-            activeAudio.currentTime = 0;
-        }
         clearTTSState();
 
         currentActiveButton = btn;
@@ -561,8 +668,8 @@
 
         activeAudio = new Audio("data:audio/mp3;base64," + base64Audio);
         
-        activeAudio.onended = () => { clearTTSState(); };
-        activeAudio.onerror = () => { clearTTSState(); };
+        activeAudio.onended = () => clearTTSState();
+        activeAudio.onerror = () => clearTTSState();
 
         activeAudio.play().catch(e => {
             console.error("Audio error:", e);
@@ -618,6 +725,8 @@
     document.querySelector('.chat-shell').addEventListener('wheel', (e) => {
         const chat = document.getElementById('chat');
         chat.scrollTop += e.deltaY;
+        // Don't prevent default on the overlay so users can scroll long transcripts if needed
+        if (e.target.closest('#live-overlay')) return; 
         e.preventDefault();
     }, { passive: false });
 
@@ -643,60 +752,16 @@
         forceUIRefreshScroll();
     }
 
-    async function send() {
-        if (isNaviThinking) return;
-        
-        if (activeAudio) {
-            activeAudio.pause();
-            activeAudio.currentTime = 0;
-            clearTTSState();
-        }
-        
-        const input   = document.getElementById('input');
-        const sendBtn = document.getElementById('send-btn');
-        const msg     = input.value.trim();
-        if (!msg) return;
-        isNaviThinking = true;
-        input.disabled = true;
-        sendBtn.disabled = true;
-        sendBtn.classList.remove('active');
-        updateStatusDisplay('thinking');
-        hideWelcome();
-        
+    function addMessageToUI(sender, text, audioBase64 = null) {
         const chat = document.getElementById('chat');
-        const userMsgDiv = document.createElement('div');
-        userMsgDiv.className = 'msg user-msg';
-        userMsgDiv.innerText = msg;
-        chat.appendChild(userMsgDiv);
-        input.value = '';
-        forceUIRefreshScroll();
+        const wrapper = document.createElement('div');
         
-        const typingId     = 'typing-' + Date.now();
-        const typingBubble = document.createElement('div');
-        typingBubble.className = 'msg bot-msg typing-bubble';
-        typingBubble.id = typingId;
-        typingBubble.innerHTML = `
-        <div class="loading-container">
-          <div class="loader">
-            <div class="cube"></div>
-            <div class="cube"></div>
-            <div class="cube"></div>
-            <div class="cube"></div>
-          </div>
-        </div>`;
-        chat.appendChild(typingBubble);
-        forceUIRefreshScroll();
-        
-        try {
-            const res  = await fetch('https://camanava-bot.onrender.com/chat', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message: msg, history })
-            });
-            const data = await res.json();
-            document.getElementById(typingId)?.remove();
-            
-            const wrapper = document.createElement('div');
+        if (sender === 'user') {
+            const userMsgDiv = document.createElement('div');
+            userMsgDiv.className = 'msg user-msg';
+            userMsgDiv.innerText = text;
+            chat.appendChild(userMsgDiv);
+        } else {
             wrapper.style.display = 'flex';
             wrapper.style.flexDirection = 'column';
             wrapper.style.alignItems = 'flex-start';
@@ -705,7 +770,7 @@
             const botMsgDiv = document.createElement('div');
             botMsgDiv.className = 'msg bot-msg';
             
-            const innerHTMLContent = formatMessageHTML(data.response);
+            const innerHTMLContent = formatMessageHTML(text);
             const containerDiv = document.createElement('div');
             containerDiv.className = 'response-container';
             botMsgDiv.appendChild(containerDiv);
@@ -723,158 +788,294 @@
                     chat.scrollTop = chat.scrollHeight;
                 } else {
                     clearInterval(typewriter);
-                    
-                    if (data.audio) {
+                    if (audioBase64) {
                         const btn = document.createElement('button');
                         btn.className = 'bubble-tts-btn';
                         btn.innerHTML = ICON_SPEAK + " Engage";
-                        btn.setAttribute('data-audio', data.audio);
+                        btn.setAttribute('data-audio', audioBase64);
                         btn.onclick = function() { playNaviVoice(this); };
                         containerDiv.appendChild(btn);
                     }
-                    
                     unlockChat();
                 }
             }, 15);
+        }
+        forceUIRefreshScroll();
+    }
+
+    async function send(messageOverride = null) {
+        if (isNaviThinking) return;
+        
+        if (activeAudio) clearTTSState();
+        
+        const input = document.getElementById('input');
+        const msg = messageOverride || input.value.trim();
+        if (!msg) return;
+        
+        isNaviThinking = true;
+        input.disabled = true;
+        document.getElementById('send-btn').disabled = true;
+        document.getElementById('send-btn').classList.remove('active');
+        updateStatusDisplay('thinking');
+        hideWelcome();
+        
+        addMessageToUI('user', msg);
+        input.value = '';
+        
+        const typingId = 'typing-' + Date.now();
+        const typingBubble = document.createElement('div');
+        typingBubble.className = 'msg bot-msg typing-bubble';
+        typingBubble.id = typingId;
+        typingBubble.innerHTML = `
+        <div class="loading-container">
+          <div class="loader">
+            <div class="cube"></div>
+            <div class="cube"></div>
+            <div class="cube"></div>
+            <div class="cube"></div>
+          </div>
+        </div>`;
+        document.getElementById('chat').appendChild(typingBubble);
+        forceUIRefreshScroll();
+        
+        try {
+            const res  = await fetch('https://camanava-bot.onrender.com/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: msg, history })
+            });
+            const data = await res.json();
+            document.getElementById(typingId)?.remove();
+            
             history = data.history;
+            
+            // If in Live Mode, divert handling to the live loop!
+            if (isLiveModeActive) {
+                handleLiveResponse(data.response, data.audio);
+            } else {
+                addMessageToUI('bot', data.response, data.audio);
+            }
+            
         } catch (err) {
             document.getElementById(typingId)?.remove();
-            const errorDiv = document.createElement('div');
-            errorDiv.className = 'msg bot-msg';
-            errorDiv.style.cssText = 'color:var(--fore); border-color: rgba(255,255,255,0.2);';
-            errorDiv.innerText = 'Connection Error.';
-            chat.appendChild(errorDiv);
-            unlockChat();
-        }
-
-        
-    }
-
-        // --- DYNAMIC PLACEHOLDER TYPING ANIMATION ---
-        const placeholderPhrases = [
-            "Where can I walk my dog?",
-            "Give me restaurants in Valenzuela...",
-            "What is the history of Malabon?",
-            "Best heritage spots in Caloocan?",
-            "Where to eat in Navotas?"
-        ];
-
-        let phIndex = 0;
-        let charIndex = 0;
-        let isDeletingPlaceholder = false;
-        const inputElement = document.getElementById('input');
-        
-        // Animation timing settings (in milliseconds)
-        const typingSpeed = 80;
-        const deletingSpeed = 40;
-        const delayBetweenPhrases = 2500;
-
-        function animatePlaceholder() {
-            // If the user starts typing, stop the animation and clear the placeholder
-            if (document.activeElement === inputElement || inputElement.value.length > 0) {
-                inputElement.setAttribute('placeholder', 'Ask Navi...');
-                setTimeout(animatePlaceholder, 2000); // Check again later
-                return;
-            }
-
-            const currentPhrase = placeholderPhrases[phIndex];
-            
-            if (isDeletingPlaceholder) {
-                inputElement.setAttribute('placeholder', currentPhrase.substring(0, charIndex - 1));
-                charIndex--;
+            if (isLiveModeActive) {
+                setLiveState('error', "Connection failed. Tap to retry.");
+                isNaviThinking = false;
             } else {
-                inputElement.setAttribute('placeholder', currentPhrase.substring(0, charIndex + 1));
-                charIndex++;
+                addMessageToUI('bot', "Connection Error.");
+                unlockChat();
             }
-
-            let currentSpeed = isDeletingPlaceholder ? deletingSpeed : typingSpeed;
-
-            if (!isDeletingPlaceholder && charIndex === currentPhrase.length) {
-                // Pause at the end of typing
-                currentSpeed = delayBetweenPhrases;
-                isDeletingPlaceholder = true;
-            } else if (isDeletingPlaceholder && charIndex === 0) {
-                // Move to the next phrase
-                isDeletingPlaceholder = false;
-                phIndex = (phIndex + 1) % placeholderPhrases.length;
-                currentSpeed = 500; // Short pause before typing the next phrase
-            }
-
-            setTimeout(animatePlaceholder, currentSpeed);
-        }
-
-        // Start the animation a second after the page loads
-        setTimeout(animatePlaceholder, 1000);
-
-        // --- GROQ WHISPER SPEECH-TO-TEXT ---
-    const micBtn = document.getElementById('mic-btn');
-    const inputElementVoice = document.getElementById('input');
-    
-    let mediaRecorder;
-    let audioChunks = [];
-    let isListening = false;
-
-    async function toggleMic() {
-        if (!isListening) {
-            try {
-                // Request microphone access
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                mediaRecorder = new MediaRecorder(stream);
-                
-                mediaRecorder.ondataavailable = event => {
-                    if (event.data.size > 0) {
-                        audioChunks.push(event.data);
-                    }
-                };
-                
-                mediaRecorder.onstop = async () => {
-                    // Stop the UI animation and show loading
-                    micBtn.classList.remove('listening');
-                    inputElementVoice.placeholder = "Transcribing with AI...";
-                    
-                    // Package the audio into a Blob
-                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-                    audioChunks = [];
-                    
-                    const formData = new FormData();
-                    formData.append("file", audioBlob, "voice.webm");
-                    
-                    try {
-                        // Send to your FastAPI backend
-                        const res = await fetch('https://camanava-bot.onrender.com/transcribe', {
-                            method: 'POST',
-                            body: formData
-                        });
-                        
-                        const data = await res.json();
-                        
-                        if (data.text) {
-                            inputElementVoice.value = data.text;
-                            toggleSendButtonState();
-                        }
-                    } catch (err) {
-                        console.error("Transcription failed:", err);
-                    }
-                    
-                    isListening = false;
-                    // The dynamic placeholder animation loop will naturally take over again
-                };
-                
-                // Start recording
-                mediaRecorder.start();
-                isListening = true;
-                micBtn.classList.add('listening');
-                inputElementVoice.placeholder = "Listening...";
-                
-            } catch (err) {
-                console.error("Microphone access denied:", err);
-                alert("Microphone access is required to talk to Navi.");
-            }
-        } else {
-            // Stop recording, which triggers the onstop event to send the data
-            mediaRecorder.stop();
         }
     }
+
+    // --- GEMINI LIVE STYLE VOICE LOOP ---
+    
+    let isLiveModeActive = false;
+    let liveMediaRecorder;
+    let liveAudioChunks = [];
+    let liveState = 'idle'; // idle, listening, thinking, speaking, error
+    let liveAudioPlayer = null;
+
+    const overlay = document.getElementById('live-overlay');
+    const orb = document.getElementById('live-orb');
+    const statusText = document.getElementById('live-status');
+    const transcriptText = document.getElementById('live-transcript');
+
+    async function openLiveMode() {
+        if (activeAudio) clearTTSState();
+        isLiveModeActive = true;
+        overlay.classList.add('is-active');
+        transcriptText.innerText = "";
+        
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            
+            let options = { mimeType: 'audio/webm' };
+            if (!MediaRecorder.isTypeSupported('audio/webm')) {
+                options = { mimeType: 'audio/mp4' }; 
+            }
+
+            liveMediaRecorder = new MediaRecorder(stream, options);
+            
+            liveMediaRecorder.ondataavailable = event => {
+                if (event.data.size > 0) liveAudioChunks.push(event.data);
+            };
+            
+            liveMediaRecorder.onstop = async () => {
+                if (!isLiveModeActive) return; // User closed it
+                
+                setLiveState('thinking', "Transcribing...");
+                
+                const audioBlob = new Blob(liveAudioChunks, { type: options.mimeType });
+                liveAudioChunks = [];
+                const formData = new FormData();
+                formData.append("file", audioBlob, "voice-audio");
+                
+                try {
+                    const res = await fetch('https://camanava-bot.onrender.com/transcribe', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    const data = await res.json();
+                    
+                    if (data.text && data.text.trim() !== "") {
+                        transcriptText.innerText = `"${data.text}"`;
+                        setLiveState('thinking', "Navi is thinking...");
+                        send(data.text); // Send to LLM
+                    } else {
+                        setLiveState('listening', "Didn't catch that. Tap when done speaking.");
+                        liveMediaRecorder.start(); // Restart listening
+                    }
+                } catch (err) {
+                    console.error("Transcription error:", err);
+                    setLiveState('error', "Transcription failed. Tap to retry.");
+                }
+            };
+            
+            // Start the loop!
+            startLiveListening();
+            
+        } catch (err) {
+            console.error("Microphone error:", err);
+            alert("Microphone access is required for Live Mode.");
+            closeLiveMode();
+        }
+    }
+
+    function startLiveListening() {
+        if (!isLiveModeActive || !liveMediaRecorder) return;
+        liveAudioChunks = [];
+        setLiveState('listening', "Listening... Tap orb to send.");
+        transcriptText.innerText = "";
+        liveMediaRecorder.start();
+    }
+
+    function handleOrbTap() {
+        if (liveState === 'listening') {
+            // Stop recording and process
+            liveMediaRecorder.stop();
+        } else if (liveState === 'speaking') {
+            // Interrupt AI
+            if (liveAudioPlayer) {
+                liveAudioPlayer.pause();
+                liveAudioPlayer = null;
+            }
+            startLiveListening();
+        } else if (liveState === 'error' || liveState === 'idle') {
+            startLiveListening();
+        }
+    }
+
+    function handleLiveResponse(text, audioBase64) {
+        if (!isLiveModeActive) return;
+        
+        isNaviThinking = false; // Free up the lock
+        
+        // Strip formatting for the live transcript view
+        const cleanText = text.replace(/\*\*(.*?)\*\*/g, '$1').replace(/\*/g, '').trim();
+        transcriptText.innerText = cleanText;
+        
+        // Also silently add it to the background chat UI so there's a history
+        addMessageToUI('bot', text, audioBase64); 
+        
+        if (audioBase64) {
+            setLiveState('speaking', "Navi is speaking... Tap to interrupt.");
+            liveAudioPlayer = new Audio("data:audio/mp3;base64," + audioBase64);
+            
+            liveAudioPlayer.onended = () => {
+                if (isLiveModeActive) startLiveListening(); // Loop back!
+            };
+            liveAudioPlayer.onerror = () => {
+                if (isLiveModeActive) startLiveListening(); 
+            };
+            
+            liveAudioPlayer.play().catch(e => {
+                console.error("Live Audio error:", e);
+                startLiveListening();
+            });
+        } else {
+            // No audio returned? Just loop back.
+            setTimeout(startLiveListening, 2000);
+        }
+    }
+
+    function setLiveState(state, message) {
+        liveState = state;
+        statusText.innerText = message;
+        
+        orb.className = 'live-orb'; // Reset classes
+        if (state === 'listening') orb.classList.add('state-listening');
+        if (state === 'thinking')  orb.classList.add('state-thinking');
+        if (state === 'speaking')  orb.classList.add('state-speaking');
+    }
+
+    function closeLiveMode() {
+        isLiveModeActive = false;
+        overlay.classList.remove('is-active');
+        
+        if (liveMediaRecorder && liveMediaRecorder.state !== 'inactive') {
+            liveMediaRecorder.stop();
+        }
+        if (liveAudioPlayer) {
+            liveAudioPlayer.pause();
+            liveAudioPlayer = null;
+        }
+        
+        // Ensure standard chat is unlocked
+        isNaviThinking = false;
+        unlockChat();
+    }
+
+    // --- DYNAMIC PLACEHOLDER TYPING ANIMATION ---
+    const placeholderPhrases = [
+        "Where can I walk my dog?",
+        "Give me restaurants in Valenzuela...",
+        "What is the history of Malabon?",
+        "Best heritage spots in Caloocan?",
+        "Where to eat in Navotas?"
+    ];
+
+    let phIndex = 0;
+    let charIndex = 0;
+    let isDeletingPlaceholder = false;
+    const inputElement = document.getElementById('input');
+    
+    const typingSpeed = 80;
+    const deletingSpeed = 40;
+    const delayBetweenPhrases = 2500;
+
+    function animatePlaceholder() {
+        if (document.activeElement === inputElement || inputElement.value.length > 0) {
+            inputElement.setAttribute('placeholder', 'Ask Navi...');
+            setTimeout(animatePlaceholder, 2000); 
+            return;
+        }
+
+        const currentPhrase = placeholderPhrases[phIndex];
+        
+        if (isDeletingPlaceholder) {
+            inputElement.setAttribute('placeholder', currentPhrase.substring(0, charIndex - 1));
+            charIndex--;
+        } else {
+            inputElement.setAttribute('placeholder', currentPhrase.substring(0, charIndex + 1));
+            charIndex++;
+        }
+
+        let currentSpeed = isDeletingPlaceholder ? deletingSpeed : typingSpeed;
+
+        if (!isDeletingPlaceholder && charIndex === currentPhrase.length) {
+            currentSpeed = delayBetweenPhrases;
+            isDeletingPlaceholder = true;
+        } else if (isDeletingPlaceholder && charIndex === 0) {
+            isDeletingPlaceholder = false;
+            phIndex = (phIndex + 1) % placeholderPhrases.length;
+            currentSpeed = 500; 
+        }
+
+        setTimeout(animatePlaceholder, currentSpeed);
+    }
+
+    setTimeout(animatePlaceholder, 1000);
 </script>
 </body>
 </html>

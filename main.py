@@ -83,10 +83,12 @@ async def generate_speech_base64(text: str, mood: str) -> str:
 
 @app.post("/transcribe")
 async def transcribe_audio(file: UploadFile = File(...)):
+    temp_audio_path = None
     try:
-        # Save the uploaded audio chunk to a temporary file
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".webm") as temp_audio:
-            temp_audio.write(await file.read())
+        # Create a safe temporary file structure
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".tmp") as temp_audio:
+            content = await file.read()
+            temp_audio.write(content)
             temp_audio_path = temp_audio.name
         
         # Send it to Groq's Whisper model
@@ -94,16 +96,20 @@ async def transcribe_audio(file: UploadFile = File(...)):
             transcription = client.audio.transcriptions.create(
                 file=(temp_audio_path, audio_file.read()),
                 model="whisper-large-v3",
-                language="en" # You can change to 'tl' for Tagalog if needed
+                response_format="json"
             )
-        
-        # Clean up the temp file
-        os.remove(temp_audio_path)
         
         return {"text": transcription.text}
     except Exception as e:
-        print(f"Transcription Error: {e}")
+        print(f"CRITICAL Transcription Error: {str(e)}")
         return {"text": ""}
+    finally:
+        # Always guarantee temp file cleanup
+        if temp_audio_path and os.path.exists(temp_audio_path):
+            try:
+                os.remove(temp_audio_path)
+            except:
+                pass
 
 @app.post("/chat")
 async def chat(request: ChatRequest):
