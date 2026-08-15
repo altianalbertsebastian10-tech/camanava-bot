@@ -902,14 +902,17 @@
             };
             
             liveMediaRecorder.onstop = async () => {
-                if (!isLiveModeActive) return; // User closed it
+                if (!isLiveModeActive) return; 
                 
                 setLiveState('thinking', "Transcribing...");
                 
                 const audioBlob = new Blob(liveAudioChunks, { type: options.mimeType });
                 liveAudioChunks = [];
                 const formData = new FormData();
-                formData.append("file", audioBlob, "voice-audio");
+                
+                // Dynamically assign the correct extension based on the browser
+                const ext = options.mimeType.includes('mp4') ? 'm4a' : 'webm';
+                formData.append("file", audioBlob, `voice.${ext}`);
                 
                 try {
                     const res = await fetch('https://camanava-bot.onrender.com/transcribe', {
@@ -921,10 +924,10 @@
                     if (data.text && data.text.trim() !== "") {
                         transcriptText.innerText = `"${data.text}"`;
                         setLiveState('thinking', "Navi is thinking...");
-                        send(data.text); // Send to LLM
+                        send(data.text); 
                     } else {
                         setLiveState('listening', "Didn't catch that. Tap when done speaking.");
-                        liveMediaRecorder.start(); // Restart listening
+                        liveMediaRecorder.start(); 
                     }
                 } catch (err) {
                     console.error("Transcription error:", err);
