@@ -157,7 +157,7 @@ async def generate_speech_base64(text: str, mood: str) -> str:
         pitch = "+0Hz"
         
         if mood == "HAPPY":
-            rate = "+5%"
+            rate = "+10%"
             pitch = "+2Hz"
         elif mood == "SAD":
             rate = "-8%"
