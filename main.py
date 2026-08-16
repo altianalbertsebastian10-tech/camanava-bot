@@ -14,6 +14,7 @@ from typing import List, Dict
 import threading
 import time
 import requests
+import datetime
 
 # --- NEW: Firebase Admin SDK Imports ---
 import firebase_admin
@@ -54,9 +55,11 @@ try:
 except Exception as e:
     print(f"Firebase Init Warning: {e}. Defaulting to JSON fallback mode.")
 
+import datetime
+
 # --- DYNAMIC PRIMARY/FALLBACK DATA ROUTER ---
 def get_city_data(target_city: str) -> dict:
-    """Fetches data from Firestore 'places' collection, groups by city, and falls back to knowledge.json."""
+    """Fetches data from Firestore 'places' collection, cleans timestamps, and groups by city."""
     cap_city = target_city.title()
     target_city_lower = target_city.lower()
     
@@ -64,16 +67,23 @@ def get_city_data(target_city: str) -> dict:
     
     if firebase_active and db is not None:
         try:
-            # Stream all documents from the 'places' collection
             docs = db.collection("places").stream()
             
             for doc in docs:
                 data = doc.to_dict()
-                # Check if the document belongs to the target city (checking the 'city' field)
                 doc_city = str(data.get("city", "")).lower()
                 
                 if doc_city == target_city_lower or doc_city == target_city.lower():
-                    firestore_spots.append(data)
+                    # Sanitize any Firestore Timestamps or special objects into strings
+                    clean_data = {}
+                    for k, v in data.items():
+                        if isinstance(v, (datetime.datetime, datetime.date)):
+                            clean_data[k] = v.isoformat()
+                        elif hasattr(v, 'isoformat'): # Handles Firestore DatetimeWithNanoseconds
+                            clean_data[k] = v.isoformat()
+                        else:
+                            clean_data[k] = v
+                    firestore_spots.append(clean_data)
                     
             if firestore_spots:
                 print(f"[FIRESTORE SUCCESS] Found {len(firestore_spots)} spots for '{target_city}' in collection 'places'.")
@@ -82,11 +92,10 @@ def get_city_data(target_city: str) -> dict:
         except Exception as e:
             print(f"[FIRESTORE ERROR] {e}. Falling back to knowledge.json...")
 
-    # SECONDARY ROUTE: Local knowledge.json fallback (or combined merge)
+    # SECONDARY ROUTE: Local knowledge.json fallback
     try:
         with open("knowledge.json", "r", encoding="utf-8") as f:
             knowledge = json.load(f)
-            # Check lowercase, title case, or original key formats
             data = knowledge.get(target_city_lower) or knowledge.get(cap_city) or knowledge.get(target_city, [])
             if data:
                 print(f"[FALLBACK] Loaded data for: {target_city} from knowledge.json")
