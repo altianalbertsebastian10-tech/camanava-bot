@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NaviGo! - Authentication</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Space Grotesk & JetBrains Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Space Grotesk', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        graphite: {
+                            900: '#07080a',
+                            800: '#0f1115',
+                            700: '#1a1d24',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-graphite-900 text-slate-100 h-screen flex flex-col justify-center items-center font-sans select-none overflow-hidden relative">
+
+  <!-- Ambient Glow Background Effect (White Monochromatic Glow) -->
+  <div class="absolute w-[450px] h-[450px] bg-white/5 rounded-full blur-[120px] pointer-events-none"></div>
+
+  <!-- Portrait Card Frame -->
+  <div class="relative w-full max-w-[420px] bg-graphite-800 rounded-3xl p-8 sm:p-10 shadow-2xl border border-white/10 flex flex-col justify-between backdrop-blur-xl">
+    
+    <!-- ERROR MESSAGE CONTAINER -->
+    <div id="error-msg" class="mb-4 text-red-400 text-xs text-center bg-red-950/40 border border-red-500/20 p-2.5 rounded-xl hidden font-mono"></div>
+
+    <!-- ================= SIGN IN VIEW ================= -->
+    <div id="signin-view" class="flex flex-col justify-center">
+      <div class="text-center">
+        <span class="font-mono text-[10px] tracking-[0.25em] text-white/60 uppercase mb-2 block">— SYSTEM LOGIN —</span>
+        <h1 class="text-3xl font-bold tracking-tight text-white">Hi! It's Navi!</h1>
+        <p class="mt-2 text-sm text-slate-400 font-normal">
+          Sign in to unlock a new CAMANAVA experience!
+        </p>
+      </div>
+
+      <form id="signin-form" class="mt-8 space-y-4" action="#">
+        <div>
+          <label class="sr-only" for="signin-email">Email</label>
+          <div class="relative">
+            <input
+              placeholder="Enter your email"
+              class="w-full rounded-xl bg-graphite-700/60 border border-white/10 p-4 pe-12 text-sm text-white placeholder-slate-500 shadow-inner focus:outline-none focus:border-white focus:ring-1 focus:ring-white transition-all"
+              id="signin-email"
+              type="email"
+              required
+            />
+            <span class="absolute inset-y-0 end-0 grid place-content-center px-4">
+              <svg stroke="currentColor" viewBox="0 0 24 24" fill="none" class="h-5 w-5 text-slate-500" xmlns="http://www.w3.org/2000/svg">
+                <path d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"></path>
+              </svg>
+            </span>
+          </div>
+        </div>
+
+        <div>
+          <label class="sr-only" for="signin-password">Password</label>
+          <div class="relative">
+            <input
+              placeholder="Enter your password"
+              class="w-full rounded-xl bg-graphite-700/60 border border-white/10 p-4 pe-12 text-sm text-white placeholder-slate-500 shadow-inner focus:outline-none focus:border-white focus:ring-1 focus:ring-white transition-all"
+              id="signin-password"
+              type="password"
+              required
+            />
+            <span class="absolute inset-y-0 end-0 grid place-content-center px-4">
+              <svg stroke="currentColor" viewBox="0 0 24 24" fill="none" class="h-5 w-5 text-slate-500" xmlns="http://www.w3.org/2000/svg">
+                <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"></path>
+                <path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"></path>
+              </svg>
+            </span>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-between pt-4">
+          <p class="text-xs text-slate-400">
+            No account yet?<br>
+            <button type="button" id="show-signup" class="underline font-medium text-white hover:text-slate-300 transition-colors">Create one</button>
+          </p>
+          <button
+            class="rounded-xl bg-white text-black px-6 py-3.5 text-sm font-semibold hover:bg-slate-200 transition-all shadow-lg focus:outline-none focus:ring-2 focus:ring-white"
+            type="submit"
+          >
+            Sign In
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <!-- ================= SIGN UP VIEW (Hidden by Default) ================= -->
+    <div id="signup-view" class="hidden flex flex-col justify-center">
+      <div class="text-center">
+        <span class="font-mono text-[10px] tracking-[0.25em] text-white/60 uppercase mb-2 block">— NEW ACCOUNT —</span>
+        <h1 class="text-3xl font-bold tracking-tight text-white">Get Started</h1>
+        <p class="mt-2 text-sm text-slate-400 font-normal">
+          Create an account to begin exploring with Navi.
+        </p>
+      </div>
+
+      <form id="signup-form" class="mt-8 space-y-4" action="#">
+        <div>
+          <label class="sr-only" for="signup-email">Email</label>
+          <div class="relative">
+            <input
+              placeholder="Enter your email"
+              class="w-full rounded-xl bg-graphite-700/60 border border-white/10 p-4 pe-12 text-sm text-white placeholder-slate-500 shadow-inner focus:outline-none focus:border-white focus:ring-1 focus:ring-white transition-all"
+              id="signup-email"
+              type="email"
+              required
+            />
+            <span class="absolute inset-y-0 end-0 grid place-content-center px-4">
+              <svg stroke="currentColor" viewBox="0 0 24 24" fill="none" class="h-5 w-5 text-slate-500" xmlns="http://www.w3.org/2000/svg">
+                <path d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"></path>
+              </svg>
+            </span>
+          </div>
+        </div>
+
+        <div>
+          <label class="sr-only" for="signup-password">Password</label>
+          <div class="relative">
+            <input
+              placeholder="Create a password"
+              class="w-full rounded-xl bg-graphite-700/60 border border-white/10 p-4 pe-12 text-sm text-white placeholder-slate-500 shadow-inner focus:outline-none focus:border-white focus:ring-1 focus:ring-white transition-all"
+              id="signup-password"
+              type="password"
+              required
+            />
+            <span class="absolute inset-y-0 end-0 grid place-content-center px-4">
+              <svg stroke="currentColor" viewBox="0 0 24 24" fill="none" class="h-5 w-5 text-slate-500" xmlns="http://www.w3.org/2000/svg">
+                <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"></path>
+                <path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"></path>
+              </svg>
+            </span>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-between pt-4">
+          <p class="text-xs text-slate-400">
+            Already have an account?<br>
+            <button type="button" id="show-signin" class="underline font-medium text-white hover:text-slate-300 transition-colors">Sign in</button>
+          </p>
+          <button
+            class="rounded-xl bg-white text-black px-6 py-3.5 text-sm font-semibold hover:bg-slate-200 transition-all shadow-lg focus:outline-none focus:ring-2 focus:ring-white"
+            type="submit"
+          >
+            Sign Up
+          </button>
+        </div>
+      </form>
+    </div>
+
+  </div>
+
+  <!-- Footer Disclaimer -->
+  <div class="absolute bottom-6 text-center">
+    <p class="font-mono text-[9px] tracking-[0.2em] text-slate-600 uppercase">
+      2025-2026 © CamaNaviGo. All rights reserved.
+    </p>
+  </div>
+
+  <!-- Firebase Auth & Toggle Script -->
+  <script>
+      const firebaseConfig = {
+          apiKey: "YOUR_FIREBASE_API_KEY",
+          authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+          projectId: "YOUR_PROJECT_ID",
+          storageBucket: "YOUR_PROJECT_ID.appspot.com",
+          messagingSenderId: "YOUR_SENDER_ID",
+          appId: "YOUR_APP_ID"
+      };
+
+      firebase.initializeApp(firebaseConfig);
+      const auth = firebase.auth();
+
+      const signinView = document.getElementById('signin-view');
+      const signupView = document.getElementById('signup-view');
+      const errorMsg = document.getElementById('error-msg');
+
+      document.getElementById('show-signup').addEventListener('click', () => {
+          signinView.classList.add('hidden');
+          signupView.classList.remove('hidden');
+          errorMsg.classList.add('hidden');
+      });
+
+      document.getElementById('show-signin').addEventListener('click', () => {
+          signupView.classList.add('hidden');
+          signinView.classList.remove('hidden');
+          errorMsg.classList.add('hidden');
+      });
+
+      auth.onAuthStateChanged((user) => {
+          if (user) {
+              window.location.href = "/chat";
+          }
+      });
+
+      document.getElementById('signin-form').addEventListener('submit', async (e) => {
+          e.preventDefault();
+          errorMsg.classList.add('hidden');
+          const email = document.getElementById('signin-email').value;
+          const password = document.getElementById('signin-password').value;
+
+          try {
+              await auth.signInWithEmailAndPassword(email, password);
+              window.location.href = "/chat";
+          } catch (error) {
+              errorMsg.textContent = error.message;
+              errorMsg.classList.remove('hidden');
+          }
+      });
+
+      document.getElementById('signup-form').addEventListener('submit', async (e) => {
+          e.preventDefault();
+          errorMsg.classList.add('hidden');
+          const email = document.getElementById('signup-email').value;
+          const password = document.getElementById('signup-password').value;
+
+          try {
+              await auth.createUserWithEmailAndPassword(email, password);
+              window.location.href = "/chat";
+          } catch (error) {
+              errorMsg.textContent = error.message;
+              errorMsg.classList.remove('hidden');
+          }
+      });
+  </script>
+</body>
+</html>
