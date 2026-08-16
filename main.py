@@ -309,8 +309,14 @@ async def chat(request: ChatRequest):
             "audio": audio_base64,
             "history": updated_history[-10:]
         }
+    
     except Exception as e:
-        return {"response": "I'm having trouble accessing my records. Try again?", "history": request.history}
+        # --- ADD THIS PRINT STATEMENT TO EXPOSE THE HIDDEN ERROR ---
+        import traceback
+        print(f"CRITICAL CHAT ERROR: {e}")
+        traceback.print_exc()
+        
+        return {"response": "I'm having trouble processing that right now. Try again?", "history": request.history}
 
 @app.get("/", response_class=HTMLResponse)
 async def get_gui():
