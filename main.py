@@ -375,13 +375,3 @@ async def chat(request: ChatRequest):
 async def get_gui():
     with open("index.html", "r", encoding="utf-8") as f:
         return f.read()
-
-@app.get("/", response_class=HTMLResponse)
-async def get_login():
-    with open("login.html", "r", encoding="utf-8") as f:
-        return f.read()
-
-@app.get("/chat", response_class=HTMLResponse)
-async def get_chat_interface():
-    with open("index.html", "r", encoding="utf-8") as f:
-        return f.read()
