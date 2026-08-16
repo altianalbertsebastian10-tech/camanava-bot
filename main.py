@@ -56,53 +56,44 @@ except Exception as e:
 
 # --- DYNAMIC PRIMARY/FALLBACK DATA ROUTER ---
 def get_city_data(target_city: str) -> dict:
-    """Fetches data for a specific city. Tries Firestore first, falls back to knowledge.json."""
+    """Fetches data from Firestore 'places' collection, groups by city, and falls back to knowledge.json."""
     cap_city = target_city.title()
+    target_city_lower = target_city.lower()
+    
+    firestore_spots = []
     
     if firebase_active and db is not None:
         try:
-            spots = []
+            # Stream all documents from the 'places' collection
+            docs = db.collection("places").stream()
             
-            # ATTEMPT 1: Direct Document ID Lookup (e.g., document named 'valenzuela' or 'Valenzuela')
-            doc_ref = db.collection("tourism_spots").document(target_city).get()
-            if not doc_ref.exists:
-                doc_ref = db.collection("tourism_spots").document(cap_city).get()
+            for doc in docs:
+                data = doc.to_dict()
+                # Check if the document belongs to the target city (checking the 'city' field)
+                doc_city = str(data.get("city", "")).lower()
                 
-            if doc_ref.exists:
-                data = doc_ref.to_dict()
-                # Extract spots whether stored under 'spots', 'places', or if the doc itself is the data
-                spots = data.get("spots", data.get("places", []))
-                if not spots and data:
-                    spots = [data] # Fallback if document fields are the attributes directly
-            
-            # ATTEMPT 2: Query by field using modern keyword argument filter if Document ID missed
-            if not spots:
-                from google.cloud.firestore_v1.base_query import FieldFilter
-                docs = db.collection("tourism_spots").where(filter=FieldFilter("city", "==", target_city)).stream()
-                spots = [doc.to_dict() for doc in docs]
-                
-                if not spots:
-                    docs = db.collection("tourism_spots").where(filter=FieldFilter("city", "==", cap_city)).stream()
-                    spots = [doc.to_dict() for doc in docs]
-
-            if spots:
-                print(f"[FIRESTORE SUCCESS] Fetched {len(spots)} items for: {target_city}")
-                return {target_city: spots}
+                if doc_city == target_city_lower or doc_city == target_city.lower():
+                    firestore_spots.append(data)
+                    
+            if firestore_spots:
+                print(f"[FIRESTORE SUCCESS] Found {len(firestore_spots)} spots for '{target_city}' in collection 'places'.")
+                return {target_city_lower: firestore_spots}
                 
         except Exception as e:
             print(f"[FIRESTORE ERROR] {e}. Falling back to knowledge.json...")
 
-    # SECONDARY ROUTE: Local knowledge.json fallback
+    # SECONDARY ROUTE: Local knowledge.json fallback (or combined merge)
     try:
         with open("knowledge.json", "r", encoding="utf-8") as f:
             knowledge = json.load(f)
-            data = knowledge.get(target_city) or knowledge.get(cap_city, [])
+            # Check lowercase, title case, or original key formats
+            data = knowledge.get(target_city_lower) or knowledge.get(cap_city) or knowledge.get(target_city, [])
             if data:
                 print(f"[FALLBACK] Loaded data for: {target_city} from knowledge.json")
-            return {target_city: data}
+            return {target_city_lower: data}
     except Exception as e:
         print(f"[CRITICAL ERROR] Both Database and Fallback failed: {e}")
-        return {target_city: []}
+        return {target_city_lower: []}
 
 
 class ChatRequest(BaseModel):
