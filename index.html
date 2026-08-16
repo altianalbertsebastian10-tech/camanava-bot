@@ -465,60 +465,76 @@
         }
         .live-close-btn:hover { color: var(--fore); }
 
+        /* --- UNIFIED LIVE ORB STYLES --- */
         .live-orb-container {
-            position: relative;
-            width: 200px;
-            height: 200px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            position: relative; width: 200px; height: 200px;
+            display: flex; align-items: center; justify-content: center;
         }
 
-        /* The Luminous Orb */
         .live-orb {
-            width: 120px;
-            height: 120px;
+            width: 140px; height: 140px; /* Unified consistent size */
             border-radius: 50%;
-            background: var(--slate);
+            background: transparent;
             cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: all 0.3s cubic-bezier(0.15, 0.83, 0.66, 1);
+            display: flex; align-items: center; justify-content: center;
+            position: relative;
+            
+            /* The JS Web Audio API will dynamically control this variable! */
+            transform: scale(var(--audio-scale, 1));
+            /* GRACEFUL CLOSING: Smooth 0.6s ease when returning to normal size */
+            transition: transform 0.6s cubic-bezier(0.15, 0.83, 0.66, 1); 
         }
-        
-        .live-orb svg { width: 32px; height: 32px; fill: var(--void); opacity: 0; transition: opacity 0.2s; }
+
+        /* The spinning blue gradients */
+        .live-orb .loader {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            border-radius: 50%;
+            background-color: transparent;
+            z-index: 0;
+            /* Default state: Listening (Slow rotate) */
+            animation: loader-rotate 6s linear infinite; 
+        }
+
+        .live-orb svg { 
+            position: relative; z-index: 10; 
+            width: 32px; height: 32px; fill: var(--fore); opacity: 0; transition: opacity 0.2s; 
+        }
         .live-orb:hover svg { opacity: 0.5; }
 
-        /* Orb States */
-        .live-orb.state-listening {
-            background: var(--fore);
-            box-shadow: 0 0 30px rgba(255,255,255,0.2);
-            animation: orbListen 2s infinite ease-in-out;
-        }
+        /* STATE: Thinking (Fixed CSS pulse, slightly faster spin) */
         .live-orb.state-thinking {
-            background: var(--panel);
-            animation: orbThink 1.5s infinite alternate ease-in-out;
+            animation: orb-think-pulse 1s infinite alternate ease-in-out;
             pointer-events: none;
         }
+        .live-orb.state-thinking .loader { animation-duration: 4s; }
+
+        /* STATE: Speaking (JS Waveform Pulse via var(--audio-scale), fast spin) */
         .live-orb.state-speaking {
-            background: var(--fore);
-            box-shadow: 0 0 40px rgba(255,255,255,0.4);
-            animation: orbSpeak 0.8s infinite alternate ease-in-out;
+            /* SNAPPY REACTIVITY: 0.05s linear only while actively responding to audio */
+            transition: transform 0.05s linear;
+        }
+        .live-orb.state-speaking .loader { animation-duration: 2.5s; }
+
+        /* Animations */
+        @keyframes orb-think-pulse {
+            0% { transform: scale(0.95); }
+            100% { transform: scale(1.05); }
         }
 
-        @keyframes orbListen {
-            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255,255,255,0.2); }
-            50% { transform: scale(1.1); box-shadow: 0 0 0 20px rgba(255,255,255,0); }
-            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255,255,255,0); }
-        }
-        @keyframes orbThink {
-            0% { transform: scale(0.95); opacity: 0.7; }
-            100% { transform: scale(1.05); opacity: 1; }
-        }
-        @keyframes orbSpeak {
-            0% { transform: scale(1); box-shadow: 0 0 20px rgba(255,255,255,0.2); }
-            100% { transform: scale(1.15); box-shadow: 0 0 50px rgba(255,255,255,0.6); }
+        /* Beautiful AI Blue colorways */
+        @keyframes loader-rotate {
+            0% {
+                transform: rotate(90deg);
+                box-shadow: 0 10px 20px 0 rgba(255,255,255,0.8) inset, 0 20px 30px 0 #00d2ff inset, 0 60px 60px 0 #3a7bd5 inset;
+            }
+            50% {
+                transform: rotate(270deg);
+                box-shadow: 0 10px 20px 0 rgba(255,255,255,0.8) inset, 0 20px 10px 0 #0072ff inset, 0 40px 60px 0 #00c6ff inset;
+            }
+            100% {
+                transform: rotate(450deg);
+                box-shadow: 0 10px 20px 0 rgba(255,255,255,0.8) inset, 0 20px 30px 0 #00d2ff inset, 0 60px 60px 0 #3a7bd5 inset;
+            }
         }
 
         .live-status-text {
@@ -543,6 +559,11 @@
             overflow-y: auto; 
             scrollbar-width: none; 
             padding: 0 10px;
+            
+            /* NEW: Graceful fade and slide transitions */
+            transition: opacity 0.3s cubic-bezier(0.15, 0.83, 0.66, 1), transform 0.3s cubic-bezier(0.15, 0.83, 0.66, 1);
+            opacity: 1;
+            transform: translateY(0);
         }
 
         .live-transcript::-webkit-scrollbar {
@@ -616,7 +637,9 @@
         
         <div class="live-orb-container">
             <div id="live-orb" class="live-orb" onclick="handleOrbTap()">
-                <!-- Stop Icon shown on hover during listening -->
+                <!-- ADD THIS LINE RIGHT HERE -->
+                <div class="loader"></div>
+                
                 <svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12"></rect></svg>
             </div>
         </div>
@@ -881,11 +904,33 @@
     const statusText = document.getElementById('live-status');
     const transcriptText = document.getElementById('live-transcript');
 
+    let transcriptTimeout;
+
+    function updateTranscript(text) {
+        const transcriptEl = document.getElementById('live-transcript');
+        
+        // 1. Fade out the current text and slide it down slightly
+        transcriptEl.style.opacity = '0';
+        transcriptEl.style.transform = 'translateY(5px)';
+        
+        // 2. Wait for the fade out to finish (300ms), then swap the text
+        clearTimeout(transcriptTimeout);
+        transcriptTimeout = setTimeout(() => {
+            transcriptEl.innerText = text;
+            
+            if (text.trim() !== "") {
+                // 3. Fade the new text back in smoothly
+                transcriptEl.style.opacity = '1';
+                transcriptEl.style.transform = 'translateY(0)';
+            }
+        }, 300); 
+    }
+
     async function openLiveMode() {
         if (activeAudio) clearTTSState();
         isLiveModeActive = true;
         overlay.classList.add('is-active');
-        transcriptText.innerText = "";
+        updateTranscript("");
         
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -922,7 +967,7 @@
                     const data = await res.json();
                     
                     if (data.text && data.text.trim() !== "") {
-                        transcriptText.innerText = `"${data.text}"`;
+                        updateTranscript(`"${data.text}"`);
                         setLiveState('thinking', "Navi is thinking...");
                         send(data.text); 
                     } else {
@@ -949,7 +994,7 @@
         if (!isLiveModeActive || !liveMediaRecorder) return;
         liveAudioChunks = [];
         setLiveState('listening', "Listening... Tap orb to send.");
-        transcriptText.innerText = "";
+        updateTranscript("");
         liveMediaRecorder.start();
     }
 
@@ -971,22 +1016,30 @@
 
     function handleLiveResponse(text, audioBase64) {
         if (!isLiveModeActive) return;
+        isNaviThinking = false; 
         
-        isNaviThinking = false; // Free up the lock
-        
-        // Strip formatting for the live transcript view
         const cleanText = text.replace(/\*\*(.*?)\*\*/g, '$1').replace(/\*/g, '').trim();
-        transcriptText.innerText = cleanText;
-        
-        // Also silently add it to the background chat UI so there's a history
+        updateTranscript(cleanText);
         addMessageToUI('bot', text, audioBase64); 
         
         if (audioBase64) {
             setLiveState('speaking', "Navi is speaking... Tap to interrupt.");
             liveAudioPlayer = new Audio("data:audio/mp3;base64," + audioBase64);
             
+            // Hook the audio up to the live visualizer!
+            try {
+                initAudio();
+                if (currentAudioSource) currentAudioSource.disconnect();
+                currentAudioSource = audioCtx.createMediaElementSource(liveAudioPlayer);
+                currentAudioSource.connect(analyser);
+                analyser.connect(audioCtx.destination);
+            } catch(e) { console.log("Web Audio Context skipped:", e); }
+
+            // Start the visualizer loop the moment she speaks
+            liveAudioPlayer.onplay = () => pulseWithAudio();
+            
             liveAudioPlayer.onended = () => {
-                if (isLiveModeActive) startLiveListening(); // Loop back!
+                if (isLiveModeActive) startLiveListening(); 
             };
             liveAudioPlayer.onerror = () => {
                 if (isLiveModeActive) startLiveListening(); 
@@ -997,7 +1050,6 @@
                 startLiveListening();
             });
         } else {
-            // No audio returned? Just loop back.
             setTimeout(startLiveListening, 2000);
         }
     }
@@ -1010,6 +1062,11 @@
         if (state === 'listening') orb.classList.add('state-listening');
         if (state === 'thinking')  orb.classList.add('state-thinking');
         if (state === 'speaking')  orb.classList.add('state-speaking');
+
+        // Force scale back to 1 to trigger the graceful CSS transition when audio stops
+        if (state !== 'speaking') {
+            orb.style.setProperty('--audio-scale', 1);
+        }
     }
 
     function closeLiveMode() {
@@ -1079,6 +1136,40 @@
     }
 
     setTimeout(animatePlaceholder, 1000);
+
+    // --- WEB AUDIO API FOR ORB WAVELENGTH ---
+    let audioCtx = null;
+    let analyser = null;
+    let dataArray = null;
+    let currentAudioSource = null;
+    let orbAnimationId = null;
+
+    function initAudio() {
+        if (!audioCtx) {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            analyser = audioCtx.createAnalyser();
+            analyser.fftSize = 128; // Small chunk size for snappy visual response
+            dataArray = new Uint8Array(analyser.frequencyBinCount);
+        }
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+    }
+
+    function pulseWithAudio() {
+        if (liveState !== 'speaking' || !analyser) return;
+        
+        analyser.getByteFrequencyData(dataArray);
+        let sum = 0;
+        for(let i = 0; i < dataArray.length; i++) { sum += dataArray[i]; }
+        let average = sum / dataArray.length;
+        
+        // Map the volume (0-255) to a scale multiplier (1.0 to 1.35)
+        let scale = 1 + (average / 255) * 0.35; 
+        
+        // Inject the scale directly into the CSS variable!
+        document.getElementById('live-orb').style.setProperty('--audio-scale', scale);
+        
+        orbAnimationId = requestAnimationFrame(pulseWithAudio);
+    }
 </script>
 </body>
 </html>

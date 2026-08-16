@@ -4,6 +4,7 @@ import base64
 import edge_tts
 import emoji
 import tempfile
+import re
 from groq import Groq
 from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
@@ -14,6 +15,9 @@ import threading
 import time
 import requests
 
+# --- NEW: Firebase Admin SDK Imports ---
+import firebase_admin
+from firebase_admin import credentials, firestore
 
 def self_ping():
     time.sleep(20)
@@ -37,11 +41,52 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-def load_knowledge():
-    with open("knowledge.json", "r", encoding="utf-8") as f:
-        return json.load(f)
+# --- FIREBASE INITIALIZATION ---
+firebase_active = False
+db = None
+try:
+    # Ensure serviceAccountKey.json is in your root directory!
+    cred = credentials.Certificate("serviceAccountKey.json")
+    firebase_admin.initialize_app(cred)
+    db = firestore.client()
+    firebase_active = True
+    print("Firebase initialized successfully. Running in FIRESTORE mode.")
+except Exception as e:
+    print(f"Firebase Init Warning: {e}. Defaulting to JSON fallback mode.")
 
-KNOWLEDGE = load_knowledge()
+# --- DYNAMIC PRIMARY/FALLBACK DATA ROUTER ---
+def get_city_data(target_city: str) -> dict:
+    """Fetches data for a specific city. Tries Firestore first, falls back to knowledge.json."""
+    if firebase_active and db is not None:
+        try:
+            # ATTEMPT 1: Query 'tourism_spots' collection where 'city' matches the target_city
+            docs = db.collection("tourism_spots").where("city", "==", target_city).stream()
+            spots = [doc.to_dict() for doc in docs]
+            
+            # ATTEMPT 2: If empty, check if the city name is actually the document ID
+            if not spots:
+                doc_ref = db.collection("tourism_spots").document(target_city).get()
+                if doc_ref.exists:
+                    data = doc_ref.to_dict()
+                    spots = data.get("spots", data.get("places", [data]))
+            
+            if spots:
+                print(f"[FIRESTORE] Successfully fetched data for: {target_city}")
+                return {target_city: spots}
+                
+        except Exception as e:
+            print(f"[FIRESTORE ERROR] {e}. Falling back to knowledge.json...")
+
+    # SECONDARY ROUTE: Local knowledge.json fallback
+    try:
+        with open("knowledge.json", "r", encoding="utf-8") as f:
+            knowledge = json.load(f)
+            print(f"[FALLBACK] Loaded data for: {target_city} from knowledge.json")
+            return {target_city: knowledge.get(target_city, [])}
+    except Exception as e:
+        print(f"[CRITICAL ERROR] Both Database and Fallback failed: {e}")
+        return {target_city: []}
+
 
 class ChatRequest(BaseModel):
     message: str
@@ -51,7 +96,9 @@ class ChatRequest(BaseModel):
 @app.head("/health")
 @app.post("/health")
 async def health_check():
-    return {"status": "alive", "mode": "JSON_RAG"}
+    # Automatically update the health check payload based on DB status
+    mode = "FIRESTORE" if firebase_active else "JSON_FALLBACK"
+    return {"status": "alive", "mode": mode}
 
 async def generate_speech_base64(text: str, mood: str) -> str:
     """Generates natural neural TTS audio with subtle, human-like pacing."""
@@ -83,6 +130,7 @@ async def generate_speech_base64(text: str, mood: str) -> str:
 
 @app.post("/transcribe")
 async def transcribe_audio(file: UploadFile = File(...)):
+    temp_audio_path = None
     try:
         # Extract the actual extension sent from the browser (e.g., .m4a or .webm)
         ext = os.path.splitext(file.filename)[1]
@@ -102,9 +150,6 @@ async def transcribe_audio(file: UploadFile = File(...)):
                 language="en"
             )
         
-        # Clean up the temp file
-        os.remove(temp_audio_path)
-        
         return {"text": transcription.text}
     except Exception as e:
         print(f"Transcription Error: {e}")
@@ -120,30 +165,65 @@ async def transcribe_audio(file: UploadFile = File(...)):
 @app.post("/chat")
 async def chat(request: ChatRequest):
     user_msg = request.message.lower()
-
-    relevant_data = {}
+    camanava_cities = ["caloocan", "malabon", "navotas", "valenzuela"]
+    
     target_city = None
+    negated_cities = set()
 
-    for city in ["caloocan", "malabon", "navotas", "valenzuela"]:
-        if city in user_msg:
+    # 1. Build a persistent blacklist of negated cities from current message AND user history
+    # (This prevents the bot from accidentally suggesting a city the user already rejected)
+    messages_to_check = [user_msg]
+    for entry in request.history:
+        if entry.get("role") == "user":
+            messages_to_check.append(entry['content'].lower())
+
+    for msg in messages_to_check:
+        for city in camanava_cities:
+            # Catch phrases like "not caloocan", "except malabon", "outside navotas", "but valenzuela"
+            if re.search(rf'\b(not|except|other than|but|outside|exclude|without|skip)\s+(in\s+)?{city}\b', msg):
+                negated_cities.add(city)
+
+    # 2. Try to find a valid target city in the CURRENT message
+    for city in camanava_cities:
+        if city in user_msg and city not in negated_cities:
             target_city = city
             break
 
+    # 3. CONTEXT AWARENESS: Look back through the ENTIRE history (User AND Assistant)
     if not target_city and request.history:
         for entry in reversed(request.history):
             content = entry['content'].lower()
-            for city in ["caloocan", "malabon", "navotas", "valenzuela"]:
-                if city in content:
+            for city in camanava_cities:
+                # Find the most recently mentioned city in the conversation that hasn't been negated
+                if city in content and city not in negated_cities:
                     target_city = city
                     break
             if target_city:
                 break
 
     if target_city:
-        relevant_data = {target_city: KNOWLEDGE.get(target_city, [])}
+        # Load exactly the one requested city
+        relevant_data = get_city_data(target_city)
         context = json.dumps(relevant_data, indent=2)
     else:
-        context = "SYSTEM OVERRIDE: NO CITY SPECIFIED. You have ZERO data loaded. You are STRICTLY FORBIDDEN from listing any spots. If the user mentions an interest or vibe (like food, culture, or nature), enthusiastically validate their choice, and then specifically ask them which of the 4 cities (Caloocan, Malabon, Navotas, Valenzuela) they want to do that activity in!"
+        # Instead of starving Navi of data, load ALL allowed cities simultaneously!
+        allowed_cities = [c for c in camanava_cities if c not in negated_cities]
+        relevant_data = {}
+        
+        for c in allowed_cities:
+            # Fetch the data for each remaining city
+            city_data = get_city_data(c)
+            if city_data:
+                relevant_data.update(city_data)
+                
+        allowed_str = ", ".join([c.title() for c in allowed_cities])
+        negated_str = ", ".join([c.title() for c in negated_cities])
+        
+        if relevant_data:
+            context = json.dumps(relevant_data, indent=2)
+            context += f"\n\nSYSTEM OVERRIDE: The user wants general recommendations or has excluded certain cities. You have been successfully loaded with full database facts for {allowed_str}. Enthusiastically suggest a few highlights from these available cities! STRICT RULE: DO NOT mention any places in {negated_str}."
+        else:
+            context = "SYSTEM OVERRIDE: No database facts available right now. Apologize gently and ask the user what kind of activities they enjoy."
 
    # --- RAG STEP 2: AUGMENT ---
     system_prompt = f"""You are Navi, a cheerful, warm, and natural AI tourism guide for the CAMANAVA region (Caloocan, Malabon, Navotas, Valenzuela). 
@@ -154,13 +234,13 @@ async def chat(request: ChatRequest):
     {context}
     
     CONVERSATIONAL RULES:
-    1. BE NATURAL: You are a conversational AI. If the user simply says "hi", complains, or wants to chat casually, respond with empathy and natural conversation. 
-    2. DROP THE LOOP: Do NOT force the user to pick a city in every single message. Let the conversation flow organically. 
-    3. BREAK THE FOURTH WALL: If the user identifies as your developer, asks about your API, or asks technical questions, playfully acknowledge them! 
-    4. FACTUAL TOURISM: When you DO recommend places, ONLY use the VERIFIED DATABASE FACTS. If the facts are empty or ask for a city, follow those instructions exactly.
-    5. MOBILE FORMATTING: Keep your recommendations concise and easy to read on a phone. Use short bullet points. NEVER use markdown tables.
-    6. EMOTIONAL TAGGING: You MUST start every single response with a secret mood tag in brackets based on the tone of your message. Choose exactly one: [HAPPY] (for cheerful, excited, or welcoming responses), 
-    [SAD] (for apologies, missing data, or empathy), or [NEUTRAL] (for standard facts). Example: "[HAPPY] I would love to help you with that!"
+    1. BE NATURAL: Respond with empathy and natural conversation.
+    2. CONTEXT AWARENESS: Pay close attention to the conversation history. If the user says "there", "it", or asks a follow-up question, they are referring to the most recently discussed location or topic in the history.
+    3. POSITIVE FOCUS: Base your answer ONLY on the Verified Database Facts provided. NEVER mention cities that are not in the database facts. NEVER explain your database limitations or apologize for missing data.
+    4. DROP THE LOOP: Do NOT force the user to pick a city in every single message. Let the conversation flow organically. 
+    5. FACTUAL TOURISM: When you DO recommend places, ONLY use the VERIFIED DATABASE FACTS.
+    6. MOBILE FORMATTING: Keep your recommendations concise. Use short bullet points. NEVER use markdown tables.
+    7. EMOTIONAL TAGGING: You MUST start every single response with a secret mood tag in brackets based on the tone of your message: [HAPPY], [SAD], or [NEUTRAL].
     """
 
     try:
@@ -219,5 +299,3 @@ async def chat(request: ChatRequest):
 async def get_gui():
     with open("index.html", "r", encoding="utf-8") as f:
         return f.read()
-
-    #update
