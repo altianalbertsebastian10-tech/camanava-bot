@@ -291,7 +291,7 @@ async def chat(request: ChatRequest):
         # Try Primary Groq Account with Fallback to Backup Groq Account
         try:
             completion = primary_client.chat.completions.create(
-                model="openai/gpt-oss/120b",
+                model="openai/gpt-oss-120b",
                 messages=[
                     {"role": "system", "content": system_prompt},
                     *request.history,
@@ -303,7 +303,7 @@ async def chat(request: ChatRequest):
         except Exception as primary_err:
             print(f"[PRIMARY GROQ LIMIT HIT] Switching to backup Groq account... Error: {primary_err}")
             completion = backup_client.chat.completions.create(
-                model="openai/gpt-oss/120b",
+                model="openai/gpt-oss-120b",
                 messages=[
                     {"role": "system", "content": system_prompt},
                     *request.history,
