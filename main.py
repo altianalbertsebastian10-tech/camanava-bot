@@ -150,18 +150,21 @@ async def health_check():
     return {"status": "alive", "mode": mode}
 
 async def generate_speech_base64(text: str, mood: str) -> str:
-    """Generates natural neural TTS audio with subtle, human-like pacing."""
+    """Generates natural neural TTS audio with a sassy, smart AI assistant vibe."""
     try:
-        voice = "en-US-AriaNeural"
-        rate = "+0%"
-        pitch = "+0Hz"
+        # JennyNeural provides that crisp, highly articulate "Smart Assistant" tone
+        voice = "en-US-JennyNeural" 
+        
+        # The "Sassy Siri" baseline: slightly faster, snappy, and a tiny bit deeper
+        rate = "+5%"
+        pitch = "-2Hz"
         
         if mood == "HAPPY":
-            rate = "+10%"
-            pitch = "+2Hz"
+            rate = "+10%"   # Quick, witty, and sharp
+            pitch = "+2Hz"  # Just a hint of brightness
         elif mood == "SAD":
-            rate = "-8%"
-            pitch = "-3Hz"
+            rate = "-5%"    # Slows down 
+            pitch = "-6Hz"  # Drops the pitch for a flatter, almost deadpan tone
 
         communicate = edge_tts.Communicate(text, voice, rate=rate, pitch=pitch)
         
