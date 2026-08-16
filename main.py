@@ -360,7 +360,7 @@ async def chat(request: ChatRequest):
         return {
             "response": response,
             "audio": audio_base64,
-            "history": updated_history[-10:]
+            "history": updated_history[-4:] # Cuts down token usage per request
         }
     
     except Exception as e:
