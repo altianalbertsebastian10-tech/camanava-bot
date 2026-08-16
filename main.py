@@ -61,13 +61,21 @@ import datetime
 
 import datetime
 
-# --- DYNAMIC PRIMARY/FALLBACK DATA ROUTER WITH PAGINATION ---
-def get_city_data(target_city: str, history: list = None) -> dict:
-    """Fetches data from Firestore, cleans fields, and rotates batches to avoid token limits."""
-    cap_city = target_city.title()
-    target_city_lower = target_city.lower()
+# --- ADVANCED DYNAMIC DATA ROUTER WITH CATEGORY FILTERING & PAGINATION ---
+def get_city_data(target_city: str = None, history: list = None, category_filter: str = None, negated_cities: set = None) -> dict:
+    """Fetches data from Firestore, filters by city, category, and handles multi-city pagination."""
+    if negated_cities is None:
+        negated_cities = set()
+        
+    camanava_cities = ["caloocan", "malabon", "navotas", "valenzuela"]
+    allowed_cities = [c for c in camanava_cities if c not in negated_cities]
     
-    firestore_spots = []
+    if target_city:
+        target_cities_to_check = [target_city.lower()]
+    else:
+        target_cities_to_check = allowed_cities
+
+    all_matching_spots = []
     
     if firebase_active and db is not None:
         try:
@@ -76,52 +84,70 @@ def get_city_data(target_city: str, history: list = None) -> dict:
             for doc in docs:
                 data = doc.to_dict()
                 doc_city = str(data.get("city", "")).lower()
+                doc_category = str(data.get("category", "")).lower()
                 
-                if doc_city == target_city_lower or doc_city == target_city.lower():
+                # Check if city matches and is NOT negated
+                if doc_city in target_cities_to_check and doc_city not in negated_cities:
+                    # If a category was requested (e.g., 'park'), filter strictly by it
+                    if category_filter:
+                        if category_filter not in doc_category and category_filter not in str(data.get("name", "")).lower() and category_filter not in str(data.get("description", "")).lower():
+                            continue
+                            
                     clean_spot = {
                         "name": data.get("name", "Unknown Spot"),
                         "description": data.get("description", ""),
                         "category": data.get("category", ""),
-                        "address": data.get("address", "")
+                        "address": data.get("address", ""),
+                        "city": doc_city.title()
                     }
-                    firestore_spots.append(clean_spot)
+                    all_matching_spots.append(clean_spot)
                     
-            if firestore_spots:
-                # Count how many times we've already suggested spots in this conversation
+            if all_matching_spots:
+                # Count rotation history
                 batch_index = 0
                 if history:
                     for msg in history:
-                        # Count assistant messages that look like recommendations
-                        if msg.get("role") == "assistant" and any(spot["name"] in msg.get("content", "") for spot in firestore_spots):
+                        if msg.get("role") == "assistant" and any(spot["name"] in msg.get("content", "") for spot in all_matching_spots):
                             batch_index += 1
                 
-                # Slice into chunks of 5 (Batch 0: spots 0-5, Batch 1: spots 5-10, etc.)
                 chunk_size = 5
-                start_idx = (batch_index * chunk_size) % len(firestore_spots)
+                start_idx = (batch_index * chunk_size) % len(all_matching_spots)
                 end_idx = start_idx + chunk_size
                 
-                if end_idx <= len(firestore_spots):
-                    selected_spots = firestore_spots[start_idx:end_idx]
+                if end_idx <= len(all_matching_spots):
+                    selected_spots = all_matching_spots[start_idx:end_idx]
                 else:
-                    # Loop back to the beginning if we run out of new spots
-                    selected_spots = firestore_spots[start_idx:] + firestore_spots[:end_idx % len(firestore_spots)]
+                    selected_spots = all_matching_spots[start_idx:] + all_matching_spots[:end_idx % len(all_matching_spots)]
                 
-                print(f"[FIRESTORE ROTATION] Serving batch {batch_index + 1} ({len(selected_spots)} spots) for '{target_city}'.")
-                return {target_city_lower: selected_spots}
+                print(f"[FIRESTORE FILTER] Serving {len(selected_spots)} spots for target={target_city}, category={category_filter}.")
+                
+                # Group back by city for JSON structure
+                grouped = {}
+                for spot in selected_spots:
+                    c_name = spot["city"].lower()
+                    if c_name not in grouped:
+                        grouped[c_name] = []
+                    grouped[c_name].append(spot)
+                return grouped
                 
         except Exception as e:
             print(f"[FIRESTORE ERROR] {e}. Falling back to knowledge.json...")
 
-    # SECONDARY ROUTE: Local knowledge.json fallback
+    # Fallback to knowledge.json if Firestore comes up empty
     try:
         with open("knowledge.json", "r", encoding="utf-8") as f:
             knowledge = json.load(f)
-            data = knowledge.get(target_city_lower) or knowledge.get(cap_city) or knowledge.get(target_city, [])
-            if data:
-                data = data[:5]
-            return {target_city_lower: data}
+            result = {}
+            for c in target_cities_to_check:
+                if c not in negated_cities:
+                    spots = knowledge.get(c, [])
+                    if category_filter:
+                        spots = [s for s in spots if category_filter in str(s).lower()]
+                    if spots:
+                        result[c] = spots[:5]
+            return result
     except Exception as e:
-        return {target_city_lower: []}
+        return {}
 
 
 class ChatRequest(BaseModel):
@@ -254,18 +280,20 @@ async def chat(request: ChatRequest):
             if target_city:
                 break
 
-    # 5. Fetch data securely
-    if target_city:
-        relevant_data = get_city_data(target_city, request.history)
-        context = json.dumps(relevant_data, indent=2)
-    else:
-        allowed_cities = [c for c in camanava_cities if c not in negated_cities]
-        relevant_data = {}
-        for c in allowed_cities:
-            c_data = get_city_data(c, request.history)
-            if c_data and c_data.get(c):
-                relevant_data.update(c_data)
-        context = json.dumps(relevant_data, indent=2)
+    # 5. Detect Category Filters from User Message (e.g., parks, food, churches)
+    category_filter = None
+    if any(w in user_msg for w in ["park", "parks", "green space", "plaza"]):
+        category_filter = "park"
+    elif any(w in user_msg for w in ["restaurant", "food", "eat", "dining", "pork", "kainan"]):
+        category_filter = "restaurant"
+    elif any(w in user_msg for w in ["church", "chapel", "shrine", "parish", "temple"]):
+        category_filter = "church"
+    elif any(w in user_msg for w in ["fish", "fishing", "port"]):
+        category_filter = "fishing"
+
+    # 6. Fetch data with category and pagination support
+    relevant_data = get_city_data(target_city, request.history, category_filter, negated_cities)
+    context = json.dumps(relevant_data, indent=2)
 
    # --- RAG STEP 2: AUGMENT ---
     system_prompt = f"""You are Navi, a cheerful, warm, and natural AI tourism guide for the CAMANAVA region (Caloocan, Malabon, Navotas, Valenzuela). 
