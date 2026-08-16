@@ -206,8 +206,7 @@ async def chat(request: ChatRequest):
     target_city = None
     negated_cities = set()
 
-    # 1. Build a persistent blacklist of negated cities from current message AND user history
-    # (This prevents the bot from accidentally suggesting a city the user already rejected)
+    # 1. Build a persistent blacklist of negated cities
     messages_to_check = [user_msg]
     for entry in request.history:
         if entry.get("role") == "user":
@@ -215,51 +214,58 @@ async def chat(request: ChatRequest):
 
     for msg in messages_to_check:
         for city in camanava_cities:
-            # Catch phrases like "not caloocan", "except malabon", "outside navotas", "but valenzuela"
-            if re.search(rf'\b(not|except|other than|but|outside|exclude|without|skip)\s+(in\s+)?{city}\b', msg):
+            city_pattern = r"(caloocan|kaloakan|kalookan)" if city == "caloocan" else city
+            if re.search(rf'\b(not|except|other than|but|outside|exclude|without|skip|no|anywhere but)\s+(in\s+|for\s+)?{city_pattern}\b', msg):
                 negated_cities.add(city)
 
-    # 2. Try to find a valid target city in the CURRENT message
+    # 2. Check if a specific city is named in the CURRENT message
     for city in camanava_cities:
-        if city in user_msg and city not in negated_cities:
+        city_pattern = r"(caloocan|kaloakan|kalookan)" if city == "caloocan" else city
+        if re.search(city_pattern, user_msg) and city not in negated_cities:
             target_city = city
             break
 
-    # 3. CONTEXT AWARENESS: Look back through the ENTIRE history (User AND Assistant)
+    # 3. Check if user is asking to switch cities (e.g., "Other cities instead")
+    if not target_city:
+        if any(phrase in user_msg for phrase in ["other city", "other cities", "different city", "another city", "elsewhere"]):
+            discussed_cities = set()
+            for entry in request.history:
+                content = entry.get('content', '').lower()
+                for c in camanava_cities:
+                    if c in content:
+                        discussed_cities.add(c)
+            
+            remaining_cities = [c for c in camanava_cities if c not in discussed_cities and c not in negated_cities]
+            if remaining_cities:
+                target_city = remaining_cities[0]
+            else:
+                allowed = [c for c in camanava_cities if c not in negated_cities]
+                target_city = allowed[0] if allowed else "malabon"
+
+    # 4. Context awareness fallback to recent history
     if not target_city and request.history:
         for entry in reversed(request.history):
             content = entry['content'].lower()
             for city in camanava_cities:
-                # Find the most recently mentioned city in the conversation that hasn't been negated
-                if city in content and city not in negated_cities:
+                city_pattern = r"(caloocan|kaloakan|kalookan)" if city == "caloocan" else city
+                if re.search(city_pattern, content) and city not in negated_cities:
                     target_city = city
                     break
             if target_city:
                 break
 
+    # 5. Fetch data securely
     if target_city:
-        # Pass the history so it knows which batch to show next!
         relevant_data = get_city_data(target_city, request.history)
         context = json.dumps(relevant_data, indent=2)
     else:
-        # Instead of starving Navi of data, load ALL allowed cities simultaneously!
         allowed_cities = [c for c in camanava_cities if c not in negated_cities]
         relevant_data = {}
-        
         for c in allowed_cities:
-            # Fetch the data for each remaining city
-            city_data = get_city_data(c)
-            if city_data:
-                relevant_data.update(city_data)
-                
-        allowed_str = ", ".join([c.title() for c in allowed_cities])
-        negated_str = ", ".join([c.title() for c in negated_cities])
-        
-        if relevant_data:
-            context = json.dumps(relevant_data, indent=2)
-            context += f"\n\nSYSTEM OVERRIDE: The user wants general recommendations or has excluded certain cities. You have been successfully loaded with full database facts for {allowed_str}. Enthusiastically suggest a few highlights from these available cities! STRICT RULE: DO NOT mention any places in {negated_str}."
-        else:
-            context = "SYSTEM OVERRIDE: No database facts available right now. Apologize gently and ask the user what kind of activities they enjoy."
+            c_data = get_city_data(c, request.history)
+            if c_data and c_data.get(c):
+                relevant_data.update(c_data)
+        context = json.dumps(relevant_data, indent=2)
 
    # --- RAG STEP 2: AUGMENT ---
     system_prompt = f"""You are Navi, a cheerful, warm, and natural AI tourism guide for the CAMANAVA region (Caloocan, Malabon, Navotas, Valenzuela). 
