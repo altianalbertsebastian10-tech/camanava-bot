@@ -57,9 +57,11 @@ except Exception as e:
 
 import datetime
 
+import datetime
+
 # --- DYNAMIC PRIMARY/FALLBACK DATA ROUTER ---
 def get_city_data(target_city: str) -> dict:
-    """Fetches data from Firestore 'places' collection, cleans timestamps, and groups by city."""
+    """Fetches data from Firestore, cleans fields, slices to top 5 to save tokens, and groups by city."""
     cap_city = target_city.title()
     target_city_lower = target_city.lower()
     
@@ -74,20 +76,20 @@ def get_city_data(target_city: str) -> dict:
                 doc_city = str(data.get("city", "")).lower()
                 
                 if doc_city == target_city_lower or doc_city == target_city.lower():
-                    # Sanitize any Firestore Timestamps or special objects into strings
-                    clean_data = {}
-                    for k, v in data.items():
-                        if isinstance(v, (datetime.datetime, datetime.date)):
-                            clean_data[k] = v.isoformat()
-                        elif hasattr(v, 'isoformat'): # Handles Firestore DatetimeWithNanoseconds
-                            clean_data[k] = v.isoformat()
-                        else:
-                            clean_data[k] = v
-                    firestore_spots.append(clean_data)
+                    # Keep only essential text fields to prevent token limit crashes (413 Error)
+                    clean_spot = {
+                        "name": data.get("name", "Unknown Spot"),
+                        "description": data.get("description", ""),
+                        "category": data.get("category", ""),
+                        "address": data.get("address", "")
+                    }
+                    firestore_spots.append(clean_spot)
                     
             if firestore_spots:
-                print(f"[FIRESTORE SUCCESS] Found {len(firestore_spots)} spots for '{target_city}' in collection 'places'.")
-                return {target_city_lower: firestore_spots}
+                # Limit to 5 spots per request to stay safely under Groq's free token limit
+                limited_spots = firestore_spots[:5]
+                print(f"[FIRESTORE SUCCESS] Fetched {len(firestore_spots)} spots for '{target_city}', sent top {len(limited_spots)} to prevent token overflow.")
+                return {target_city_lower: limited_spots}
                 
         except Exception as e:
             print(f"[FIRESTORE ERROR] {e}. Falling back to knowledge.json...")
@@ -98,6 +100,8 @@ def get_city_data(target_city: str) -> dict:
             knowledge = json.load(f)
             data = knowledge.get(target_city_lower) or knowledge.get(cap_city) or knowledge.get(target_city, [])
             if data:
+                # Limit fallback data too just in case
+                data = data[:5]
                 print(f"[FALLBACK] Loaded data for: {target_city} from knowledge.json")
             return {target_city_lower: data}
     except Exception as e:
