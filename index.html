@@ -559,22 +559,6 @@
             }
             #live-overlay { border-radius: 20px; }
         }
-
-        /* --- Mobile 90% Zoom Optimization --- */
-        @media (max-width: 480px) {
-            body {
-                zoom: 0.9; /* Scales the entire interface down by 10% */
-            }
-            
-            .chat-shell {
-                /* 100dvh / 0.9 = 111.11dvh. This prevents a gap at the bottom of the phone! */
-                height: 111.11dvh; 
-            }
-
-            #live-overlay {
-                height: 111.11dvh;
-            }
-        }
     </style>
 </head>
 <body>
