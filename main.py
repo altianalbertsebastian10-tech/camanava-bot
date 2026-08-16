@@ -59,9 +59,11 @@ import datetime
 
 import datetime
 
-# --- DYNAMIC PRIMARY/FALLBACK DATA ROUTER ---
-def get_city_data(target_city: str) -> dict:
-    """Fetches data from Firestore, cleans fields, slices to top 5 to save tokens, and groups by city."""
+import datetime
+
+# --- DYNAMIC PRIMARY/FALLBACK DATA ROUTER WITH PAGINATION ---
+def get_city_data(target_city: str, history: list = None) -> dict:
+    """Fetches data from Firestore, cleans fields, and rotates batches to avoid token limits."""
     cap_city = target_city.title()
     target_city_lower = target_city.lower()
     
@@ -76,7 +78,6 @@ def get_city_data(target_city: str) -> dict:
                 doc_city = str(data.get("city", "")).lower()
                 
                 if doc_city == target_city_lower or doc_city == target_city.lower():
-                    # Keep only essential text fields to prevent token limit crashes (413 Error)
                     clean_spot = {
                         "name": data.get("name", "Unknown Spot"),
                         "description": data.get("description", ""),
@@ -86,10 +87,27 @@ def get_city_data(target_city: str) -> dict:
                     firestore_spots.append(clean_spot)
                     
             if firestore_spots:
-                # Limit to 5 spots per request to stay safely under Groq's free token limit
-                limited_spots = firestore_spots[:5]
-                print(f"[FIRESTORE SUCCESS] Fetched {len(firestore_spots)} spots for '{target_city}', sent top {len(limited_spots)} to prevent token overflow.")
-                return {target_city_lower: limited_spots}
+                # Count how many times we've already suggested spots in this conversation
+                batch_index = 0
+                if history:
+                    for msg in history:
+                        # Count assistant messages that look like recommendations
+                        if msg.get("role") == "assistant" and any(spot["name"] in msg.get("content", "") for spot in firestore_spots):
+                            batch_index += 1
+                
+                # Slice into chunks of 5 (Batch 0: spots 0-5, Batch 1: spots 5-10, etc.)
+                chunk_size = 5
+                start_idx = (batch_index * chunk_size) % len(firestore_spots)
+                end_idx = start_idx + chunk_size
+                
+                if end_idx <= len(firestore_spots):
+                    selected_spots = firestore_spots[start_idx:end_idx]
+                else:
+                    # Loop back to the beginning if we run out of new spots
+                    selected_spots = firestore_spots[start_idx:] + firestore_spots[:end_idx % len(firestore_spots)]
+                
+                print(f"[FIRESTORE ROTATION] Serving batch {batch_index + 1} ({len(selected_spots)} spots) for '{target_city}'.")
+                return {target_city_lower: selected_spots}
                 
         except Exception as e:
             print(f"[FIRESTORE ERROR] {e}. Falling back to knowledge.json...")
@@ -100,12 +118,9 @@ def get_city_data(target_city: str) -> dict:
             knowledge = json.load(f)
             data = knowledge.get(target_city_lower) or knowledge.get(cap_city) or knowledge.get(target_city, [])
             if data:
-                # Limit fallback data too just in case
                 data = data[:5]
-                print(f"[FALLBACK] Loaded data for: {target_city} from knowledge.json")
             return {target_city_lower: data}
     except Exception as e:
-        print(f"[CRITICAL ERROR] Both Database and Fallback failed: {e}")
         return {target_city_lower: []}
 
 
@@ -223,8 +238,8 @@ async def chat(request: ChatRequest):
                 break
 
     if target_city:
-        # Load exactly the one requested city
-        relevant_data = get_city_data(target_city)
+        # Pass the history so it knows which batch to show next!
+        relevant_data = get_city_data(target_city, request.history)
         context = json.dumps(relevant_data, indent=2)
     else:
         # Instead of starving Navi of data, load ALL allowed cities simultaneously!
