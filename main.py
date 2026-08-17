@@ -136,43 +136,6 @@ def get_city_data(target_city: str = None, history: list = None, category_filter
     except Exception as e:
         return {}
 
-def get_current_weather(city: str) -> str:
-    """Fetches real-time weather data for CAMANAVA cities using the free Open-Meteo API."""
-    # Approximate coordinates for CAMANAVA cities
-    coords = {
-        "caloocan": {"lat": 14.6500, "lon": 120.9833},
-        "malabon": {"lat": 14.6667, "lon": 120.9667},
-        "navotas": {"lat": 14.6667, "lon": 120.9417},
-        "valenzuela": {"lat": 14.7000, "lon": 120.9833}
-    }
-    
-    if city not in coords:
-        return ""
-        
-    try:
-        url = f"https://api.open-meteo.com/v1/forecast?latitude={coords[city]['lat']}&longitude={coords[city]['lon']}&current_weather=true"
-        response = requests.get(url, timeout=4)
-        data = response.json()
-        
-        cw = data.get("current_weather", {})
-        temp = cw.get("temperature", "unknown")
-        wcode = cw.get("weathercode", 0)
-        
-        # Translate WMO weather codes into readable conditions
-        if wcode <= 1: condition = "Clear and Sunny"
-        elif wcode <= 3: condition = "Partly Cloudy"
-        elif wcode <= 48: condition = "Foggy"
-        elif wcode <= 55: condition = "Drizzling"
-        elif wcode <= 65: condition = "Raining"
-        elif wcode <= 82: condition = "Rain Showers"
-        elif wcode >= 95: condition = "Thunderstorms"
-        else: condition = "Variable"
-        
-        return f"Real-time weather for {city.title()}: {condition}, {temp}°C."
-    except Exception as e:
-        print(f"Weather API Error: {e}")
-        return f"Weather data temporarily unavailable for {city.title()}."    
-
 
 class ChatRequest(BaseModel):
     message: str
@@ -308,19 +271,16 @@ async def chat(request: ChatRequest):
         elif any(w in user_msg for w in ["fish", "fishing", "port"]):
             category_filter = "fishing"
 
-        # 5.5 Detect Weather Intent & Fetch Real-Time Data
-        weather_info = "No weather data requested."
-        weather_keywords = ["weather", "rain", "temperature", "hot", "cold", "sunny", "forecast", "typhoon", "storm", "umbrella"]
-        
-        if any(kw in user_msg for kw in weather_keywords) and target_city:
-            weather_info = get_current_weather(target_city)
 
         relevant_data = get_city_data(target_city, request.history, category_filter, negated_cities)
         context = json.dumps(relevant_data, indent=2)
 
-        system_prompt = f"""You are Navi, a cheerful, warm, and natural AI tourism guide for the CAMANAVA region (Caloocan, Malabon, Navotas, Valenzuela). 
+        system_prompt = f"""You are Navi, a cheerful, warm, and natural AI tourism guide for the CAMANAVA region (Caloocan, Malabon, Navotas, Valenzuela) But you are also a bit of a sassy and witty AI. 
         
         USER QUERY: {request.message}
+
+        LIVE WEATHER STATUS:
+        {weather_info}
         
         VERIFIED DATABASE FACTS:
         {context}
