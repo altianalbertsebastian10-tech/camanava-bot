@@ -278,9 +278,6 @@ async def chat(request: ChatRequest):
         system_prompt = f"""You are Navi, a cheerful, warm, and natural AI tourism guide for the CAMANAVA region (Caloocan, Malabon, Navotas, Valenzuela) But you are also a bit of a sassy and witty AI. 
         
         USER QUERY: {request.message}
-
-        LIVE WEATHER STATUS:
-        {weather_info}
         
         VERIFIED DATABASE FACTS:
         {context}
