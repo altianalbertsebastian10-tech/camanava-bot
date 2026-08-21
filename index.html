@@ -4,71 +4,1172 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>CamaNaviGo: Chat</title>
-    <!-- ... (Keep all your existing CSS and Head content here) ... -->
+    <link rel="icon" type="image/png" href="https://raw.githubusercontent.com/altianalbertsebastian10-tech/camanava-bot/main/navi_avatar.png">
+    
+    <!-- Lumen Edge Typography: Space Grotesk & Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet" />
+    
+    <style>
+        :root {
+            /* Lumen Edge Palette (Luminance Only) */
+            --void: #121316;
+            --graph: #1a1b1f;
+            --panel: #222328;
+            --slate: #31333a;
+            --hairline: #42454d;
+            --muted: #8b8f9a;
+            --fore: #ffffff;
+            --lumen: #e2e8f0;
+
+            /* Typography */
+            --font-display: 'Space Grotesk', sans-serif;
+            --font-body: 'Inter', sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+
+            /* Core Lumen Effects */
+            --radius-box: 14px;
+            --radius-inner: 7px;
+            --rim-inset: inset 0 1px 0 rgba(255,255,255,0.06);
+            --horizon-glow: 0 20px 40px -10px rgba(255,255,255,0.04);
+            
+            /* The Lumen Focus Signal */
+            --focus-ring: 0 0 0 1px var(--slate), 0 0 20px rgba(255,255,255,0.1);
+        }
+
+        body {
+            margin: 0;
+            background-color: var(--void);
+            height: 100dvh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: var(--font-body);
+            color: var(--fore);
+            overflow: hidden;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .chat-shell {
+            width: 100%;
+            max-width: 480px;
+            height: 100dvh;
+            display: flex;
+            flex-direction: column;
+            background: transparent;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .gradient-bg-wrapper {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            z-index: -2;
+            background: radial-gradient(1200px circle at 50% 120%, rgba(255,255,255,0.03), transparent 60%);
+        }
+
+        .top-nav {
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 24px;
+            background: linear-gradient(180deg, var(--void) 0%, transparent 100%);
+            z-index: 200;
+            flex-shrink: 0;
+        }
+
+        .top-identity {
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .avatar-wrap {
+            width: 34px; height: 34px;
+            border-radius: var(--radius-inner);
+            background: var(--graph);
+            border: 1px solid var(--slate);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: var(--rim-inset);
+            padding: 2px;
+            flex-shrink: 0;
+        }
+
+        .avatar {
+            width: 100%; height: 100%;
+            border-radius: 4px;
+            object-fit: contain;
+        }
+
+        .name-tag {
+            font-family: var(--font-display);
+            color: var(--fore);
+            font-size: 1.15rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            margin: 0;
+        }
+
+        .tech-stats {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            font-family: var(--font-mono);
+            font-size: 0.65rem;
+            color: var(--muted);
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .pulse-dot {
+            width: 6px; height: 6px;
+            background-color: var(--fore);
+            border-radius: 50%;
+            box-shadow: 0 0 10px rgba(255,255,255,0.8);
+        }
+
+        #chat {
+            flex: 1;
+            padding: 100px 24px 24px 24px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            scrollbar-width: none;
+            position: relative;
+            z-index: 100;
+        }
+
+        #chat::-webkit-scrollbar { display: none; }
+
+        .welcome-spacer { flex: 1; }
+
+        .welcome-container {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            padding: 20px 0;
+            margin-bottom: auto;
+        }
+
+        .welcome-eyebrow {
+            font-family: var(--font-mono);
+            font-size: 0.65rem;
+            color: var(--muted);
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .welcome-eyebrow::before {
+            content: "";
+            width: 24px; height: 1px;
+            background-color: var(--hairline);
+        }
+
+        .welcome-title-large {
+            font-family: var(--font-display);
+            font-size: 4.5rem;
+            font-weight: 700;
+            letter-spacing: -0.04em;
+            line-height: 0.95;
+            color: var(--fore);
+            margin: 0 0 20px 0;
+            background: linear-gradient(180deg, var(--fore) 20%, var(--muted) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .welcome-title-sub {
+            font-family: var(--font-body);
+            font-size: 0.95rem;
+            color: var(--muted);
+            line-height: 1.6;
+            max-width: 90%;
+            margin: 0;
+        }
+
+        .welcome-title-sub b {
+            color: var(--lumen);
+            font-weight: 500;
+        }
+
+        .msg {
+            max-width: 85%;
+            padding: 18px 22px;
+            font-size: 0.95rem;
+            line-height: 1.55;
+            border-radius: var(--radius-box);
+            opacity: 0;
+            transform: translateY(10px);
+            animation: bubblePop 0.4s cubic-bezier(0.15, 0.83, 0.66, 1) forwards;
+            position: relative;
+        }
+
+        @keyframes bubblePop { to { opacity: 1; transform: translateY(0); } }
+
+        .bot-msg {
+            align-self: flex-start;
+            background: radial-gradient(150% 100% at 50% 100%, var(--panel) 0%, var(--graph) 100%);
+            border: 1px solid transparent;
+            color: var(--fore);
+            border-top-left-radius: 4px;
+            box-shadow: var(--rim-inset), var(--horizon-glow);
+        }
+
+        .bot-msg::after {
+            content: "";
+            position: absolute;
+            bottom: -1px; left: 15%; right: 15%;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+        }
+
+        .user-msg {
+            align-self: flex-end;
+            background-color: var(--slate);
+            color: var(--fore);
+            border: 1px solid var(--hairline);
+            border-top-right-radius: 4px;
+            box-shadow: var(--rim-inset);
+        }
+
+        .typing-bubble {
+            display: flex !important;
+            align-items: center;
+            justify-content: center;
+            width: 75px; height: 50px;
+            padding: 0 !important;
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+        }
+
+        .typing-bubble::after { display: none; }
+
+        .loading-container {
+            display: flex; justify-content: center; align-items: center;
+            transform: scale(0.18);
+        }
+
+        .loader {
+            display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;
+            width: 80px; height: 80px;
+            transform: rotate(45deg);
+            animation: rotateLoader 2.0s cubic-bezier(0.15, 0.83, 0.66, 1) infinite;
+        }
+
+        .cube {
+            width: 35px; height: 35px;
+            background: var(--muted);
+            border-radius: 8px;
+            transition: all 0.3s ease;
+            animation: pulse 1.6s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); background: var(--slate); }
+            50% { transform: scale(1.2); background: var(--fore); box-shadow: 0 0 20px rgba(255,255,255,0.2); }
+        }
+
+        @keyframes rotateLoader {
+            0% { transform: rotate(45deg); }
+            50% { transform: rotate(225deg); }
+            100% { transform: rotate(405deg); }
+        }
+        .cube:nth-child(1) { animation-delay: 0s; }
+        .cube:nth-child(2) { animation-delay: 0.2s; }
+        .cube:nth-child(3) { animation-delay: 0.4s; }
+        .cube:nth-child(4) { animation-delay: 0.6s; }
+
+        .response-container { width: 100%; }
+        .resp-body { color: inherit; }
+        strong { font-family: var(--font-display); font-weight: 700; color: var(--fore); }
+
+        .footer-container {
+            padding: 16px 24px 20px;
+            background: rgba(18, 19, 22, 0.9);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-top: 1px solid var(--slate);
+            display: flex; flex-direction: column; gap: 12px;
+            z-index: 200;
+        }
+
+        .disclaimer-text {
+            font-family: var(--font-mono);
+            font-size: 0.65rem;
+            color: var(--muted);
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            text-align: center;
+        }
+
+        .input-bar {
+            width: 100%;
+            display: flex; 
+            align-items: center;
+            gap: 12px;
+            background-color: var(--graph);
+            border: 1px solid var(--slate);
+            border-radius: var(--radius-box);
+            padding: 6px 6px 6px 18px;
+            box-shadow: var(--rim-inset);
+            transition: all 0.25s cubic-bezier(0.15, 0.83, 0.66, 1);
+            box-sizing: border-box;
+        }
+
+        .input-bar:focus-within {
+            border-color: var(--hairline);
+            box-shadow: var(--focus-ring);
+            background-color: var(--panel);
+        }
+
+        input {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: var(--fore);
+            padding: 0;
+            margin: 0;
+            outline: none;
+            font-size: 0.95rem;
+            font-family: var(--font-body);
+        }
+
+        input::placeholder { color: var(--muted); }
+
+        .send-pill {
+            background-color: var(--slate);
+            color: var(--muted);
+            width: 36px; height: 36px;
+            border-radius: 8px;
+            border: 1px solid transparent;
+            cursor: not-allowed;
+            display: flex; align-items: center; justify-content: center;
+            transition: all 0.25s cubic-bezier(0.15, 0.83, 0.66, 1);
+            flex-shrink: 0;
+        }
+        
+        .send-pill.active {
+            background-color: var(--fore);
+            color: var(--void);
+            border: none;
+            box-shadow: 0 0 20px rgba(255,255,255,0.15);
+            cursor: pointer;
+        }
+
+        .send-pill.active:hover { filter: brightness(0.9); transform: scale(1.02); }
+        .send-pill.active:active { transform: scale(0.96); }
+        .send-pill svg { width: 16px; height: 16px; fill: currentColor; }
+
+        .bubble-tts-btn {
+            background-color: transparent;
+            color: var(--muted);
+            border: 1px solid var(--slate);
+            border-radius: var(--radius-inner);
+            cursor: pointer;
+            padding: 6px 14px;
+            margin-top: 14px;
+            display: inline-flex; align-items: center; gap: 8px;
+            font-family: var(--font-body);
+            font-size: 0.8rem; font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        .bubble-tts-btn:hover { background-color: var(--slate); color: var(--fore); }
+        .bubble-tts-btn:active { transform: scale(0.95); }
+        .bubble-tts-btn svg { fill: currentColor; width: 14px; height: 14px;}
+        
+        .bubble-tts-btn.playing-active {
+            color: var(--void);
+            background-color: var(--fore);
+            border-color: var(--fore);
+            box-shadow: 0 0 15px rgba(255,255,255,0.15);
+        }
+
+        /* --- Header Voice Trigger --- */
+        .header-mic-btn {
+            background-color: var(--graph);
+            color: var(--muted);
+            border: 1px solid var(--slate);
+            border-radius: var(--radius-inner);
+            padding: 6px 10px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-family: var(--font-mono);
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .header-mic-btn:hover {
+            background-color: var(--panel);
+            color: var(--fore);
+            border-color: var(--hairline);
+        }
+
+        .header-mic-btn svg {
+            width: 14px; height: 14px;
+            fill: currentColor; 
+        }
+
+        /* --- GEMINI LIVE OVERLAY --- */
+        #live-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(18, 19, 22, 0.98);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            z-index: 3000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.4s cubic-bezier(0.15, 0.83, 0.66, 1);
+        }
+
+        #live-overlay.is-active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .live-close-btn {
+            position: absolute;
+            top: 24px;
+            right: 24px;
+            background: transparent;
+            border: none;
+            color: var(--muted);
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+        .live-close-btn:hover { color: var(--fore); }
+
+        /* --- UNIFIED LIVE ORB STYLES --- */
+        .live-orb-container {
+            position: relative; width: 200px; height: 200px;
+            display: flex; align-items: center; justify-content: center;
+        }
+
+        .live-orb {
+            width: 140px; height: 140px; /* Unified consistent size */
+            border-radius: 50%;
+            background: transparent;
+            cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            position: relative;
+            
+            /* The JS Web Audio API will dynamically control this variable! */
+            transform: scale(var(--audio-scale, 1));
+            /* GRACEFUL CLOSING: Smooth 0.6s ease when returning to normal size */
+            transition: transform 0.6s cubic-bezier(0.15, 0.83, 0.66, 1); 
+        }
+
+        /* The spinning blue gradients */
+        .live-orb .loader {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            border-radius: 50%;
+            background-color: transparent;
+            z-index: 0;
+            /* Default state: Listening (Slow rotate) */
+            animation: loader-rotate 6s linear infinite; 
+        }
+
+        .live-orb svg { 
+            position: relative; z-index: 10; 
+            width: 32px; height: 32px; fill: var(--fore); opacity: 0; transition: opacity 0.2s; 
+        }
+        .live-orb:hover svg { opacity: 0.5; }
+
+        /* STATE: Thinking (Fixed CSS pulse, slightly faster spin) */
+        .live-orb.state-thinking {
+            animation: orb-think-pulse 1s infinite alternate ease-in-out;
+            pointer-events: none;
+        }
+        .live-orb.state-thinking .loader { animation-duration: 4s; }
+
+        /* STATE: Speaking (JS Waveform Pulse via var(--audio-scale), fast spin) */
+        .live-orb.state-speaking {
+            /* SNAPPY REACTIVITY: 0.05s linear only while actively responding to audio */
+            transition: transform 0.05s linear;
+        }
+        .live-orb.state-speaking .loader { animation-duration: 2.5s; }
+
+        /* Animations */
+        @keyframes orb-think-pulse {
+            0% { transform: scale(0.95); }
+            100% { transform: scale(1.05); }
+        }
+
+        /* Beautiful AI Blue colorways */
+        @keyframes loader-rotate {
+            0% {
+                transform: rotate(90deg);
+                box-shadow: 0 10px 20px 0 rgba(255,255,255,0.8) inset, 0 20px 30px 0 #00d2ff inset, 0 60px 60px 0 #3a7bd5 inset;
+            }
+            50% {
+                transform: rotate(270deg);
+                box-shadow: 0 10px 20px 0 rgba(255,255,255,0.8) inset, 0 20px 10px 0 #0072ff inset, 0 40px 60px 0 #00c6ff inset;
+            }
+            100% {
+                transform: rotate(450deg);
+                box-shadow: 0 10px 20px 0 rgba(255,255,255,0.8) inset, 0 20px 30px 0 #00d2ff inset, 0 60px 60px 0 #3a7bd5 inset;
+            }
+        }
+
+        .live-status-text {
+            margin-top: 40px;
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            letter-spacing: 0.15em;
+            color: var(--muted);
+            text-transform: uppercase;
+        }
+
+        .live-transcript {
+            margin-top: 30px;
+            font-family: var(--font-display); 
+            font-size: 1.15rem;
+            line-height: 1.6;
+            color: var(--fore);
+            text-align: center;
+            max-width: 85%;
+            min-height: 30px;
+            max-height: 180px; 
+            overflow-y: auto; 
+            scrollbar-width: none; 
+            padding: 0 10px;
+            
+            /* NEW: Graceful fade and slide transitions */
+            transition: opacity 0.3s cubic-bezier(0.15, 0.83, 0.66, 1), transform 0.3s cubic-bezier(0.15, 0.83, 0.66, 1);
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .live-transcript::-webkit-scrollbar {
+            display: none; 
+        }
+
+        @media (min-width: 481px) {
+            .chat-shell {
+                height: 90vh;
+                border-radius: 20px;
+                border: 1px solid var(--slate);
+                box-shadow: 0 40px 100px rgba(0,0,0,0.9), inset 0 1px 0 rgba(255,255,255,0.06);
+            }
+            #live-overlay { border-radius: 20px; }
+        }
+    </style>
 </head>
 <body>
 
-<!-- NEW LOGIN GATE OVERLAY -->
-<div id="login-gate" style="display: none; position: absolute; inset: 0; background: #121316; z-index: 4000; flex-direction: column; align-items: center; justify-content: center; padding: 24px; text-align: center;">
-    <h2 style="font-family: 'Space Grotesk', sans-serif; font-size: 2rem; margin-bottom: 12px; color: #ffffff;">Authentication Required</h2>
-    <p style="color: #8b8f9a; font-size: 0.95rem; line-height: 1.5;">Please log in through the NaviGo! mobile application to access Navi.</p>
-</div>
-
 <div class="chat-shell">
-    <!-- ... (Keep the rest of your chat UI structure here) ... -->
+    <div class="gradient-bg-wrapper"></div>
+
+    <div class="top-nav">
+        <div class="top-identity">
+            <div class="avatar-wrap" id="navi-avatar-wrap">
+                <img src="https://raw.githubusercontent.com/altianalbertsebastian10-tech/camanava-bot/main/navi_avatar.png" class="avatar" id="navi-avatar" alt="Navi">
+            </div>
+            <h1 class="name-tag">Navi</h1>
+        </div>
+        <div class="tech-stats">
+            <!-- Voice Trigger for Gemini Live Mode -->
+            <button class="header-mic-btn" onclick="openLiveMode()" title="Start Live Session">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16">
+                    <path fill-rule="evenodd" d="M8.5 2a.5.5 0 0 1 .5.5v11a.5.5 0 0 1-1 0v-11a.5.5 0 0 1 .5-.5m-2 2a.5.5 0 0 1 .5.5v7a.5.5 0 0 1-1 0v-7a.5.5 0 0 1 .5-.5m4 0a.5.5 0 0 1 .5.5v7a.5.5 0 0 1-1 0v-7a.5.5 0 0 1 .5-.5m-6 1.5A.5.5 0 0 1 5 6v4a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m8 0a.5.5 0 0 1 .5.5v4a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m-10 1A.5.5 0 0 1 3 7v2a.5.5 0 0 1-1 0V7a.5.5 0 0 1 .5-.5m12 0a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-1 0V7a.5.5 0 0 1 .5-.5"/>
+                </svg>
+                
+            </button>
+            <div class="status-indicator">
+                <div class="pulse-dot"></div>
+                <span id="status-tag">SYSTEM ONLINE</span>
+            </div>
+            <span class="hidden-mobile">V 2.0</span>
+        </div>
+    </div>
+
+    <div id="chat">
+        <div class="welcome-spacer" id="welcome-spacer"></div>
+        <div class="welcome-container" id="welcome-container">
+            <span class="welcome-eyebrow">HI I AM CamaNaviGo's</span>
+            <h2 class="welcome-title-large">Navi!</h2>
+            <p class="welcome-title-sub">How can I be of assistance today?</p>
+        </div>
+        <div class="welcome-spacer" id="welcome-spacer-bottom"></div>
+    </div>
+
+    <div class="footer-container">
+        <div class="input-bar">
+            <input id="input" type="text" placeholder="" onkeypress="handleKeyPress(event)" oninput="toggleSendButtonState()" autocomplete="off">
+            <button id="send-btn" class="send-pill" onclick="send()" disabled>
+                <svg viewBox="0 0 24 24"><path d="M4 12l1.41 1.41L11 7.83V20h2V7.83l5.58 5.59L20 12l-8-8-8 8z" fill="currentColor"/></svg>
+            </button>
+        </div>
+        <div class="disclaimer-text">Navi is an AI and can make mistakes</div>
+    </div>
+
+    <!-- GEMINI LIVE STYLE OVERLAY -->
+    <div id="live-overlay">
+        <button class="live-close-btn" onclick="closeLiveMode()">
+            <svg viewBox="0 0 24 24" width="28" height="28" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+        
+        <div class="live-orb-container">
+            <div id="live-orb" class="live-orb" onclick="handleOrbTap()">
+                <!-- ADD THIS LINE RIGHT HERE -->
+                <div class="loader"></div>
+                
+                <svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12"></rect></svg>
+            </div>
+        </div>
+        
+        <div id="live-status" class="live-status-text">INITIATING...</div>
+        <div id="live-transcript" class="live-transcript"></div>
+    </div>
 </div>
 
 <script>
-    // --- AUTHENTICATION STATE ---
-    let authToken = localStorage.getItem('authToken') || '';
+    let history = [];
+    let isNaviThinking = false;
+    let welcomeHidden = false;
 
-    // Function called by Flutter when the WebView loads (via runJavaScript)
-    window.handleAppLogin = function(uid, token, displayName) {
-        authToken = token;
-        localStorage.setItem('authToken', token);
-        localStorage.setItem('uid', uid);
-        document.getElementById('login-gate').style.display = 'none';
-        console.log("Flutter Auth Received.");
-    };
+    let currentActiveButton = null;
+    let activeAudio = null;
 
-    // Check for auth on load
-    window.addEventListener('DOMContentLoaded', () => {
-        if (!authToken) {
-            setTimeout(() => {
-                if (!authToken) document.getElementById('login-gate').style.display = 'flex';
-            }, 1000);
+    const ICON_SPEAK = `<svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z" fill="currentColor"/></svg>`;
+    const ICON_STOP  = `<svg viewBox="0 0 24 24"><path d="M6 6h12v12H6z" fill="currentColor"/></svg>`;
+
+    function clearTTSState() {
+        if (currentActiveButton) {
+            currentActiveButton.classList.remove('playing-active');
+            currentActiveButton.innerHTML = ICON_SPEAK + " Engage";
+            currentActiveButton = null;
         }
-    });
+        updateStatusDisplay('idle');
+        if (activeAudio) {
+            activeAudio.pause();
+            activeAudio = null;
+        }
+    }
 
-    // --- MODIFIED SEND FUNCTION ---
+    function playNaviVoice(btn) {
+        const base64Audio = btn.getAttribute('data-audio');
+        if (!base64Audio) return; 
+
+        if (currentActiveButton === btn && activeAudio) {
+            clearTTSState();
+            return;
+        }
+
+        clearTTSState();
+
+        currentActiveButton = btn;
+        btn.classList.add('playing-active');
+        btn.innerHTML = ICON_STOP + " Off";
+        updateStatusDisplay('speaking');
+
+        activeAudio = new Audio("data:audio/mp3;base64," + base64Audio);
+        
+        activeAudio.onended = () => clearTTSState();
+        activeAudio.onerror = () => clearTTSState();
+
+        activeAudio.play().catch(e => {
+            console.error("Audio error:", e);
+            clearTTSState();
+        });
+    }
+
+    function formatMessageHTML(text) {
+        if (!text) return '';
+        let formatted = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\*/g, '').trim();
+        let lines = formatted.split('\n').filter(l => l.trim() !== '');
+        if (lines.length <= 1) {
+            return `<div class="resp-body">${formatted}</div>`;
+        } else {
+            const inner = lines.map(l =>
+                l.trim().startsWith('- ') ? `<li>${l.trim().substring(2)}</li>` : l + '<br>'
+            ).join('');
+            return `<div class="resp-body">${inner}</div>`;
+        }
+    }
+
+    function updateStatusDisplay(mode) {
+        const tag = document.getElementById('status-tag');
+        if      (mode === 'thinking') tag.innerHTML = 'PROCESSING';
+        else if (mode === 'speaking') tag.innerHTML = 'STREAMING';
+        else                          tag.innerHTML = 'SYSTEM ONLINE';
+    }
+
+    function handleKeyPress(e) {
+        if (e.key === 'Enter' && !document.getElementById('send-btn').disabled) send();
+    }
+
+    function toggleSendButtonState() {
+        const input   = document.getElementById('input');
+        const sendBtn = document.getElementById('send-btn');
+        if (isNaviThinking) return;
+        if (input.value.trim().length > 0) {
+            sendBtn.disabled = false;
+            sendBtn.classList.add('active');
+        } else {
+            sendBtn.disabled = true;
+            sendBtn.classList.remove('active');
+        }
+    }
+
+    function forceUIRefreshScroll() {
+        const chat = document.getElementById('chat');
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+            chat.scrollTop = chat.scrollHeight;
+        }));
+    }
+
+    document.querySelector('.chat-shell').addEventListener('wheel', (e) => {
+        const chat = document.getElementById('chat');
+        chat.scrollTop += e.deltaY;
+        // Don't prevent default on the overlay so users can scroll long transcripts if needed
+        if (e.target.closest('#live-overlay')) return; 
+        e.preventDefault();
+    }, { passive: false });
+
+    function hideWelcome() {
+        if (welcomeHidden) return;
+        welcomeHidden = true;
+        const spacer       = document.getElementById('welcome-spacer');
+        const spacerBottom = document.getElementById('welcome-spacer-bottom');
+        const welcome      = document.getElementById('welcome-container');
+        if (welcome) { welcome.style.opacity = '0'; welcome.style.transition = 'opacity 0.25s cubic-bezier(0.15, 0.83, 0.66, 1)'; }
+        if (spacer)       spacer.style.display = 'none';
+        if (spacerBottom) spacerBottom.style.display = 'none';
+        setTimeout(() => { welcome?.remove(); spacer?.remove(); spacerBottom?.remove(); }, 250);
+    }
+
+    function unlockChat() {
+        isNaviThinking = false;
+        const input = document.getElementById('input');
+        input.disabled = false;
+        updateStatusDisplay('idle');
+        toggleSendButtonState();
+        input.focus();
+        forceUIRefreshScroll();
+    }
+
+    function addMessageToUI(sender, text, audioBase64 = null) {
+        const chat = document.getElementById('chat');
+        const wrapper = document.createElement('div');
+        
+        if (sender === 'user') {
+            const userMsgDiv = document.createElement('div');
+            userMsgDiv.className = 'msg user-msg';
+            userMsgDiv.innerText = text;
+            chat.appendChild(userMsgDiv);
+        } else {
+            wrapper.style.display = 'flex';
+            wrapper.style.flexDirection = 'column';
+            wrapper.style.alignItems = 'flex-start';
+            chat.appendChild(wrapper);
+            
+            const botMsgDiv = document.createElement('div');
+            botMsgDiv.className = 'msg bot-msg';
+            
+            const innerHTMLContent = formatMessageHTML(text);
+            const containerDiv = document.createElement('div');
+            containerDiv.className = 'response-container';
+            botMsgDiv.appendChild(containerDiv);
+            wrapper.appendChild(botMsgDiv);
+            
+            let index = 0;
+            const typewriter = setInterval(() => {
+                if (index < innerHTMLContent.length) {
+                    if (innerHTMLContent[index] === '<') {
+                        const tagEnd = innerHTMLContent.indexOf('>', index);
+                        if (tagEnd !== -1) index = tagEnd;
+                    }
+                    containerDiv.innerHTML = innerHTMLContent.slice(0, index + 1);
+                    index++;
+                    chat.scrollTop = chat.scrollHeight;
+                } else {
+                    clearInterval(typewriter);
+                    if (audioBase64) {
+                        const btn = document.createElement('button');
+                        btn.className = 'bubble-tts-btn';
+                        btn.innerHTML = ICON_SPEAK + " Engage";
+                        btn.setAttribute('data-audio', audioBase64);
+                        btn.onclick = function() { playNaviVoice(this); };
+                        containerDiv.appendChild(btn);
+                    }
+                    unlockChat();
+                }
+            }, 15);
+        }
+        forceUIRefreshScroll();
+    }
+
     async function send(messageOverride = null) {
         if (isNaviThinking) return;
         
-        // ... (Keep existing setup logic here) ...
+        if (activeAudio) clearTTSState();
+        
+        const input = document.getElementById('input');
+        const msg = messageOverride || input.value.trim();
+        if (!msg) return;
+        
+        isNaviThinking = true;
+        input.disabled = true;
+        document.getElementById('send-btn').disabled = true;
+        document.getElementById('send-btn').classList.remove('active');
+        updateStatusDisplay('thinking');
+        hideWelcome();
+        
+        addMessageToUI('user', msg);
+        input.value = '';
+        
+        const typingId = 'typing-' + Date.now();
+        const typingBubble = document.createElement('div');
+        typingBubble.className = 'msg bot-msg typing-bubble';
+        typingBubble.id = typingId;
+        typingBubble.innerHTML = `
+        <div class="loading-container">
+          <div class="loader">
+            <div class="cube"></div>
+            <div class="cube"></div>
+            <div class="cube"></div>
+            <div class="cube"></div>
+          </div>
+        </div>`;
+        document.getElementById('chat').appendChild(typingBubble);
+        forceUIRefreshScroll();
         
         try {
-            const res = await fetch('https://camanava-bot.onrender.com/chat', {
+            const res  = await fetch('https://camanava-bot.onrender.com/chat', {
                 method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'Authorization': 'Bearer ' + authToken // <-- Token sent here!
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ message: msg, history })
             });
+            const data = await res.json();
+            document.getElementById(typingId)?.remove();
             
-            if (res.status === 401) {
-                document.getElementById('login-gate').style.display = 'flex';
-                throw new Error("Unauthorized");
+            history = data.history;
+            
+            // If in Live Mode, divert handling to the live loop!
+            if (isLiveModeActive) {
+                handleLiveResponse(data.response, data.audio);
+            } else {
+                addMessageToUI('bot', data.response, data.audio);
             }
             
-            const data = await res.json();
-            // ... (Keep existing UI rendering logic here) ...
         } catch (err) {
-            // ... (Keep existing error handling here) ...
+            document.getElementById(typingId)?.remove();
+            if (isLiveModeActive) {
+                setLiveState('error', "Connection failed. Tap to retry.");
+                isNaviThinking = false;
+            } else {
+                addMessageToUI('bot', "Connection Error.");
+                unlockChat();
+            }
         }
     }
+
+    // --- GEMINI LIVE STYLE VOICE LOOP ---
     
-    // ... (Keep all your existing JavaScript functions here) ...
+    let isLiveModeActive = false;
+    let liveMediaRecorder;
+    let liveAudioChunks = [];
+    let liveState = 'idle'; // idle, listening, thinking, speaking, error
+    let liveAudioPlayer = null;
+
+    const overlay = document.getElementById('live-overlay');
+    const orb = document.getElementById('live-orb');
+    const statusText = document.getElementById('live-status');
+    const transcriptText = document.getElementById('live-transcript');
+
+    let transcriptTimeout;
+
+    function updateTranscript(text) {
+        const transcriptEl = document.getElementById('live-transcript');
+        
+        // 1. Fade out the current text and slide it down slightly
+        transcriptEl.style.opacity = '0';
+        transcriptEl.style.transform = 'translateY(5px)';
+        
+        // 2. Wait for the fade out to finish (300ms), then swap the text
+        clearTimeout(transcriptTimeout);
+        transcriptTimeout = setTimeout(() => {
+            transcriptEl.innerText = text;
+            
+            if (text.trim() !== "") {
+                // 3. Fade the new text back in smoothly
+                transcriptEl.style.opacity = '1';
+                transcriptEl.style.transform = 'translateY(0)';
+            }
+        }, 300); 
+    }
+
+    async function openLiveMode() {
+        if (activeAudio) clearTTSState();
+        isLiveModeActive = true;
+        overlay.classList.add('is-active');
+        updateTranscript("");
+        
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            
+            let options = { mimeType: 'audio/webm' };
+            if (!MediaRecorder.isTypeSupported('audio/webm')) {
+                options = { mimeType: 'audio/mp4' }; 
+            }
+
+            liveMediaRecorder = new MediaRecorder(stream, options);
+            
+            liveMediaRecorder.ondataavailable = event => {
+                if (event.data.size > 0) liveAudioChunks.push(event.data);
+            };
+            
+            liveMediaRecorder.onstop = async () => {
+                if (!isLiveModeActive) return; 
+                
+                setLiveState('thinking', "Transcribing...");
+                
+                const audioBlob = new Blob(liveAudioChunks, { type: options.mimeType });
+                liveAudioChunks = [];
+                const formData = new FormData();
+                
+                // Dynamically assign the correct extension based on the browser
+                const ext = options.mimeType.includes('mp4') ? 'm4a' : 'webm';
+                formData.append("file", audioBlob, `voice.${ext}`);
+                
+                try {
+                    const res = await fetch('https://camanava-bot.onrender.com/transcribe', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    const data = await res.json();
+                    
+                    if (data.text && data.text.trim() !== "") {
+                        updateTranscript(`"${data.text}"`);
+                        setLiveState('thinking', "Navi is thinking...");
+                        send(data.text); 
+                    } else {
+                        setLiveState('listening', "Didn't catch that. Tap when done speaking.");
+                        liveMediaRecorder.start(); 
+                    }
+                } catch (err) {
+                    console.error("Transcription error:", err);
+                    setLiveState('error', "Transcription failed. Tap to retry.");
+                }
+            };
+            
+            // Start the loop!
+            startLiveListening();
+            
+        } catch (err) {
+            console.error("Microphone error:", err);
+            alert("Microphone access is required for Live Mode.");
+            closeLiveMode();
+        }
+    }
+
+    function startLiveListening() {
+        if (!isLiveModeActive || !liveMediaRecorder) return;
+        liveAudioChunks = [];
+        setLiveState('listening', "Listening... Tap orb to send.");
+        updateTranscript("");
+        liveMediaRecorder.start();
+    }
+
+    function handleOrbTap() {
+        if (liveState === 'listening') {
+            // Stop recording and process
+            liveMediaRecorder.stop();
+        } else if (liveState === 'speaking') {
+            // Interrupt AI
+            if (liveAudioPlayer) {
+                liveAudioPlayer.pause();
+                liveAudioPlayer = null;
+            }
+            startLiveListening();
+        } else if (liveState === 'error' || liveState === 'idle') {
+            startLiveListening();
+        }
+    }
+
+    function handleLiveResponse(text, audioBase64) {
+        if (!isLiveModeActive) return;
+        isNaviThinking = false; 
+        
+        const cleanText = text.replace(/\*\*(.*?)\*\*/g, '$1').replace(/\*/g, '').trim();
+        updateTranscript(cleanText);
+        addMessageToUI('bot', text, audioBase64); 
+        
+        if (audioBase64) {
+            setLiveState('speaking', "Navi is speaking... Tap to interrupt.");
+            liveAudioPlayer = new Audio("data:audio/mp3;base64," + audioBase64);
+            
+            // Hook the audio up to the live visualizer!
+            try {
+                initAudio();
+                if (currentAudioSource) currentAudioSource.disconnect();
+                currentAudioSource = audioCtx.createMediaElementSource(liveAudioPlayer);
+                currentAudioSource.connect(analyser);
+                analyser.connect(audioCtx.destination);
+            } catch(e) { console.log("Web Audio Context skipped:", e); }
+
+            // Start the visualizer loop the moment she speaks
+            liveAudioPlayer.onplay = () => pulseWithAudio();
+            
+            liveAudioPlayer.onended = () => {
+                if (isLiveModeActive) startLiveListening(); 
+            };
+            liveAudioPlayer.onerror = () => {
+                if (isLiveModeActive) startLiveListening(); 
+            };
+            
+            liveAudioPlayer.play().catch(e => {
+                console.error("Live Audio error:", e);
+                startLiveListening();
+            });
+        } else {
+            setTimeout(startLiveListening, 2000);
+        }
+    }
+
+    function setLiveState(state, message) {
+        liveState = state;
+        statusText.innerText = message;
+        
+        orb.className = 'live-orb'; // Reset classes
+        if (state === 'listening') orb.classList.add('state-listening');
+        if (state === 'thinking')  orb.classList.add('state-thinking');
+        if (state === 'speaking')  orb.classList.add('state-speaking');
+
+        // Force scale back to 1 to trigger the graceful CSS transition when audio stops
+        if (state !== 'speaking') {
+            orb.style.setProperty('--audio-scale', 1);
+        }
+    }
+
+    function closeLiveMode() {
+        isLiveModeActive = false;
+        overlay.classList.remove('is-active');
+        
+        if (liveMediaRecorder && liveMediaRecorder.state !== 'inactive') {
+            liveMediaRecorder.stop();
+        }
+        if (liveAudioPlayer) {
+            liveAudioPlayer.pause();
+            liveAudioPlayer = null;
+        }
+        
+        // Ensure standard chat is unlocked
+        isNaviThinking = false;
+        unlockChat();
+    }
+
+    // --- DYNAMIC PLACEHOLDER TYPING ANIMATION ---
+    const placeholderPhrases = [
+        "Where can I walk my dog?",
+        "Give me restaurants in Valenzuela...",
+        "What is the history of Malabon?",
+        "Best heritage spots in Caloocan?",
+        "Where to eat in Navotas?"
+    ];
+
+    let phIndex = 0;
+    let charIndex = 0;
+    let isDeletingPlaceholder = false;
+    const inputElement = document.getElementById('input');
+    
+    const typingSpeed = 80;
+    const deletingSpeed = 40;
+    const delayBetweenPhrases = 2500;
+
+    function animatePlaceholder() {
+        if (document.activeElement === inputElement || inputElement.value.length > 0) {
+            inputElement.setAttribute('placeholder', 'Ask Navi...');
+            setTimeout(animatePlaceholder, 2000); 
+            return;
+        }
+
+        const currentPhrase = placeholderPhrases[phIndex];
+        
+        if (isDeletingPlaceholder) {
+            inputElement.setAttribute('placeholder', currentPhrase.substring(0, charIndex - 1));
+            charIndex--;
+        } else {
+            inputElement.setAttribute('placeholder', currentPhrase.substring(0, charIndex + 1));
+            charIndex++;
+        }
+
+        let currentSpeed = isDeletingPlaceholder ? deletingSpeed : typingSpeed;
+
+        if (!isDeletingPlaceholder && charIndex === currentPhrase.length) {
+            currentSpeed = delayBetweenPhrases;
+            isDeletingPlaceholder = true;
+        } else if (isDeletingPlaceholder && charIndex === 0) {
+            isDeletingPlaceholder = false;
+            phIndex = (phIndex + 1) % placeholderPhrases.length;
+            currentSpeed = 500; 
+        }
+
+        setTimeout(animatePlaceholder, currentSpeed);
+    }
+
+    setTimeout(animatePlaceholder, 1000);
+
+    // --- WEB AUDIO API FOR ORB WAVELENGTH ---
+    let audioCtx = null;
+    let analyser = null;
+    let dataArray = null;
+    let currentAudioSource = null;
+    let orbAnimationId = null;
+
+    function initAudio() {
+        if (!audioCtx) {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            analyser = audioCtx.createAnalyser();
+            analyser.fftSize = 128; // Small chunk size for snappy visual response
+            dataArray = new Uint8Array(analyser.frequencyBinCount);
+        }
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+    }
+
+    function pulseWithAudio() {
+        if (liveState !== 'speaking' || !analyser) return;
+        
+        analyser.getByteFrequencyData(dataArray);
+        let sum = 0;
+        for(let i = 0; i < dataArray.length; i++) { sum += dataArray[i]; }
+        let average = sum / dataArray.length;
+        
+        // Map the volume (0-255) to a scale multiplier (1.0 to 1.35)
+        let scale = 1 + (average / 255) * 0.35; 
+        
+        // Inject the scale directly into the CSS variable!
+        document.getElementById('live-orb').style.setProperty('--audio-scale', scale);
+        
+        orbAnimationId = requestAnimationFrame(pulseWithAudio);
+    }
 </script>
 </body>
 </html>
