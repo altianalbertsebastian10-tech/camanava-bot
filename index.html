@@ -51,6 +51,8 @@
             -webkit-font-smoothing: antialiased;
         }
 
+        
+
         .chat-shell {
             width: 100%;
             max-width: 480px;
@@ -582,6 +584,11 @@
     </style>
 </head>
 <body>
+<!-- LOGIN GATE OVERLAY -->
+<div id="login-gate" style="display: flex; position: absolute; inset: 0; background: #121316; z-index: 4000; flex-direction: column; align-items: center; justify-content: center; padding: 24px; text-align: center;">
+    <h2 style="font-family: 'Space Grotesk', sans-serif; font-size: 2rem; margin-bottom: 12px; color: #ffffff;">Authentication Required</h2>
+    <p style="color: #8b8f9a; font-size: 0.95rem; line-height: 1.5;">Please log in through the NaviGo! mobile application to access Navi.</p>
+</div>
 
 <div class="chat-shell">
     <div class="gradient-bg-wrapper"></div>
@@ -650,6 +657,22 @@
 </div>
 
 <script>
+
+    let authToken = localStorage.getItem('authToken') || '';
+
+        window.handleAppLogin = function(uid, token, displayName) {
+            authToken = token;
+            localStorage.setItem('authToken', token);
+            localStorage.setItem('uid', uid);
+            document.getElementById('login-gate').style.display = 'none';
+        };
+
+        window.addEventListener('DOMContentLoaded', () => {
+            if (authToken) {
+                document.getElementById('login-gate').style.display = 'none';
+            }
+        });
+        
     let history = [];
     let isNaviThinking = false;
     let welcomeHidden = false;
@@ -862,11 +885,19 @@
         forceUIRefreshScroll();
         
         try {
-            const res  = await fetch('https://camanava-bot.onrender.com/chat', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message: msg, history })
-            });
+            const res = await fetch('https://camanava-bot.onrender.com/chat', {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + authToken // <-- Added this header
+            },
+            body: JSON.stringify({ message: msg, history })
+        });
+
+        if (res.status === 401) {
+            document.getElementById('login-gate').style.display = 'flex';
+            throw new Error("Unauthorized");
+        }
             const data = await res.json();
             document.getElementById(typingId)?.remove();
             

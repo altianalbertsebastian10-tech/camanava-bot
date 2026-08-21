@@ -6,7 +6,7 @@ import emoji
 import tempfile
 import re
 from groq import Groq
-from fastapi import FastAPI, UploadFile, File
+from fastapi import FastAPI, UploadFile, File, Header, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
@@ -53,6 +53,21 @@ try:
     print("Firebase initialized successfully. Running in FIRESTORE mode.")
 except Exception as e:
     print(f"Firebase Init Warning: {e}. Defaulting to JSON fallback mode.")
+
+# --- FIREBASE TOKEN GATEKEEPER ---
+def verify_firebase_token(authorization: str = Header(None)):
+    if not firebase_active:
+        return {"uid": "dev_user"}
+        
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing or invalid token format")
+    
+    token = authorization.split("Bearer ")[1]
+    try:
+        decoded_token = auth.verify_id_token(token)
+        return decoded_token  # Returns dict containing 'uid', 'email', etc.
+    except Exception as e:
+        raise HTTPException(status_code=401, detail=f"Invalid or expired token: {str(e)}")
 
 # --- ADVANCED DYNAMIC DATA ROUTER WITH CATEGORY FILTERING & PAGINATION ---
 def get_city_data(target_city: str = None, history: list = None, category_filter: str = None, negated_cities: set = None) -> dict:
@@ -208,7 +223,7 @@ async def transcribe_audio(file: UploadFile = File(...)):
                 pass
 
 @app.post("/chat")
-async def chat(request: ChatRequest):
+async def chat(request: ChatRequest, user: dict = Depends(verify_firebase_token)):
     try:
         
         verified_uid = user.get("uid")
