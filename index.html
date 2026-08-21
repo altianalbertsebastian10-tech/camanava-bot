@@ -658,20 +658,43 @@
 
 <script>
 
+    
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlToken = urlParams.get('token');
+    const urlUid = urlParams.get('uid');
+
+    if (urlToken) {
+        localStorage.setItem('authToken', urlToken);
+        if (urlUid) localStorage.setItem('uid', urlUid);
+        
+       
+        window.history.replaceState({}, document.title, window.location.pathname);
+    }
+
+    // 2. KUNIN ANG TOKEN MULA SA LOCAL STORAGE
     let authToken = localStorage.getItem('authToken') || '';
 
-        window.handleAppLogin = function(uid, token, displayName) {
-            authToken = token;
-            localStorage.setItem('authToken', token);
-            localStorage.setItem('uid', uid);
-            document.getElementById('login-gate').style.display = 'none';
-        };
+    // Eto yung lumang function para sa Android/iOS native webview
+    window.handleAppLogin = function(uid, token, displayName) {
+        authToken = token;
+        localStorage.setItem('authToken', token);
+        localStorage.setItem('uid', uid);
+        document.getElementById('login-gate').style.display = 'none';
+    };
 
-        window.addEventListener('DOMContentLoaded', () => {
-            if (authToken) {
-                document.getElementById('login-gate').style.display = 'none';
-            }
-        });
+    // 3. ITAGO ANG LOGIN GATE KUNG MAY TOKEN NA
+    window.addEventListener('DOMContentLoaded', () => {
+        if (authToken) {
+            document.getElementById('login-gate').style.display = 'none';
+        } else {
+            // Bigyan ng 1 second allowance bago ipakita ang block screen (in case naglo-load pa)
+            setTimeout(() => {
+                if (!localStorage.getItem('authToken')) {
+                    document.getElementById('login-gate').style.display = 'flex';
+                }
+            }, 1000);
+        }
+    });
         
     let history = [];
     let isNaviThinking = false;
