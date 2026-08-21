@@ -208,7 +208,7 @@ async def transcribe_audio(file: UploadFile = File(...)):
                 pass
 
 @app.post("/chat")
-async def chat(request: ChatRequest, user: dict = Depends(verify_firebase_token)):
+async def chat(request: ChatRequest):
     try:
         
         verified_uid = user.get("uid")
