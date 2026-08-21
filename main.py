@@ -6,7 +6,7 @@ import emoji
 import tempfile
 import re
 from groq import Groq
-from fastapi import FastAPI, UploadFile, File, Header, HTTPException, Depends
+from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
@@ -18,23 +18,6 @@ import datetime
 
 import firebase_admin
 from firebase_admin import credentials, firestore, auth
-
-# --- FIREBASE TOKEN GATEKEEPER ---
-def verify_firebase_token(authorization: str = Header(None)):
-    if not firebase_active:
-        # If Firebase isn't configured, bypass for local dev/testing
-        return {"uid": "dev_user"}
-        
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Missing or invalid token format")
-    
-    token = authorization.split("Bearer ")[1]
-    try:
-        decoded_token = auth.verify_id_token(token)
-        return decoded_token  # Returns dict containing 'uid', 'email', etc.
-    except Exception as e:
-        raise HTTPException(status_code=401, detail=f"Invalid or expired token: {str(e)}")
-
 
 def self_ping():
     time.sleep(20)
@@ -295,7 +278,7 @@ async def chat(request: ChatRequest, user: dict = Depends(verify_firebase_token)
         relevant_data = get_city_data(target_city, request.history, category_filter, negated_cities)
         context = json.dumps(relevant_data, indent=2)
 
-        system_prompt = f"""You are Navi, a cheerful, warm, and natural AI tourism guide for the CAMANAVA region (Caloocan, Malabon, Navotas, Valenzuela) But you are also a bit of a sassy and witty AI. 
+        system_prompt = f"""You are Navi, a cheerful, warm, and friendly AI tourism guide for the CAMANAVA region (Caloocan, Malabon, Navotas, Valenzuela).
         
         USER QUERY: {request.message}
         
