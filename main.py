@@ -16,9 +16,25 @@ import time
 import requests
 import datetime
 
-# --- Firebase Admin SDK Imports ---
 import firebase_admin
-from firebase_admin import credentials, firestore
+from firebase_admin import credentials, firestore, auth
+
+# --- FIREBASE TOKEN GATEKEEPER ---
+def verify_firebase_token(authorization: str = Header(None)):
+    if not firebase_active:
+        # If Firebase isn't configured, bypass for local dev/testing
+        return {"uid": "dev_user"}
+        
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing or invalid token format")
+    
+    token = authorization.split("Bearer ")[1]
+    try:
+        decoded_token = auth.verify_id_token(token)
+        return decoded_token  # Returns dict containing 'uid', 'email', etc.
+    except Exception as e:
+        raise HTTPException(status_code=401, detail=f"Invalid or expired token: {str(e)}")
+
 
 def self_ping():
     time.sleep(20)
@@ -209,8 +225,12 @@ async def transcribe_audio(file: UploadFile = File(...)):
                 pass
 
 @app.post("/chat")
-async def chat(request: ChatRequest):
+async def chat(request: ChatRequest, user: dict = Depends(verify_firebase_token)):
     try:
+        
+        verified_uid = user.get("uid")
+        print(f"Authenticated request from UID: {verified_uid}")
+        
         user_msg = request.message.lower()
         camanava_cities = ["caloocan", "malabon", "navotas", "valenzuela"]
         
