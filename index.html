@@ -584,26 +584,51 @@
     </style>
 </head>
 <body>
-<!-- LOGIN GATE OVERLAY -->
-<div id="login-gate" style="display: flex; position: absolute; inset: 0; background: #121316; z-index: 4000; flex-direction: column; align-items: center; justify-content: center; padding: 24px; text-align: center;">
-    <h2 style="font-family: 'Space Grotesk', sans-serif; font-size: 2rem; margin-bottom: 12px; color: #ffffff;">Authentication Required</h2>
-    <p style="color: #8b8f9a; font-size: 0.95rem; line-height: 1.5;">Please log in through the NaviGo! mobile application to access Navi.</p>
-    <button onclick="enableGuestMode()" style="margin-top: 20px; padding: 10px 24px; background: #2a2d35; color: #ffffff; border: 1px solid #3f434e; border-radius: 8px; cursor: pointer; font-family: 'Space Grotesk', sans-serif; transition: background 0.2s;">
-        Continue as Guest
-    </button>
-</div>
+    <!-- LOGIN GATE OVERLAY -->
+    <div id="login-gate" style="display: flex; position: absolute; inset: 0; background: #121316; z-index: 4000; flex-direction: column; align-items: center; justify-content: center; padding: 24px; text-align: center;">
+        <h2 style="font-family: 'Space Grotesk', sans-serif; font-size: 2rem; margin-bottom: 12px; color: #ffffff;">Authentication Required</h2>
+        <p style="color: #8b8f9a; font-size: 0.95rem; line-height: 1.5;">Please log in through the NaviGo! mobile application to access Navi.</p>
+        <button onclick="enableGuestMode()" style="margin-top: 20px; padding: 10px 24px; background: #2a2d35; color: #ffffff; border: 1px solid #3f434e; border-radius: 8px; cursor: pointer; font-family: 'Space Grotesk', sans-serif; transition: background 0.2s;">
+            Continue as Guest
+        </button>
+    </div>
+
+    <!-- SIDEBAR UI -->
+    <div id="sidebar-overlay" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 4999;" onclick="toggleSidebar()"></div>
+
+    <div id="sidebar" style="position: fixed; left: -280px; top: 0; width: 280px; height: 100%; background: #121316; border-right: 1px solid #2a2d35; transition: left 0.3s ease; z-index: 5000; display: flex; flex-direction: column;">
+        <div style="padding: 20px; border-bottom: 1px solid #2a2d35;">
+            <button onclick="startNewChat()" style="width: 100%; padding: 12px; background: #2a2d35; color: white; border: 1px solid #3f434e; border-radius: 8px; cursor: pointer; font-family: 'Space Grotesk', sans-serif;">+ New Chat</button>
+        </div>
+        
+        <div id="history-list" style="flex: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px;">
+            <!-- Chat history items will load here -->
+        </div>
+        
+        <div style="padding: 20px; border-top: 1px solid #2a2d35; color: #8b8f9a; font-family: 'Space Grotesk', sans-serif; font-size: 0.9rem;">
+            Logged in as:<br>
+            <strong id="current-user-display" style="color: #ffffff;">Guest</strong>
+        </div>
+    </div>
 
 
-<div class="chat-shell">
+    <div class="chat-shell">
     <div class="gradient-bg-wrapper"></div>
 
     <div class="top-nav">
         <div class="top-identity">
             <div class="avatar-wrap" id="navi-avatar-wrap">
-                <img src="https://raw.githubusercontent.com/altianalbertsebastian10-tech/camanava-bot/main/navi_avatar.png" class="avatar" id="navi-avatar" alt="Navi">
+                <!-- Added onclick and cursor directly to your existing avatar -->
+                <img src="https://raw.githubusercontent.com/altianalbertsebastian10-tech/camanava-bot/main/navi_avatar.png" 
+                    class="avatar" 
+                    id="navi-avatar" 
+                    alt="Navi" 
+                    onclick="toggleSidebar()" 
+                    style="cursor: pointer;">
             </div>
             <h1 class="name-tag">Navi</h1>
         </div>
+
         <div class="tech-stats">
             <!-- Voice Trigger for Gemini Live Mode -->
             <button class="header-mic-btn" onclick="openLiveMode()" title="Start Live Session">
@@ -715,8 +740,70 @@
     let currentActiveButton = null;
     let activeAudio = null;
 
+    let currentSessionId = 'session_' + Date.now();
+    let localHistories = JSON.parse(localStorage.getItem('navi_histories')) || [];
+
+
     const ICON_SPEAK = `<svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z" fill="currentColor"/></svg>`;
     const ICON_STOP  = `<svg viewBox="0 0 24 24"><path d="M6 6h12v12H6z" fill="currentColor"/></svg>`;
+
+    function toggleSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebar-overlay');
+    const isOpen = sidebar.style.left === '0px';
+    
+    sidebar.style.left = isOpen ? '-280px' : '0px';
+    overlay.style.display = isOpen ? 'none' : 'block';
+    
+    if (!isOpen) renderHistoryList();
+    }
+
+    function startNewChat() {
+        currentSessionId = 'session_' + Date.now();
+        history = []; // Clear current active chat context
+        document.getElementById('chat').innerHTML = ''; // Clear chat UI
+        addMessageToUI('bot', "Hi! I'm Navi. What new adventure are we planning today?");
+        toggleSidebar();
+    }
+
+    function saveToLocalHistory(previewText) {
+        if (authToken !== 'guest_mode_active') return; // Only save locally for guests
+        
+        // Remove if session already exists to update it at the top
+        localHistories = localHistories.filter(h => h.id !== currentSessionId);
+        
+        localHistories.unshift({
+            id: currentSessionId,
+            preview: previewText.substring(0, 30) + '...',
+            timestamp: Date.now()
+        });
+        
+        // Enforce maximum of 10 limit
+        if (localHistories.length > 10) {
+            localHistories.pop(); 
+        }
+        
+        localStorage.setItem('navi_histories', JSON.stringify(localHistories));
+    }
+
+    function renderHistoryList() {
+        const list = document.getElementById('history-list');
+        list.innerHTML = '';
+        
+        // Update user display name
+        document.getElementById('current-user-display').innerText = 
+            (authToken === 'guest_mode_active') ? 'Guest User' : localStorage.getItem('uid');
+        
+        // Temporarily only render local histories (Firebase rendering comes next)
+        localHistories.forEach(hist => {
+            const btn = document.createElement('button');
+            btn.innerText = hist.preview;
+            btn.style.cssText = "padding: 10px; background: transparent; color: white; border: none; text-align: left; cursor: pointer; border-radius: 5px;";
+            btn.onmouseover = () => btn.style.background = '#2a2d35';
+            btn.onmouseout = () => btn.style.background = 'transparent';
+            list.appendChild(btn);
+        });
+    }
 
     function clearTTSState() {
         if (currentActiveButton) {
@@ -902,6 +989,8 @@
         
         addMessageToUI('user', msg);
         input.value = '';
+
+        saveToLocalHistory(msg);
         
         const typingId = 'typing-' + Date.now();
         const typingBubble = document.createElement('div');
