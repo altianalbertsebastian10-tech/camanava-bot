@@ -56,19 +56,35 @@ except Exception as e:
 
 # --- FIREBASE TOKEN GATEKEEPER ---
 def verify_firebase_token(authorization: str = Header(None)):
+    # 1. Dev mode bypass if Firebase failed to initialize
     if not firebase_active:
         return {"uid": "dev_user"}
         
-    if not authorization or not authorization.startswith("Bearer "):
+    # 2. Temporary fallback for missing/null tokens during local web testing
+    if not authorization or authorization == "Bearer null" or authorization == "Bearer undefined":
+        return {"uid": "local_fallback_user"}
+    
+    # 3. GUEST MODE BYPASS (NEW)
+    if authorization == "Bearer guest_mode_active":
+        return {"uid": "guest_user"}
+        
+    # 4. Strict format check for real tokens
+    if not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Missing or invalid token format")
     
     token = authorization.split("Bearer ")[1]
+    
+    # 5. Specific localhost bypass token
+    if token == "bypass_token_123":
+        return {"uid": "local_test_user"}
+        
+    # 6. Real Firebase Authentication check
     try:
         decoded_token = auth.verify_id_token(token)
         return decoded_token  # Returns dict containing 'uid', 'email', etc.
     except Exception as e:
         raise HTTPException(status_code=401, detail=f"Invalid or expired token: {str(e)}")
-
+        
 # --- ADVANCED DYNAMIC DATA ROUTER WITH CATEGORY FILTERING & PAGINATION ---
 def get_city_data(target_city: str = None, history: list = None, category_filter: str = None, negated_cities: set = None) -> dict:
     """Fetches data from Firestore, filters by city, category, and handles multi-city pagination."""

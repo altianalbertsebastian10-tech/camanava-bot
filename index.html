@@ -590,6 +590,11 @@
     <p style="color: #8b8f9a; font-size: 0.95rem; line-height: 1.5;">Please log in through the NaviGo! mobile application to access Navi.</p>
 </div>
 
+<button onclick="enableGuestMode()" style="margin-top: 20px; padding: 10px 24px; background: #2a2d35; color: #ffffff; border: 1px solid #3f434e; border-radius: 8px; cursor: pointer; font-family: 'Space Grotesk', sans-serif; transition: background 0.2s;">
+        Continue as Guest
+    </button>
+</div>
+
 <div class="chat-shell">
     <div class="gradient-bg-wrapper"></div>
 
@@ -680,6 +685,14 @@
         localStorage.setItem('authToken', token);
         localStorage.setItem('uid', uid);
         document.getElementById('login-gate').style.display = 'none';
+    };
+
+    window.enableGuestMode = function() {
+    const guestToken = 'guest_mode_active';
+    authToken = guestToken;
+    localStorage.setItem('authToken', guestToken);
+    localStorage.setItem('uid', 'guest_user');
+    document.getElementById('login-gate').style.display = 'none';
     };
 
     // 3. ITAGO ANG LOGIN GATE KUNG MAY TOKEN NA
