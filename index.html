@@ -781,33 +781,44 @@
     }
 
     function saveToLocalHistory(previewText) {
-        if (authToken !== 'guest_mode_active') return; // Only save locally for guests
+        // 1. Identify who is using the app right now
+        const currentUid = localStorage.getItem('uid') || 'guest_user';
+        const storageKey = 'navi_histories_' + currentUid;
         
-        // Remove if session already exists to update it at the top
-        localHistories = localHistories.filter(h => h.id !== currentSessionId);
+        // 2. Fetch only THIS user's history
+        let userHistories = JSON.parse(localStorage.getItem(storageKey)) || [];
         
-        localHistories.unshift({
+        userHistories = userHistories.filter(h => h.id !== currentSessionId);
+        
+        userHistories.unshift({
             id: currentSessionId,
             preview: previewText.substring(0, 30) + '...',
-            timestamp: Date.now()
+            timestamp: Date.now(),
+            messages: history // Saves the full chat for the WebView reload fix
         });
         
-        // Enforce maximum of 10 limit
-        if (localHistories.length > 10) {
-            localHistories.pop(); 
-        }
+        if (userHistories.length > 10) userHistories.pop(); 
         
-        localStorage.setItem('navi_histories', JSON.stringify(localHistories));
+        // 3. Save it back to their specific folder
+        localStorage.setItem(storageKey, JSON.stringify(userHistories));
     }
 
     function renderHistoryList() {
         const list = document.getElementById('history-list');
         list.innerHTML = '';
         
-        document.getElementById('current-user-display').innerText = 
-            (authToken === 'guest_mode_active') ? 'Guest User' : localStorage.getItem('uid');
+        // 1. Identify the current user and their specific storage key
+        const currentUid = localStorage.getItem('uid') || 'guest_user';
+        const storageKey = 'navi_histories_' + currentUid;
         
-        localHistories.forEach(hist => {
+        // 2. Fetch only THIS user's history
+        let userHistories = JSON.parse(localStorage.getItem(storageKey)) || [];
+        
+        document.getElementById('current-user-display').innerText = 
+            (authToken === 'guest_mode_active') ? 'Guest User' : currentUid;
+        
+        // 3. Iterate over userHistories instead of the old localHistories
+        userHistories.forEach(hist => {
             // Create a wrapper for the list item
             const wrapper = document.createElement('div');
             wrapper.style.cssText = "position: relative; display: flex; align-items: center; border-radius: 5px; transition: background 0.2s; user-select: none; -webkit-user-select: none;";
@@ -816,6 +827,9 @@
             const btn = document.createElement('button');
             btn.innerText = hist.preview;
             btn.style.cssText = "flex: 1; padding: 10px; background: transparent; color: white; border: none; text-align: left; cursor: pointer; border-radius: 5px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;";
+            
+            // ADDED: This makes the button actually load the old chat!
+            btn.onclick = () => loadSession(hist.id);
             
             // The Delete Icon Button (Hidden by default)
             const delBtn = document.createElement('button');
@@ -857,10 +871,10 @@
                 openDeleteModal(hist.id);
             };
 
-                wrapper.appendChild(btn);
-                wrapper.appendChild(delBtn);
-                list.appendChild(wrapper);
-            });
+            wrapper.appendChild(btn);
+            wrapper.appendChild(delBtn);
+            list.appendChild(wrapper);
+        });
     }
 
     function openDeleteModal(sessionId) {
@@ -880,17 +894,20 @@
     }
 
     function executeDelete(sessionId) {
-        // Remove from local storage array
-        localHistories = localHistories.filter(h => h.id !== sessionId);
-        localStorage.setItem('navi_histories', JSON.stringify(localHistories));
-        
-        // If they delete the chat they are currently looking at, start a new one
-        if (sessionId === currentSessionId) {
-            startNewChat(); 
-        } else {
-            renderHistoryList(); // Otherwise just refresh the list
-        }
+    const currentUid = localStorage.getItem('uid') || 'guest_user';
+    const storageKey = 'navi_histories_' + currentUid;
+    let userHistories = JSON.parse(localStorage.getItem(storageKey)) || [];
+
+    // Remove from this specific user's array
+    userHistories = userHistories.filter(h => h.id !== sessionId);
+    localStorage.setItem(storageKey, JSON.stringify(userHistories));
+    
+    if (sessionId === currentSessionId) {
+        startNewChat(); 
+    } else {
+        renderHistoryList(); 
     }
+}
 
     function clearTTSState() {
         if (currentActiveButton) {
