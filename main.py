@@ -325,7 +325,7 @@ async def chat(request: ChatRequest, user: dict = Depends(verify_firebase_token)
         6. MOBILE FORMATTING: Keep your recommendations concise. Use short bullet points. NEVER use markdown tables.
         7. EMOTIONAL TAGGING: You MUST start every single response with a secret mood tag in brackets based on the tone of your message: [HAPPY], [SAD], or [NEUTRAL].
         8. WEATHER ALERT: If real-time weather data is provided in the prompt, weave it naturally and cleverly into your response (e.g., "It's 32°C in Valenzuela right now, so you might want to grab some shade at...").
-        9. ITINERARY SCHEDULING: If the user explicitly asks to schedule, visit, or add a place to their itinerary, include this exact tag anywhere in your text: [ADD_ITINERARY: Exact Place Name].
+        
         """
 
         # Try Primary Groq Account with Fallback to Backup Groq Account
@@ -356,30 +356,6 @@ async def chat(request: ChatRequest, user: dict = Depends(verify_firebase_token)
         response = completion.choices[0].message.content
         response = response.replace("{{user_loc}}", "your area").replace("{user_loc}", "your area")
 
-        # --- ITINERARY INTERCEPTOR ---
-        import re
-        itinerary_match = re.search(r'\[ADD_ITINERARY:\s*(.+?)\]', response)
-        
-        if itinerary_match:
-            place_to_add = itinerary_match.group(1).strip()
-            # Remove the secret tag from the response text
-            response = re.sub(r'\[ADD_ITINERARY:\s*(.+?)\]', '', response).strip()
-            
-            # Save to Firestore if it's a real logged-in app user (not a guest bypass)
-            if firebase_active and verified_uid and verified_uid not in ["guest_user", "dev_user", "local_fallback_user"]:
-                try:
-                    # Writes to: users -> [uid] -> itineraries -> [auto-id]
-                    db.collection("users").document(verified_uid).collection("itineraries").add({
-                        "place_name": place_to_add,
-                        "added_by": "navi",
-                        "timestamp": firestore.SERVER_TIMESTAMP,
-                        "status": "planned"
-                    })
-                    print(f"SUCCESS: Added '{place_to_add}' to UID: {verified_uid}")
-                except Exception as db_err:
-                    print(f"FIRESTORE WRITE ERROR: {db_err}")
-        # -----------------------------
-        
         mood = "NEUTRAL"
         if response.strip().startswith("["):
             end_idx = response.find("]")

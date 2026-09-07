@@ -877,6 +877,63 @@
         });
     }
 
+    function loadSession(sessionId) {
+        // 1. Hanapin ang tamang folder ng user
+        const currentUid = localStorage.getItem('uid') || 'guest_user';
+        const storageKey = 'navi_histories_' + currentUid;
+        let userHistories = JSON.parse(localStorage.getItem(storageKey)) || [];
+        
+        // 2. Hanapin yung mismong chat session na kiniclick
+        const session = userHistories.find(h => h.id === sessionId);
+        
+        // Kung walang laman o walang messages, wag ituloy
+        if (!session || !session.messages) return;
+        
+        // 3. I-set ito bilang active chat
+        currentSessionId = session.id;
+        history = session.messages;
+        
+        // 4. Linisin ang kasalukuyang chat screen
+        const chat = document.getElementById('chat');
+        chat.innerHTML = ''; 
+        hideWelcome(); 
+        
+        // 5. I-print ulit isa-isa ang mga lumang messages sa UI
+        history.forEach(msg => {
+            const sender = msg.role === 'assistant' ? 'bot' : 'user';
+            const wrapper = document.createElement('div');
+            
+            if (sender === 'user') {
+                const userMsgDiv = document.createElement('div');
+                userMsgDiv.className = 'msg user-msg';
+                userMsgDiv.innerText = msg.content;
+                chat.appendChild(userMsgDiv);
+            } else {
+                wrapper.style.display = 'flex';
+                wrapper.style.flexDirection = 'column';
+                wrapper.style.alignItems = 'flex-start';
+                
+                const botMsgDiv = document.createElement('div');
+                botMsgDiv.className = 'msg bot-msg';
+                
+                const containerDiv = document.createElement('div');
+                containerDiv.className = 'response-container';
+                // Gamitin yung formatter mo para maayos ang bold at lists
+                containerDiv.innerHTML = formatMessageHTML(msg.content); 
+                
+                botMsgDiv.appendChild(containerDiv);
+                wrapper.appendChild(botMsgDiv);
+                chat.appendChild(wrapper);
+            }
+        });
+        
+        // 6. I-scroll pababa at isara ang sidebar para makita ang chat
+        forceUIRefreshScroll();
+        if (document.getElementById('sidebar').style.left === '0px') {
+            toggleSidebar();
+        }
+    }
+
     function openDeleteModal(sessionId) {
         sessionToDelete = sessionId;
         const modal = document.getElementById('delete-confirm-modal');
