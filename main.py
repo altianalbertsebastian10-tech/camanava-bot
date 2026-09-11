@@ -167,10 +167,16 @@ def get_city_data(target_city: str = None, history: list = None, category_filter
         return {}
 
 
+# UIDs that are not "real" logged-in accounts (guest/dev/fallback bypasses).
+# Sessions for these are never persisted to Firestore -- they stay local-only on the client.
+GUEST_LIKE_UIDS = {"guest_user", "dev_user", "local_fallback_user", "local_test_user"}
+
+
 class ChatRequest(BaseModel):
     message: str
     user_id: str = "default_user"
     history: List[Dict[str, str]] = []
+    session_id: str = "default_session"
 
 @app.get("/health")
 @app.head("/health")
@@ -328,13 +334,19 @@ async def chat(request: ChatRequest, user: dict = Depends(verify_firebase_token)
         
         """
 
+        # Only send a short rolling window of history to the LLM to keep token usage
+        # (and cost/latency) in check. This is independent of how much conversation
+        # we actually store/return -- see updated_history below.
+        LLM_CONTEXT_TURNS = 12
+        context_history = request.history[-LLM_CONTEXT_TURNS:]
+
         # Try Primary Groq Account with Fallback to Backup Groq Account
         try:
             completion = primary_client.chat.completions.create(
                 model="openai/gpt-oss-120b",
                 messages=[
                     {"role": "system", "content": system_prompt},
-                    *request.history,
+                    *context_history,
                     {"role": "user", "content": request.message}
                 ],
                 temperature=0.1,
@@ -346,7 +358,7 @@ async def chat(request: ChatRequest, user: dict = Depends(verify_firebase_token)
                 model="openai/gpt-oss-120b",
                 messages=[
                     {"role": "system", "content": system_prompt},
-                    *request.history,
+                    *context_history,
                     {"role": "user", "content": request.message}
                 ],
                 temperature=0.1,
@@ -368,15 +380,42 @@ async def chat(request: ChatRequest, user: dict = Depends(verify_firebase_token)
 
         audio_base64 = await generate_speech_base64(audio_text, mood)
 
-        updated_history = request.history + [
+        # Keep the FULL conversation here (not truncated to 4) so the client can
+        # actually persist and reload a whole session. LLM context length is
+        # controlled separately above via context_history, so this doesn't affect
+        # token cost -- it only affects what gets stored/displayed.
+        MAX_STORED_MESSAGES = 60
+        updated_history = (request.history + [
             {"role": "user", "content": request.message},
             {"role": "assistant", "content": response}
-        ]
+        ])[-MAX_STORED_MESSAGES:]
+
+        # Persist to Firestore for real logged-in users only. Guests and dev/local
+        # bypass "users" stay local-only on the client (localStorage), since there's
+        # no real account to attach the data to.
+        if firebase_active and db is not None and verified_uid and verified_uid not in GUEST_LIKE_UIDS:
+            try:
+                preview_source = next(
+                    (m["content"] for m in updated_history if m.get("role") == "user"),
+                    request.message
+                )
+                session_ref = (
+                    db.collection("users").document(verified_uid)
+                    .collection("sessions").document(request.session_id)
+                )
+                session_ref.set({
+                    "id": request.session_id,
+                    "preview": preview_source[:30] + "...",
+                    "timestamp": int(time.time() * 1000),
+                    "messages": updated_history,
+                })
+            except Exception as save_err:
+                print(f"[FIRESTORE SAVE ERROR] {save_err}")
 
         return {
             "response": response,
             "audio": audio_base64,
-            "history": updated_history[-4:]
+            "history": updated_history
         }
         
     except Exception as e:
@@ -384,6 +423,77 @@ async def chat(request: ChatRequest, user: dict = Depends(verify_firebase_token)
         print(f"CRITICAL CHAT ERROR: {e}")
         traceback.print_exc()
         return {"response": "I'm having trouble processing that right now. Try again?", "history": request.history}
+
+@app.get("/sessions")
+async def list_sessions(user: dict = Depends(verify_firebase_token)):
+    """List saved chat sessions for a real logged-in user (sidebar history list)."""
+    verified_uid = user.get("uid")
+    if not firebase_active or db is None or not verified_uid or verified_uid in GUEST_LIKE_UIDS:
+        return {"sessions": []}
+    try:
+        docs = (
+            db.collection("users").document(verified_uid)
+            .collection("sessions")
+            .order_by("timestamp", direction=firestore.Query.DESCENDING)
+            .limit(20)
+            .stream()
+        )
+        sessions = []
+        for doc in docs:
+            data = doc.to_dict()
+            sessions.append({
+                "id": data.get("id", doc.id),
+                "preview": data.get("preview", ""),
+                "timestamp": data.get("timestamp", 0),
+            })
+        return {"sessions": sessions}
+    except Exception as e:
+        print(f"[FIRESTORE LIST ERROR] {e}")
+        return {"sessions": []}
+
+
+@app.get("/sessions/{session_id}")
+async def get_session(session_id: str, user: dict = Depends(verify_firebase_token)):
+    """Load one full saved session (used when the user taps a chat in the sidebar)."""
+    verified_uid = user.get("uid")
+    if not firebase_active or db is None or not verified_uid or verified_uid in GUEST_LIKE_UIDS:
+        raise HTTPException(status_code=404, detail="Session not found")
+    try:
+        doc = (
+            db.collection("users").document(verified_uid)
+            .collection("sessions").document(session_id).get()
+        )
+        if not doc.exists:
+            raise HTTPException(status_code=404, detail="Session not found")
+        data = doc.to_dict()
+        return {
+            "id": data.get("id", session_id),
+            "preview": data.get("preview", ""),
+            "timestamp": data.get("timestamp", 0),
+            "messages": data.get("messages", []),
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[FIRESTORE GET ERROR] {e}")
+        raise HTTPException(status_code=500, detail="Failed to load session")
+
+
+@app.delete("/sessions/{session_id}")
+async def delete_session(session_id: str, user: dict = Depends(verify_firebase_token)):
+    verified_uid = user.get("uid")
+    if not firebase_active or db is None or not verified_uid or verified_uid in GUEST_LIKE_UIDS:
+        return {"deleted": False}
+    try:
+        (
+            db.collection("users").document(verified_uid)
+            .collection("sessions").document(session_id).delete()
+        )
+        return {"deleted": True}
+    except Exception as e:
+        print(f"[FIRESTORE DELETE ERROR] {e}")
+        return {"deleted": False}
+
 
 @app.get("/", response_class=HTMLResponse)
 async def get_gui():

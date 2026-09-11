@@ -803,21 +803,47 @@
         localStorage.setItem(storageKey, JSON.stringify(userHistories));
     }
 
-    function renderHistoryList() {
-        const list = document.getElementById('history-list');
-        list.innerHTML = '';
-        
-        // 1. Identify the current user and their specific storage key
+    // True for a real logged-in user (not guest, not empty, not a local/dev bypass token).
+    function isLoggedIn() {
+        return !!authToken && authToken !== 'guest_mode_active';
+    }
+
+    async function fetchSessionList() {
+        // Logged-in users: sessions live in Firestore, fetched via the backend.
+        if (isLoggedIn()) {
+            try {
+                const res = await fetch('https://camanava-bot.onrender.com/sessions', {
+                    headers: { 'Authorization': 'Bearer ' + authToken }
+                });
+                if (!res.ok) return [];
+                const data = await res.json();
+                return data.sessions || [];
+            } catch (err) {
+                console.error("Failed to load sessions:", err);
+                return [];
+            }
+        }
+        // Guests: sessions only ever lived in this browser's localStorage.
         const currentUid = localStorage.getItem('uid') || 'guest_user';
         const storageKey = 'navi_histories_' + currentUid;
-        
-        // 2. Fetch only THIS user's history
-        let userHistories = JSON.parse(localStorage.getItem(storageKey)) || [];
-        
-        document.getElementById('current-user-display').innerText = 
-            (authToken === 'guest_mode_active') ? 'Guest User' : currentUid;
-        
-        // 3. Iterate over userHistories instead of the old localHistories
+        return JSON.parse(localStorage.getItem(storageKey)) || [];
+    }
+
+    async function renderHistoryList() {
+        const list = document.getElementById('history-list');
+        list.innerHTML = '<div style="padding:10px;color:#8b8f9a;font-size:0.85rem;">Loading...</div>';
+
+        const currentUid = localStorage.getItem('uid') || 'guest_user';
+        document.getElementById('current-user-display').innerText =
+            isLoggedIn() ? currentUid : 'Guest User';
+
+        const userHistories = await fetchSessionList();
+
+        list.innerHTML = '';
+        if (userHistories.length === 0) {
+            list.innerHTML = '<div style="padding:10px;color:#8b8f9a;font-size:0.85rem;">No saved chats yet.</div>';
+        }
+
         userHistories.forEach(hist => {
             // Create a wrapper for the list item
             const wrapper = document.createElement('div');
@@ -877,21 +903,37 @@
         });
     }
 
-    function loadSession(sessionId) {
-        // 1. Hanapin ang tamang folder ng user
-        const currentUid = localStorage.getItem('uid') || 'guest_user';
-        const storageKey = 'navi_histories_' + currentUid;
-        let userHistories = JSON.parse(localStorage.getItem(storageKey)) || [];
-        
-        // 2. Hanapin yung mismong chat session na kiniclick
-        const session = userHistories.find(h => h.id === sessionId);
-        
+    async function loadSession(sessionId) {
+        let messages = null;
+
+        if (isLoggedIn()) {
+            // Logged-in: pull the full session (with messages) from Firestore via the backend.
+            try {
+                const res = await fetch('https://camanava-bot.onrender.com/sessions/' + sessionId, {
+                    headers: { 'Authorization': 'Bearer ' + authToken }
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    messages = data.messages;
+                }
+            } catch (err) {
+                console.error("Failed to load session:", err);
+            }
+        } else {
+            // Guest: everything lives in localStorage.
+            const currentUid = localStorage.getItem('uid') || 'guest_user';
+            const storageKey = 'navi_histories_' + currentUid;
+            const userHistories = JSON.parse(localStorage.getItem(storageKey)) || [];
+            const session = userHistories.find(h => h.id === sessionId);
+            messages = session ? session.messages : null;
+        }
+
         // Kung walang laman o walang messages, wag ituloy
-        if (!session || !session.messages) return;
-        
-        // 3. I-set ito bilang active chat
-        currentSessionId = session.id;
-        history = session.messages;
+        if (!messages) return;
+
+        // I-set ito bilang active chat
+        currentSessionId = sessionId;
+        history = messages;
         
         // 4. Linisin ang kasalukuyang chat screen
         const chat = document.getElementById('chat');
@@ -950,15 +992,25 @@
         document.getElementById('delete-confirm-modal').style.display = 'none';
     }
 
-    function executeDelete(sessionId) {
-    const currentUid = localStorage.getItem('uid') || 'guest_user';
-    const storageKey = 'navi_histories_' + currentUid;
-    let userHistories = JSON.parse(localStorage.getItem(storageKey)) || [];
+    async function executeDelete(sessionId) {
+    if (isLoggedIn()) {
+        // Logged-in: delete the Firestore-backed session via the backend.
+        try {
+            await fetch('https://camanava-bot.onrender.com/sessions/' + sessionId, {
+                method: 'DELETE',
+                headers: { 'Authorization': 'Bearer ' + authToken }
+            });
+        } catch (err) {
+            console.error("Failed to delete session:", err);
+        }
+    } else {
+        const currentUid = localStorage.getItem('uid') || 'guest_user';
+        const storageKey = 'navi_histories_' + currentUid;
+        let userHistories = JSON.parse(localStorage.getItem(storageKey)) || [];
+        userHistories = userHistories.filter(h => h.id !== sessionId);
+        localStorage.setItem(storageKey, JSON.stringify(userHistories));
+    }
 
-    // Remove from this specific user's array
-    userHistories = userHistories.filter(h => h.id !== sessionId);
-    localStorage.setItem(storageKey, JSON.stringify(userHistories));
-    
     if (sessionId === currentSessionId) {
         startNewChat(); 
     } else {
@@ -1151,8 +1203,6 @@
         addMessageToUI('user', msg);
         input.value = '';
 
-        saveToLocalHistory(msg);
-        
         const typingId = 'typing-' + Date.now();
         const typingBubble = document.createElement('div');
         typingBubble.className = 'msg bot-msg typing-bubble';
@@ -1176,7 +1226,7 @@
                 'Content-Type': 'application/json',
                 'Authorization': 'Bearer ' + authToken // <-- Added this header
             },
-            body: JSON.stringify({ message: msg, history })
+            body: JSON.stringify({ message: msg, history, session_id: currentSessionId })
         });
 
         if (res.status === 401) {
@@ -1186,7 +1236,15 @@
             const data = await res.json();
             document.getElementById(typingId)?.remove();
             
+            // Update AFTER the exchange completes, so this actually includes the
+            // message + reply that just happened (fixes history always lagging one turn behind).
             history = data.history;
+
+            // Logged-in users are persisted server-side in Firestore (done inside /chat).
+            // Guests (and local/dev bypass modes) only exist in this browser, so save locally.
+            if (!authToken || authToken === 'guest_mode_active') {
+                saveToLocalHistory(msg);
+            }
             
             // If in Live Mode, divert handling to the live loop!
             if (isLiveModeActive) {
