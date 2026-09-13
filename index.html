@@ -342,6 +342,68 @@
             background-color: var(--panel);
         }
 
+        .itinerary-banner {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            background-color: var(--panel);
+            border: 1px solid var(--slate);
+            border-radius: var(--radius-inner);
+            padding: 8px 12px;
+            box-shadow: var(--rim-inset);
+        }
+
+        .itinerary-banner-text {
+            display: flex;
+            align-items: baseline;
+            gap: 6px;
+            overflow: hidden;
+            font-family: var(--font-body);
+            font-size: 0.8rem;
+            color: var(--fore);
+            white-space: nowrap;
+        }
+
+        .itinerary-banner-label {
+            font-family: var(--font-mono);
+            font-size: 0.65rem;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: var(--muted);
+            flex-shrink: 0;
+        }
+
+        #itinerary-banner-title {
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .itinerary-banner-count {
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            color: var(--muted);
+            flex-shrink: 0;
+        }
+
+        .itinerary-banner-clear {
+            font-family: var(--font-body);
+            font-size: 0.75rem;
+            color: var(--muted);
+            background: none;
+            border: 1px solid var(--hairline);
+            border-radius: var(--radius-inner);
+            padding: 4px 10px;
+            cursor: pointer;
+            flex-shrink: 0;
+            transition: color 0.2s, border-color 0.2s;
+        }
+
+        .itinerary-banner-clear:hover {
+            color: var(--fore);
+            border-color: var(--muted);
+        }
+
         input {
             flex: 1;
             background: transparent;
@@ -668,6 +730,14 @@
     </div>
 
     <div class="footer-container">
+        <div id="itinerary-banner" class="itinerary-banner" style="display:none;">
+            <div class="itinerary-banner-text">
+                <span class="itinerary-banner-label">Planning:</span>
+                <span id="itinerary-banner-title"></span>
+                <span id="itinerary-banner-count" class="itinerary-banner-count"></span>
+            </div>
+            <button class="itinerary-banner-clear" onclick="clearItineraryDraft()">Discard</button>
+        </div>
         <div class="input-bar">
             <input id="input" type="text" placeholder="" onkeypress="handleKeyPress(event)" oninput="toggleSendButtonState()" autocomplete="off">
             <button id="send-btn" class="send-pill" onclick="send()" disabled>
@@ -746,6 +816,7 @@
     });
         
     let history = [];
+    let itineraryDraft = null; // in-progress itinerary being built via chat; null = none active
     let isNaviThinking = false;
     let welcomeHidden = false;
 
@@ -775,9 +846,32 @@
     function startNewChat() {
         currentSessionId = 'session_' + Date.now();
         history = []; // Clear current active chat context
+        itineraryDraft = null;
+        updateItineraryBanner();
         document.getElementById('chat').innerHTML = ''; // Clear chat UI
         addMessageToUI('bot', "Hi! I'm Navi. What new adventure are we planning today?");
         toggleSidebar();
+    }
+
+    function updateItineraryBanner() {
+        const banner = document.getElementById('itinerary-banner');
+        if (!banner) return;
+        const stops = (itineraryDraft && Array.isArray(itineraryDraft.stops)) ? itineraryDraft.stops : [];
+        if (stops.length === 0) {
+            banner.style.display = 'none';
+            return;
+        }
+        banner.style.display = 'flex';
+        document.getElementById('itinerary-banner-title').textContent =
+            itineraryDraft.title || 'Planning a trip';
+        document.getElementById('itinerary-banner-count').textContent =
+            stops.length + (stops.length === 1 ? ' stop' : ' stops');
+    }
+
+    function clearItineraryDraft() {
+        itineraryDraft = null;
+        updateItineraryBanner();
+        addMessageToUI('bot', "No worries, I've cleared that itinerary draft.");
     }
 
     function saveToLocalHistory(previewText) {
@@ -794,7 +888,8 @@
             id: currentSessionId,
             preview: previewText.substring(0, 30) + '...',
             timestamp: Date.now(),
-            messages: history // Saves the full chat for the WebView reload fix
+            messages: history, // Saves the full chat for the WebView reload fix
+            itineraryDraft: itineraryDraft // so resuming a session resumes any in-progress trip too
         });
         
         if (userHistories.length > 10) userHistories.pop(); 
@@ -905,6 +1000,7 @@
 
     async function loadSession(sessionId) {
         let messages = null;
+        let restoredDraft = null;
 
         if (isLoggedIn()) {
             // Logged-in: pull the full session (with messages) from Firestore via the backend.
@@ -915,6 +1011,7 @@
                 if (res.ok) {
                     const data = await res.json();
                     messages = data.messages;
+                    restoredDraft = data.itineraryDraft || null;
                 }
             } catch (err) {
                 console.error("Failed to load session:", err);
@@ -926,6 +1023,7 @@
             const userHistories = JSON.parse(localStorage.getItem(storageKey)) || [];
             const session = userHistories.find(h => h.id === sessionId);
             messages = session ? session.messages : null;
+            restoredDraft = session ? (session.itineraryDraft || null) : null;
         }
 
         // Kung walang laman o walang messages, wag ituloy
@@ -934,6 +1032,8 @@
         // I-set ito bilang active chat
         currentSessionId = sessionId;
         history = messages;
+        itineraryDraft = restoredDraft;
+        updateItineraryBanner();
         
         // 4. Linisin ang kasalukuyang chat screen
         const chat = document.getElementById('chat');
@@ -1226,7 +1326,7 @@
                 'Content-Type': 'application/json',
                 'Authorization': 'Bearer ' + authToken // <-- Added this header
             },
-            body: JSON.stringify({ message: msg, history, session_id: currentSessionId })
+            body: JSON.stringify({ message: msg, history, session_id: currentSessionId, itinerary_draft: itineraryDraft })
         });
 
         if (res.status === 401) {
@@ -1239,6 +1339,8 @@
             // Update AFTER the exchange completes, so this actually includes the
             // message + reply that just happened (fixes history always lagging one turn behind).
             history = data.history;
+            itineraryDraft = data.itinerary_draft || null;
+            updateItineraryBanner();
 
             // Logged-in users are persisted server-side in Firestore (done inside /chat).
             // Guests (and local/dev bypass modes) only exist in this browser, so save locally.

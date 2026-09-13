@@ -10,7 +10,7 @@ from fastapi import FastAPI, UploadFile, File, Header, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
-from typing import List, Dict
+from typing import List, Dict, Optional
 import threading
 import time
 import requests
@@ -116,6 +116,7 @@ def get_city_data(target_city: str = None, history: list = None, category_filter
                             continue
                             
                     clean_spot = {
+                        "place_id": doc.id,
                         "name": data.get("name", "Unknown Spot"),
                         "description": data.get("description", ""),
                         "category": data.get("category", ""),
@@ -161,7 +162,13 @@ def get_city_data(target_city: str = None, history: list = None, category_filter
                     if category_filter:
                         spots = [s for s in spots if category_filter in str(s).lower()]
                     if spots:
-                        result[c] = spots[:5]
+                        # knowledge.json entries may not have a real Firestore doc id --
+                        # itinerary-building falls back to using the spot's name as a
+                        # reference in that case (Firestore mode is what gives real IDs).
+                        result[c] = [
+                            {**s, "place_id": s.get("id", s.get("name", ""))} if isinstance(s, dict) else s
+                            for s in spots[:5]
+                        ]
             return result
     except Exception as e:
         return {}
@@ -177,6 +184,222 @@ class ChatRequest(BaseModel):
     user_id: str = "default_user"
     history: List[Dict[str, str]] = []
     session_id: str = "default_session"
+    # Client keeps this alive across turns (like `history`) while an itinerary is
+    # being built. None means "no itinerary in progress right now".
+    itinerary_draft: Optional[Dict] = None
+
+
+# --- ITINERARY INTENT DETECTION ---
+# Deliberately kept simple/regex-based to match the style of the existing city/category
+# detection above. Whether to actually WRITE to Firestore is always decided in code
+# (never by trusting the LLM's own judgment), for safety and predictability.
+ITINERARY_TRIGGER_PATTERN = re.compile(
+    r"\b(itinerary|day\s*trip|plan (a|my|our) (trip|day|weekend|visit)|"
+    r"build (a|an|my) (trip|itinerary)|schedule (a|my) (visit|trip)|trip plan)\b",
+    re.IGNORECASE
+)
+ITINERARY_CONFIRM_PATTERN = re.compile(
+    r"\b(save (it|this|that)|confirm (it|this|that)?|finalize|lock (it|this) in|"
+    r"add (it|this) to my itinerar(y|ies)|looks good,?\s*save|yes,?\s*save|save (my|the) (itinerary|trip|plan))\b",
+    re.IGNORECASE
+)
+ITINERARY_CANCEL_PATTERN = re.compile(
+    r"\b(cancel (the|this) (itinerary|trip|plan)|discard (the|this) (itinerary|plan)|"
+    r"start over|forget (it|this|that|about it))\b",
+    re.IGNORECASE
+)
+
+EMPTY_ITINERARY_DRAFT = {"title": "", "startDate": None, "citiesCovered": [], "stops": []}
+
+
+def persist_chat_session(verified_uid: str, session_id: str, updated_history: list, itinerary_draft: Optional[dict]):
+    """Shared by both the normal chat path and the itinerary path. Writes the rolling
+    conversation (and any in-progress itinerary draft, so it survives a reload) to
+    Firestore for real logged-in users only -- guests stay local-only on the client."""
+    if not (firebase_active and db is not None and verified_uid and verified_uid not in GUEST_LIKE_UIDS):
+        return
+    try:
+        preview_source = next(
+            (m["content"] for m in updated_history if m.get("role") == "user"),
+            ""
+        )
+        session_ref = (
+            db.collection("users").document(verified_uid)
+            .collection("sessions").document(session_id)
+        )
+        session_ref.set({
+            "id": session_id,
+            "preview": preview_source[:30] + "...",
+            "timestamp": int(time.time() * 1000),
+            "messages": updated_history,
+            "itineraryDraft": itinerary_draft,
+        })
+    except Exception as save_err:
+        print(f"[FIRESTORE SAVE ERROR] {save_err}")
+
+
+async def handle_itinerary_turn(request: "ChatRequest", verified_uid: str) -> dict:
+    """Handles one turn of itinerary building: collecting stops, cancelling a draft,
+    or confirming/saving one to Firestore so it shows up in the app's Itineraries tab."""
+    user_msg = request.message.lower()
+    draft = request.itinerary_draft or dict(EMPTY_ITINERARY_DRAFT)
+    has_stops = bool(draft.get("stops"))
+
+    def build_result(reply: str, mood: str, new_draft: Optional[dict]):
+        updated_history = (request.history + [
+            {"role": "user", "content": request.message},
+            {"role": "assistant", "content": reply}
+        ])[-60:]
+        return reply, mood, new_draft, updated_history
+
+    # --- CANCEL ---
+    if has_stops and ITINERARY_CANCEL_PATTERN.search(user_msg):
+        reply, mood, new_draft, updated_history = build_result(
+            "No worries, I've cleared that itinerary draft. Want to start planning a new one?",
+            "NEUTRAL", None
+        )
+
+    # --- CONFIRM / SAVE ---
+    elif has_stops and ITINERARY_CONFIRM_PATTERN.search(user_msg):
+        if not verified_uid or verified_uid in GUEST_LIKE_UIDS:
+            reply, mood, new_draft, updated_history = build_result(
+                "I'd love to save that for you, but you'll need to log in first so it's tied to your "
+                "account. Once you're logged in, just ask me to save it again and it'll be right there.",
+                "NEUTRAL", draft
+            )
+        elif not (firebase_active and db is not None):
+            reply, mood, new_draft, updated_history = build_result(
+                "I couldn't save that just now, our database connection seems to be down. Mind trying again in a bit?",
+                "SAD", draft
+            )
+        else:
+            try:
+                title = draft.get("title") or "My CAMANAVA Trip"
+                itinerary_ref = db.collection("itineraries").document()
+                itinerary_ref.set({
+                    "userId": verified_uid,
+                    "title": title,
+                    "status": "confirmed",
+                    "createdAt": firestore.SERVER_TIMESTAMP,
+                    "updatedAt": firestore.SERVER_TIMESTAMP,
+                    "createdVia": "chatbot",
+                    "startDate": draft.get("startDate"),
+                    "citiesCovered": draft.get("citiesCovered", []),
+                    "stops": draft.get("stops", []),
+                })
+                stop_count = len(draft.get("stops", []))
+                reply, mood, new_draft, updated_history = build_result(
+                    f"Saved! \"{title}\" is now in your Itineraries tab with {stop_count} stop"
+                    f"{'s' if stop_count != 1 else ''}. Have an amazing trip!",
+                    "HAPPY", None
+                )
+            except Exception as save_err:
+                print(f"[ITINERARY SAVE ERROR] {save_err}")
+                reply, mood, new_draft, updated_history = build_result(
+                    "Something went wrong saving that itinerary. Mind trying that again?",
+                    "SAD", draft
+                )
+
+    # --- COLLECT / BUILD ---
+    else:
+        camanava_cities = ["caloocan", "malabon", "navotas", "valenzuela"]
+        mentioned_cities = []
+        for city in camanava_cities:
+            city_pattern = r"(caloocan|kaloakan|kalookan)" if city == "caloocan" else city
+            if re.search(city_pattern, user_msg):
+                mentioned_cities.append(city)
+        if not mentioned_cities:
+            mentioned_cities = [c for c in draft.get("citiesCovered", []) if c in camanava_cities]
+
+        # Grounding data: intentionally called with history=None so this always returns
+        # the same stable first chunk of spots per city, rather than the rotating/paginated
+        # chunk the normal chat flow uses -- an itinerary needs a consistent option set
+        # to build against turn to turn, not a "show me different ones" rotation.
+        verified_places = {}
+        for c in (mentioned_cities or camanava_cities):
+            verified_places.update(get_city_data(c, None, None, set()))
+
+        system_prompt = f"""You are Navi, helping a user build a multi-stop travel itinerary in the
+CAMANAVA region (Caloocan, Malabon, Navotas, Valenzuela).
+
+CURRENT DRAFT ITINERARY (JSON):
+{json.dumps(draft, indent=2)}
+
+VERIFIED AVAILABLE PLACES (JSON -- you may ONLY use place_id/name values that appear here):
+{json.dumps(verified_places, indent=2)}
+
+USER'S LATEST MESSAGE: {request.message}
+
+RULES:
+1. Update the draft itinerary based on the user's message and the conversation so far.
+2. NEVER invent a place_id or place name. Only use entries from VERIFIED AVAILABLE PLACES. If the
+   user asks for a place/city not in that list, say so naturally in your reply and suggest an
+   alternative from what IS available.
+3. Each stop needs: dayIndex (0-based), order (position within that day), time ("HH:MM", your best
+   sensible estimate if the user didn't specify one), placeId, placeName, city, cityKey (lowercase city),
+   and notes (short, can be empty string).
+4. Keep dayIndex/order consistent and non-conflicting as you add stops.
+5. If the draft has at least one stop and feels reasonably complete, end your reply by asking if
+   they'd like you to save it to their itinerary.
+6. Keep the reply short, warm, and conversational -- this is a chat message, not a report.
+7. Respond with ONLY a single JSON object, no other text, in exactly this shape:
+{{
+  "reply": "<your conversational message to the user>",
+  "draft": {{
+    "title": "<short trip title>",
+    "startDate": "<YYYY-MM-DD or null>",
+    "citiesCovered": ["<lowercase city keys involved>"],
+    "stops": [
+      {{"dayIndex": 0, "order": 0, "time": "09:00", "placeId": "...", "placeName": "...", "city": "...", "cityKey": "...", "notes": "..."}}
+    ]
+  }}
+}}
+"""
+
+        try:
+            completion = primary_client.chat.completions.create(
+                model="openai/gpt-oss-120b",
+                messages=[{"role": "system", "content": system_prompt}],
+                temperature=0.2,
+                max_tokens=1024,
+                response_format={"type": "json_object"}
+            )
+        except Exception as primary_err:
+            print(f"[PRIMARY GROQ LIMIT HIT - itinerary] Switching to backup Groq account... Error: {primary_err}")
+            completion = backup_client.chat.completions.create(
+                model="openai/gpt-oss-120b",
+                messages=[{"role": "system", "content": system_prompt}],
+                temperature=0.2,
+                max_tokens=1024,
+                response_format={"type": "json_object"}
+            )
+
+        raw = completion.choices[0].message.content
+        try:
+            parsed = json.loads(raw)
+            reply_text = parsed.get("reply") or "Here's what I've got so far!"
+            candidate_draft = parsed.get("draft") or draft
+            if not isinstance(candidate_draft.get("stops"), list):
+                candidate_draft["stops"] = draft.get("stops", [])
+        except Exception as parse_err:
+            print(f"[ITINERARY JSON PARSE ERROR] {parse_err} RAW: {raw}")
+            reply_text = "I'm having a little trouble organizing that -- could you tell me again which places and days you'd like?"
+            candidate_draft = draft
+
+        reply, mood, new_draft, updated_history = build_result(reply_text, "NEUTRAL", candidate_draft)
+
+    audio_text = emoji.replace_emoji(reply, replace='')
+    audio_text = audio_text.replace('*', '').replace('#', '').replace(':', ',')
+    audio_base64 = await generate_speech_base64(audio_text, mood)
+
+    persist_chat_session(verified_uid, request.session_id, updated_history, new_draft)
+
+    return {
+        "response": reply,
+        "audio": audio_base64,
+        "history": updated_history,
+        "itinerary_draft": new_draft
+    }
 
 @app.get("/health")
 @app.head("/health")
@@ -250,6 +473,12 @@ async def chat(request: ChatRequest, user: dict = Depends(verify_firebase_token)
         
         verified_uid = user.get("uid")
         print(f"Authenticated request from UID: {verified_uid}")
+
+        # An itinerary is "in progress" either because the client is already carrying
+        # a draft from a previous turn, or because this message just triggered one.
+        itinerary_in_progress = bool(request.itinerary_draft and request.itinerary_draft.get("stops"))
+        if itinerary_in_progress or ITINERARY_TRIGGER_PATTERN.search(request.message.lower()):
+            return await handle_itinerary_turn(request, verified_uid)
         
         user_msg = request.message.lower()
         camanava_cities = ["caloocan", "malabon", "navotas", "valenzuela"]
@@ -390,39 +619,21 @@ async def chat(request: ChatRequest, user: dict = Depends(verify_firebase_token)
             {"role": "assistant", "content": response}
         ])[-MAX_STORED_MESSAGES:]
 
-        # Persist to Firestore for real logged-in users only. Guests and dev/local
-        # bypass "users" stay local-only on the client (localStorage), since there's
-        # no real account to attach the data to.
-        if firebase_active and db is not None and verified_uid and verified_uid not in GUEST_LIKE_UIDS:
-            try:
-                preview_source = next(
-                    (m["content"] for m in updated_history if m.get("role") == "user"),
-                    request.message
-                )
-                session_ref = (
-                    db.collection("users").document(verified_uid)
-                    .collection("sessions").document(request.session_id)
-                )
-                session_ref.set({
-                    "id": request.session_id,
-                    "preview": preview_source[:30] + "...",
-                    "timestamp": int(time.time() * 1000),
-                    "messages": updated_history,
-                })
-            except Exception as save_err:
-                print(f"[FIRESTORE SAVE ERROR] {save_err}")
+        # Persist to Firestore for real logged-in users only (see persist_chat_session).
+        persist_chat_session(verified_uid, request.session_id, updated_history, None)
 
         return {
             "response": response,
             "audio": audio_base64,
-            "history": updated_history
+            "history": updated_history,
+            "itinerary_draft": None
         }
         
     except Exception as e:
         import traceback
         print(f"CRITICAL CHAT ERROR: {e}")
         traceback.print_exc()
-        return {"response": "I'm having trouble processing that right now. Try again?", "history": request.history}
+        return {"response": "I'm having trouble processing that right now. Try again?", "history": request.history, "itinerary_draft": request.itinerary_draft}
 
 @app.get("/sessions")
 async def list_sessions(user: dict = Depends(verify_firebase_token)):
@@ -471,6 +682,7 @@ async def get_session(session_id: str, user: dict = Depends(verify_firebase_toke
             "preview": data.get("preview", ""),
             "timestamp": data.get("timestamp", 0),
             "messages": data.get("messages", []),
+            "itineraryDraft": data.get("itineraryDraft"),
         }
     except HTTPException:
         raise
