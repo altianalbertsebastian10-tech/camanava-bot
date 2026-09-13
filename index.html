@@ -1220,6 +1220,18 @@
     let history = [];
     let itineraryDraft = null; // in-progress itinerary being built via chat; null = none active
     let isNaviThinking = false;
+
+    // Browsers throttle setInterval/setTimeout heavily in background tabs, which is why the
+    // typewriter reveal used to appear to "freeze" when you switched away — it wasn't frozen,
+    // just running at a fraction of a tick per second. Instead of fighting that throttling,
+    // finish any in-progress reply instantly the moment the tab is hidden, so the full
+    // response and an unlocked input are already waiting for you when you come back.
+    const pendingTypewriters = new Set();
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+            pendingTypewriters.forEach(finish => finish());
+        }
+    });
     let welcomeHidden = false;
 
     let currentActiveButton = null;
@@ -1590,7 +1602,7 @@
     function clearTTSState() {
         if (currentActiveButton) {
             currentActiveButton.classList.remove('playing-active');
-            currentActiveButton.innerHTML = ICON_SPEAK + " Engage";
+            currentActiveButton.innerHTML = ICON_SPEAK;
             currentActiveButton = null;
         }
         updateStatusDisplay('idle');
@@ -1739,6 +1751,25 @@
             wrapper.appendChild(botMsgDiv);
             
             let index = 0;
+            let typewriterDone = false;
+            const finishTypewriter = () => {
+                if (typewriterDone) return;
+                typewriterDone = true;
+                clearInterval(typewriter);
+                pendingTypewriters.delete(finishTypewriter);
+                containerDiv.innerHTML = innerHTMLContent;
+                if (audioBase64) {
+                    const btn = document.createElement('button');
+                    btn.className = 'bubble-tts-btn';
+                    btn.innerHTML = ICON_SPEAK + " Engage";
+                    btn.setAttribute('data-audio', audioBase64);
+                    btn.onclick = function() { playNaviVoice(this); };
+                    containerDiv.appendChild(btn);
+                }
+                unlockChat();
+            };
+            pendingTypewriters.add(finishTypewriter);
+
             const typewriter = setInterval(() => {
                 if (index < innerHTMLContent.length) {
                     if (innerHTMLContent[index] === '<') {
@@ -1749,16 +1780,7 @@
                     index++;
                     chat.scrollTop = chat.scrollHeight;
                 } else {
-                    clearInterval(typewriter);
-                    if (audioBase64) {
-                        const btn = document.createElement('button');
-                        btn.className = 'bubble-tts-btn';
-                        btn.innerHTML = ICON_SPEAK + " Engage";
-                        btn.setAttribute('data-audio', audioBase64);
-                        btn.onclick = function() { playNaviVoice(this); };
-                        containerDiv.appendChild(btn);
-                    }
-                    unlockChat();
+                    finishTypewriter();
                 }
             }, 15);
         }
