@@ -363,6 +363,13 @@
             font-size: 0.8rem;
             color: var(--fore);
             white-space: nowrap;
+            cursor: pointer;
+        }
+
+        .itinerary-banner-chevron {
+            flex-shrink: 0;
+            color: var(--muted);
+            align-self: center;
         }
 
         .itinerary-banner-label {
@@ -403,6 +410,183 @@
             color: var(--fore);
             border-color: var(--muted);
         }
+
+        /* --- Itinerary timeline preview modal --- */
+        .itinerary-preview-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.75);
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+            z-index: 6500;
+            align-items: flex-end;
+            justify-content: center;
+        }
+
+        .itinerary-preview-overlay.is-active { display: flex; }
+
+        .itinerary-preview-panel {
+            width: 100%;
+            max-width: 480px;
+            max-height: 78vh;
+            background: var(--void);
+            border: 1px solid var(--slate);
+            border-bottom: none;
+            border-radius: 20px 20px 0 0;
+            box-shadow: var(--horizon-glow);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .itinerary-preview-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 18px 20px 14px;
+            border-bottom: 1px solid var(--slate);
+            flex-shrink: 0;
+        }
+
+        .itinerary-preview-header h3 {
+            margin: 0;
+            font-family: var(--font-display);
+            font-size: 1.05rem;
+            color: var(--fore);
+        }
+
+        .itinerary-preview-subtitle {
+            margin-top: 4px;
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            letter-spacing: 0.04em;
+            color: var(--muted);
+        }
+
+        .itinerary-preview-close {
+            background: var(--panel);
+            border: 1px solid var(--hairline);
+            color: var(--muted);
+            border-radius: 50%;
+            width: 32px; height: 32px;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer;
+            flex-shrink: 0;
+            transition: color 0.2s, border-color 0.2s;
+        }
+
+        .itinerary-preview-close:hover { color: var(--fore); border-color: var(--muted); }
+
+        .itinerary-preview-body {
+            padding: 18px 20px;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .itinerary-day-block { margin-bottom: 22px; }
+        .itinerary-day-block:last-child { margin-bottom: 0; }
+
+        .itinerary-day-heading {
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--muted);
+            margin-bottom: 12px;
+        }
+
+        .itinerary-timeline {
+            position: relative;
+            padding-left: 20px;
+        }
+
+        .itinerary-timeline::before {
+            content: '';
+            position: absolute;
+            left: 5px;
+            top: 6px;
+            bottom: 6px;
+            width: 1px;
+            background: var(--hairline);
+        }
+
+        .itinerary-stop {
+            position: relative;
+            padding-bottom: 18px;
+        }
+
+        .itinerary-stop:last-child { padding-bottom: 0; }
+
+        .itinerary-stop-marker {
+            position: absolute;
+            left: -20px;
+            top: 4px;
+            width: 11px; height: 11px;
+            border-radius: 50%;
+            background: var(--lumen);
+            border: 2px solid var(--void);
+            box-shadow: 0 0 0 1px var(--hairline);
+        }
+
+        .itinerary-stop-time {
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            color: var(--muted);
+            margin-bottom: 2px;
+        }
+
+        .itinerary-stop-name {
+            font-family: var(--font-display);
+            font-size: 0.9rem;
+            color: var(--fore);
+        }
+
+        .itinerary-stop-city {
+            font-family: var(--font-body);
+            font-size: 0.72rem;
+            color: var(--muted);
+            margin-top: 1px;
+        }
+
+        .itinerary-stop-notes {
+            font-family: var(--font-body);
+            font-size: 0.78rem;
+            color: var(--lumen);
+            margin-top: 4px;
+            line-height: 1.4;
+        }
+
+        .itinerary-preview-empty {
+            font-family: var(--font-body);
+            font-size: 0.85rem;
+            color: var(--muted);
+            text-align: center;
+            padding: 24px 0;
+        }
+
+        .itinerary-preview-footer {
+            padding: 14px 20px 18px;
+            border-top: 1px solid var(--slate);
+            flex-shrink: 0;
+        }
+
+        .itinerary-preview-save {
+            width: 100%;
+            padding: 13px;
+            background: var(--fore);
+            color: var(--void);
+            border: none;
+            border-radius: var(--radius-inner);
+            font-family: var(--font-display);
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+
+        .itinerary-preview-save:hover { opacity: 0.85; }
 
         input {
             flex: 1;
@@ -667,6 +851,24 @@
         </div>
     </div>
 
+    <div id="itinerary-preview-modal" class="itinerary-preview-overlay" onclick="if(event.target===this) closeItineraryPreview()">
+        <div class="itinerary-preview-panel">
+            <div class="itinerary-preview-header">
+                <div>
+                    <h3 id="itinerary-preview-title">Trip</h3>
+                    <div id="itinerary-preview-subtitle" class="itinerary-preview-subtitle"></div>
+                </div>
+                <button class="itinerary-preview-close" onclick="closeItineraryPreview()" aria-label="Close">
+                    <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+            </div>
+            <div id="itinerary-preview-body" class="itinerary-preview-body"></div>
+            <div class="itinerary-preview-footer">
+                <button class="itinerary-preview-save" onclick="confirmItineraryFromPreview()">Save this itinerary</button>
+            </div>
+        </div>
+    </div>
+
     <!-- SIDEBAR UI -->
     <div id="sidebar-overlay" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 4999;" onclick="toggleSidebar()"></div>
 
@@ -731,10 +933,11 @@
 
     <div class="footer-container">
         <div id="itinerary-banner" class="itinerary-banner" style="display:none;">
-            <div class="itinerary-banner-text">
+            <div class="itinerary-banner-text" onclick="openItineraryPreview()" role="button" tabindex="0">
                 <span class="itinerary-banner-label">Planning:</span>
                 <span id="itinerary-banner-title"></span>
                 <span id="itinerary-banner-count" class="itinerary-banner-count"></span>
+                <svg class="itinerary-banner-chevron" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
             </div>
             <button class="itinerary-banner-clear" onclick="clearItineraryDraft()">Discard</button>
         </div>
@@ -872,6 +1075,75 @@
         itineraryDraft = null;
         updateItineraryBanner();
         addMessageToUI('bot', "No worries, I've cleared that itinerary draft.");
+    }
+
+    function escapeHtml(str) {
+        const div = document.createElement('div');
+        div.textContent = str == null ? '' : String(str);
+        return div.innerHTML;
+    }
+
+    function openItineraryPreview() {
+        if (!itineraryDraft) return;
+        const stops = (itineraryDraft && Array.isArray(itineraryDraft.stops)) ? itineraryDraft.stops : [];
+        const modal = document.getElementById('itinerary-preview-modal');
+        const body = document.getElementById('itinerary-preview-body');
+
+        document.getElementById('itinerary-preview-title').textContent = itineraryDraft.title || 'Planning a trip';
+        const cities = Array.isArray(itineraryDraft.citiesCovered) ? itineraryDraft.citiesCovered : [];
+        document.getElementById('itinerary-preview-subtitle').textContent =
+            (cities.length ? cities.map(c => c.charAt(0).toUpperCase() + c.slice(1)).join(', ') + ' \u2022 ' : '') +
+            stops.length + (stops.length === 1 ? ' stop' : ' stops');
+
+        if (stops.length === 0) {
+            body.innerHTML = '<div class="itinerary-preview-empty">No stops added yet.</div>';
+        } else {
+            // Group by dayIndex, sort days ascending, sort stops within a day by order (fallback: time).
+            const byDay = {};
+            stops.forEach(stop => {
+                const d = Number.isInteger(stop.dayIndex) ? stop.dayIndex : 0;
+                if (!byDay[d]) byDay[d] = [];
+                byDay[d].push(stop);
+            });
+            const dayKeys = Object.keys(byDay).map(Number).sort((a, b) => a - b);
+
+            body.innerHTML = dayKeys.map(dayNum => {
+                const dayStops = byDay[dayNum].slice().sort((a, b) => {
+                    const orderA = Number.isInteger(a.order) ? a.order : 0;
+                    const orderB = Number.isInteger(b.order) ? b.order : 0;
+                    if (orderA !== orderB) return orderA - orderB;
+                    return String(a.time || '').localeCompare(String(b.time || ''));
+                });
+
+                const stopsHtml = dayStops.map(stop => `
+                    <div class="itinerary-stop">
+                        <div class="itinerary-stop-marker"></div>
+                        <div class="itinerary-stop-time">${escapeHtml(stop.time || '')}</div>
+                        <div class="itinerary-stop-name">${escapeHtml(stop.placeName || 'Unnamed stop')}</div>
+                        <div class="itinerary-stop-city">${escapeHtml(stop.city || '')}</div>
+                        ${stop.notes ? `<div class="itinerary-stop-notes">${escapeHtml(stop.notes)}</div>` : ''}
+                    </div>
+                `).join('');
+
+                return `
+                    <div class="itinerary-day-block">
+                        <div class="itinerary-day-heading">Day ${dayNum + 1}</div>
+                        <div class="itinerary-timeline">${stopsHtml}</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        modal.classList.add('is-active');
+    }
+
+    function closeItineraryPreview() {
+        document.getElementById('itinerary-preview-modal').classList.remove('is-active');
+    }
+
+    function confirmItineraryFromPreview() {
+        closeItineraryPreview();
+        send('save it to my itinerary');
     }
 
     function saveToLocalHistory(previewText) {
