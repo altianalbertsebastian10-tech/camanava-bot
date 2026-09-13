@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>CamaNaviGo: Chat</title>
     <link rel="icon" type="image/png" href="https://raw.githubusercontent.com/altianalbertsebastian10-tech/camanava-bot/main/navi_avatar.png">
     
@@ -761,10 +761,16 @@
         input::placeholder { color: var(--muted); }
 
         button:focus-visible,
-        [role="button"]:focus-visible,
-        input:focus-visible {
+        [role="button"]:focus-visible {
             outline: 2px solid var(--lumen);
             outline-offset: 2px;
+        }
+
+        /* The chat input's own container (.input-bar) already shows a focus state
+           via its :focus-within border/glow -- a second hard outline on the input
+           itself on top of that just reads as a stray white line while typing. */
+        #input:focus-visible {
+            outline: none;
         }
 
         .send-pill {
