@@ -275,19 +275,51 @@ async def handle_itinerary_turn(request: "ChatRequest", verified_uid: str) -> di
         else:
             try:
                 title = draft.get("title") or "My CAMANAVA Trip"
-                itinerary_ref = db.collection("itineraries").document()
+                stops = draft.get("stops", [])
+
+                # --- date: the app stores a single human-readable date string, e.g. "Feb 26, 2026" ---
+                # (not a range -- confirmed from a real saved document). If the user gave a start date,
+                # use it; otherwise default to today, same as if they'd made it straight in the app.
+                start_date_raw = draft.get("startDate")
+                date_obj = None
+                if start_date_raw:
+                    for fmt in ("%Y-%m-%d", "%m/%d/%Y"):
+                        try:
+                            date_obj = datetime.datetime.strptime(start_date_raw, fmt)
+                            break
+                        except (ValueError, TypeError):
+                            continue
+                if date_obj is None:
+                    date_obj = datetime.datetime.now()
+                date_str = date_obj.strftime("%b %-d, %Y")
+
+                # --- duration: the app uses a text label, not a number. We only have one confirmed
+                # example ("Full day trip"), so this is a best-effort guess based on how many distinct
+                # days the chat draft covered -- worth checking against the app's own picker options.
+                day_count = len({s.get("dayIndex", 0) for s in stops}) or 1
+                duration_label = "Full day trip" if day_count <= 1 else f"{day_count}-day trip"
+
+                # --- notes: the app has no field for WHICH places are in a trip, only a count (see
+                # `places` below). So the actual place list is folded into notes as plain text --
+                # nothing structural, but at least a human reading the app still sees what's included.
+                place_names = [s.get("placeName") for s in stops if s.get("placeName")]
+                notes_str = "Places: " + ", ".join(place_names) if place_names else ""
+
+                itinerary_ref = (
+                    db.collection("users").document(verified_uid)
+                    .collection("itineraries").document()
+                )
                 itinerary_ref.set({
-                    "userId": verified_uid,
                     "title": title,
-                    "status": "confirmed",
+                    "date": date_str,
+                    "duration": duration_label,
+                    "notes": notes_str,
+                    "places": len(stops),
+                    "status": "upcoming",
+                    "uid": verified_uid,
                     "createdAt": firestore.SERVER_TIMESTAMP,
-                    "updatedAt": firestore.SERVER_TIMESTAMP,
-                    "createdVia": "chatbot",
-                    "startDate": draft.get("startDate"),
-                    "citiesCovered": draft.get("citiesCovered", []),
-                    "stops": draft.get("stops", []),
                 })
-                stop_count = len(draft.get("stops", []))
+                stop_count = len(stops)
                 reply, mood, new_draft, updated_history = build_result(
                     f"Saved! \"{title}\" is now in your Itineraries tab with {stop_count} stop"
                     f"{'s' if stop_count != 1 else ''}. Have an amazing trip!",
