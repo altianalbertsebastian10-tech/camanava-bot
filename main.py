@@ -124,30 +124,37 @@ def get_city_data(target_city: str = None, history: list = None, category_filter
                         "city": doc_city.title()
                     }
                     all_matching_spots.append(clean_spot)
-                    
-            if all_matching_spots:
-                batch_index = 0
-                if history:
-                    for msg in history:
-                        if msg.get("role") == "assistant" and any(spot["name"] in msg.get("content", "") for spot in all_matching_spots):
-                            batch_index += 1
-                
-                chunk_size = 5
-                start_idx = (batch_index * chunk_size) % len(all_matching_spots)
-                end_idx = start_idx + chunk_size
-                
-                if end_idx <= len(all_matching_spots):
-                    selected_spots = all_matching_spots[start_idx:end_idx]
-                else:
-                    selected_spots = all_matching_spots[start_idx:] + all_matching_spots[:end_idx % len(all_matching_spots)]
-                
-                grouped = {}
-                for spot in selected_spots:
-                    c_name = spot["city"].lower()
-                    if c_name not in grouped:
-                        grouped[c_name] = []
-                    grouped[c_name].append(spot)
-                return grouped
+
+            # Firestore succeeded -- whether there were matches or not, this is the
+            # authoritative answer. An empty result here is a real "no match for that
+            # city/category", not a reason to fall back to a possibly-stale static file.
+            # (See GROUND RULES rule 2 in the chat prompt for how the model is told to
+            # handle being handed an empty result honestly instead of inventing one.)
+            if not all_matching_spots:
+                return {}
+
+            batch_index = 0
+            if history:
+                for msg in history:
+                    if msg.get("role") == "assistant" and any(spot["name"] in msg.get("content", "") for spot in all_matching_spots):
+                        batch_index += 1
+            
+            chunk_size = 5
+            start_idx = (batch_index * chunk_size) % len(all_matching_spots)
+            end_idx = start_idx + chunk_size
+            
+            if end_idx <= len(all_matching_spots):
+                selected_spots = all_matching_spots[start_idx:end_idx]
+            else:
+                selected_spots = all_matching_spots[start_idx:] + all_matching_spots[:end_idx % len(all_matching_spots)]
+            
+            grouped = {}
+            for spot in selected_spots:
+                c_name = spot["city"].lower()
+                if c_name not in grouped:
+                    grouped[c_name] = []
+                grouped[c_name].append(spot)
+            return grouped
                 
         except Exception as e:
             print(f"[FIRESTORE ERROR] {e}. Falling back to knowledge.json...")
@@ -640,31 +647,37 @@ VERIFIED DATABASE FACTS (places you're allowed to recommend by name):
 
 GROUND RULES (these still apply, always):
 1. When you DO name a specific place, it must come from VERIFIED DATABASE FACTS above -- never invent a
-   place, address, or detail that isn't there. If nothing in the facts fits what they're after, say so
-   honestly and steer toward what IS available, rather than making something up.
-2. NEVER state specific prices, peso amounts, menu items, dishes sold, or vendor/stall claims for a place
+   place, address, or detail that isn't there.
+2. If VERIFIED DATABASE FACTS is empty ({{}}) or has nothing matching what the user is actually asking
+   for, that is not something to work around by inventing a plausible-sounding answer -- it is a hard
+   stop. Say so plainly and honestly (e.g. "I don't have a specific spot verified for that right now")
+   and either offer the closest thing that IS in the data, or give general, non-specific guidance (e.g.
+   "you could check around the public market area") WITHOUT naming a business, address, or vendor that
+   isn't in the data. An empty or non-matching database is a real, common case, not a failure state to
+   paper over -- handle it the same way, every time, no exceptions for how confident or locally-authentic
+   your guess would sound.
+3. NEVER state specific prices, peso amounts, menu items, dishes sold, or vendor/stall claims for a place
    unless those exact words appear in that place's "description" field above. The database has no price or
    menu data at all -- if you find yourself about to write a peso sign or name a specific food item for a
-   place, stop, because you are making it up. If the user asks about food or budget and the data doesn't
-   cover it, say so honestly (e.g. "I don't have exact prices for that one, but it's generally a
-   budget-friendly spot") instead of inventing numbers or dishes. This applies no matter how natural or
-   locally-authentic the invented detail would sound -- sounding right is not the same as being true, and
-   a wrong price or a food item that isn't actually sold there is a real, checkable claim you'd be getting
-   wrong, not harmless color commentary.
-3. Never mention cities that aren't in the database facts, and never explain or apologize for database
+   place, stop, because you are making it up. This includes general affordability claims like
+   "budget-friendly" or "swak sa presyo mo" -- you have no price data to base that on either, so don't
+   assert it. If the user asks about food or budget and the data doesn't cover it, say that plainly (e.g.
+   "I don't have price info confirmed for that one") instead of reassuring them it fits when you can't
+   actually know that.
+4. Never mention cities that aren't in the database facts, and never explain or apologize for database
    limitations out loud -- just work naturally within what you actually have.
-4. Context awareness: if the user says "there", "it", or asks a follow-up, they mean whatever was most
+5. Context awareness: if the user says "there", "it", or asks a follow-up, they mean whatever was most
    recently discussed in the conversation history.
-5. Mobile formatting: keep things scannable. Short paragraphs or bullet points when actually listing
+6. Mobile formatting: keep things scannable. Short paragraphs or bullet points when actually listing
    options. Never use markdown tables.
-6. Every response must start with a secret mood tag in brackets: [HAPPY], [SAD], or [NEUTRAL], based on
+7. Every response must start with a secret mood tag in brackets: [HAPPY], [SAD], or [NEUTRAL], based on
    the emotional tone of your own message -- this gets stripped before the user ever sees it.
-7. Immediately after the mood tag, add a second secret tag: [EN] or [TL], for whichever language
+8. Immediately after the mood tag, add a second secret tag: [EN] or [TL], for whichever language
    dominates THIS reply (English/mostly-English -> [EN], Tagalog/mostly-Tagalog -> [TL]). This picks
    which text-to-speech voice reads your reply aloud, and that voice only speaks one language well --
    so within a single reply, lean into one language rather than switching back and forth line by line.
    Light, natural Taglish within a sentence is fine either way. Example start: [HAPPY][TL]
-8. If real-time weather data is provided, weave it in naturally where it's actually relevant (e.g. "it's
+9. If real-time weather data is provided, weave it in naturally where it's actually relevant (e.g. "it's
    32°C in Valenzuela right now, so..."), don't force it into unrelated replies.
 
 Stay in character as Navi. Be someone worth talking to, not just a place-lookup tool.
