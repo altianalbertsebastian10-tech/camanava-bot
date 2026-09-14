@@ -244,6 +244,9 @@ async def handle_itinerary_turn(request: "ChatRequest", verified_uid: str) -> di
     user_msg = request.message.lower()
     draft = request.itinerary_draft or dict(EMPTY_ITINERARY_DRAFT)
     has_stops = bool(draft.get("stops"))
+    # Backend-authored messages (cancel/confirm/error) are always plain English;
+    # only the LLM-generated "collect" branch below can override this to "TL".
+    lang = "EN"
 
     def build_result(reply: str, mood: str, new_draft: Optional[dict]):
         updated_history = (request.history + [
@@ -374,9 +377,13 @@ RULES:
 5. If the draft has at least one stop and feels reasonably complete, end your reply by asking if
    they'd like you to save it to their itinerary.
 6. Keep the reply short, warm, and conversational -- this is a chat message, not a report.
-7. Respond with ONLY a single JSON object, no other text, in exactly this shape:
+7. Add a "lang" field: "EN" or "TL", for whichever language dominates your "reply" text. This picks
+   which text-to-speech voice reads it aloud, and that voice only speaks one language well -- so lean
+   into one language per reply rather than switching back and forth line by line.
+8. Respond with ONLY a single JSON object, no other text, in exactly this shape:
 {{
   "reply": "<your conversational message to the user>",
+  "lang": "EN",
   "draft": {{
     "title": "<short trip title>",
     "startDate": "<YYYY-MM-DD or null>",
@@ -413,6 +420,8 @@ RULES:
             candidate_draft = parsed.get("draft") or draft
             if not isinstance(candidate_draft.get("stops"), list):
                 candidate_draft["stops"] = draft.get("stops", [])
+            if parsed.get("lang") in ("EN", "TL"):
+                lang = parsed["lang"]
         except Exception as parse_err:
             print(f"[ITINERARY JSON PARSE ERROR] {parse_err} RAW: {raw}")
             reply_text = "I'm having a little trouble organizing that -- could you tell me again which places and days you'd like?"
@@ -422,7 +431,7 @@ RULES:
 
     audio_text = emoji.replace_emoji(reply, replace='')
     audio_text = audio_text.replace('*', '').replace('#', '').replace(':', ',')
-    audio_base64 = await generate_speech_base64(audio_text, mood)
+    audio_base64 = await generate_speech_base64(audio_text, mood, lang)
 
     persist_chat_session(verified_uid, request.session_id, updated_history, new_draft)
 
@@ -440,11 +449,24 @@ async def health_check():
     mode = "FIRESTORE" if firebase_active else "JSON_FALLBACK"
     return {"status": "alive", "mode": mode}
 
-async def generate_speech_base64(text: str, mood: str) -> str:
-    """Generates natural neural TTS audio with a sassy, smart AI assistant vibe."""
+async def generate_speech_base64(text: str, mood: str, lang: str = "EN") -> str:
+    """Generates natural neural TTS audio with a sassy, smart AI assistant vibe.
+
+    Edge TTS only speaks one language well per voice. We don't have budget for a
+    proper multilingual engine, so instead of always using the English voice (which
+    mispronounces Tagalog badly), we pick between two free Edge TTS voices based on
+    which language actually dominates THIS reply: an English voice for English/mostly-
+    English replies, and a real Filipino neural voice for Tagalog/mostly-Tagalog ones.
+    Genuinely mixed-language sentences will still favor whichever voice was picked --
+    that's an inherent limit of single-language TTS, not something free tooling can fix.
+    """
     try:
-        # JennyNeural provides that crisp, highly articulate "Smart Assistant" tone
-        voice = "en-US-JennyNeural" 
+        if lang == "TL":
+            # Real Filipino neural voice -- also free via edge-tts, same service as JennyNeural.
+            voice = "fil-PH-BlessicaNeural"
+        else:
+            # JennyNeural provides that crisp, highly articulate "Smart Assistant" tone
+            voice = "en-US-JennyNeural"
         
         # The "Sassy Siri" baseline: slightly faster, snappy, and a tiny bit deeper
         rate = "+5%"
@@ -620,7 +642,12 @@ GROUND RULES (these still apply, always):
    options. Never use markdown tables.
 5. Every response must start with a secret mood tag in brackets: [HAPPY], [SAD], or [NEUTRAL], based on
    the emotional tone of your own message -- this gets stripped before the user ever sees it.
-6. If real-time weather data is provided, weave it in naturally where it's actually relevant (e.g. "it's
+6. Immediately after the mood tag, add a second secret tag: [EN] or [TL], for whichever language
+   dominates THIS reply (English/mostly-English -> [EN], Tagalog/mostly-Tagalog -> [TL]). This picks
+   which text-to-speech voice reads your reply aloud, and that voice only speaks one language well --
+   so within a single reply, lean into one language rather than switching back and forth line by line.
+   Light, natural Taglish within a sentence is fine either way. Example start: [HAPPY][TL]
+7. If real-time weather data is provided, weave it in naturally where it's actually relevant (e.g. "it's
    32°C in Valenzuela right now, so..."), don't force it into unrelated replies.
 
 Stay in character as Navi. Be someone worth talking to, not just a place-lookup tool.
@@ -667,10 +694,22 @@ Stay in character as Navi. Be someone worth talking to, not just a place-lookup 
                 mood = response[1:end_idx].upper()
                 response = response[end_idx+1:].strip()
 
+        # Second tag right after the mood tag tells us which TTS voice to use --
+        # see generate_speech_base64 for why this matters (no budget for a proper
+        # multilingual TTS engine, so we switch between two free Edge TTS voices).
+        lang = "EN"
+        if response.strip().startswith("["):
+            end_idx2 = response.find("]")
+            if end_idx2 != -1:
+                candidate_lang = response[1:end_idx2].upper()
+                if candidate_lang in ("EN", "TL"):
+                    lang = candidate_lang
+                    response = response[end_idx2+1:].strip()
+
         audio_text = emoji.replace_emoji(response, replace='')
         audio_text = audio_text.replace('*', '').replace('#', '').replace(':', ',')
 
-        audio_base64 = await generate_speech_base64(audio_text, mood)
+        audio_base64 = await generate_speech_base64(audio_text, mood, lang)
 
         # Keep the FULL conversation here (not truncated to 4) so the client can
         # actually persist and reload a whole session. LLM context length is
