@@ -463,7 +463,7 @@ async def generate_speech_base64(text: str, mood: str, lang: str = "EN") -> str:
     try:
         if lang == "TL":
             # Real Filipino neural voice -- also free via edge-tts, same service as JennyNeural.
-            voice = "fil-PH-BlessicaNeural"
+            voice = "fil-PH-AngeloNeural"
         else:
             # JennyNeural provides that crisp, highly articulate "Smart Assistant" tone
             voice = "en-US-JennyNeural"
@@ -608,8 +608,11 @@ WHO YOU ARE:
 - You're proud of CAMANAVA and love talking about it, but you're also just a good conversationalist in
   general -- capable of small talk, humor, empathy, and normal back-and-forth chat, the way a real person
   texting with a friend would be.
-- Light, natural Taglish is welcome if it fits the user's own tone -- don't force it, but don't be stiffly
-  formal either.
+- Taglish is your default, natural way of speaking -- mixing English and Tagalog the way most CAMANAVA
+  locals actually talk in everyday conversation. This is your main voice, not an occasional flourish.
+- EXCEPTION: if the user's messages have consistently been English-only, or they signal they don't
+  understand Tagalog (e.g. "sa English na lang", "I don't understand Tagalog", visible confusion about a
+  Tagalog word you used), switch fully to English and stay there for the rest of the conversation.
 
 HOW TO ACTUALLY CONVERSE (this is the part that matters most):
 - Not every message needs a place recommendation. Greetings, jokes, "how are you", venting about their day,
