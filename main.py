@@ -86,8 +86,18 @@ def verify_firebase_token(authorization: str = Header(None)):
         raise HTTPException(status_code=401, detail=f"Invalid or expired token: {str(e)}")
 
 # --- ADVANCED DYNAMIC DATA ROUTER WITH CATEGORY FILTERING & PAGINATION ---
-def get_city_data(target_city: str = None, history: list = None, category_filter: str = None, negated_cities: set = None) -> dict:
-    """Fetches data from Firestore, filters by city, category, and handles multi-city pagination."""
+def get_city_data(target_city: str = None, history: list = None, category_filter: str = None, negated_cities: set = None, paginate: bool = True) -> dict:
+    """Fetches data from Firestore, filters by city, category, and handles multi-city pagination.
+
+    paginate=True (default): used by the normal chat flow. Rotates through matching spots in
+    chunks of 5 based on what's already been mentioned in `history`, so repeated "show me more"
+    style questions surface different spots each time.
+
+    paginate=False: used by the itinerary flow. Returns EVERY matching spot, not just one 5-item
+    chunk. The itinerary needs to recognize a place regardless of which chunk the normal chat
+    happened to show earlier -- that's what was causing verified places (e.g. a city's 6th+ spot)
+    to be reported as "not in the database" even though they exist.
+    """
     if negated_cities is None:
         negated_cities = set()
         
@@ -133,21 +143,24 @@ def get_city_data(target_city: str = None, history: list = None, category_filter
             if not all_matching_spots:
                 return {}
 
-            batch_index = 0
-            if history:
-                for msg in history:
-                    if msg.get("role") == "assistant" and any(spot["name"] in msg.get("content", "") for spot in all_matching_spots):
-                        batch_index += 1
-            
-            chunk_size = 5
-            start_idx = (batch_index * chunk_size) % len(all_matching_spots)
-            end_idx = start_idx + chunk_size
-            
-            if end_idx <= len(all_matching_spots):
-                selected_spots = all_matching_spots[start_idx:end_idx]
+            if paginate:
+                batch_index = 0
+                if history:
+                    for msg in history:
+                        if msg.get("role") == "assistant" and any(spot["name"] in msg.get("content", "") for spot in all_matching_spots):
+                            batch_index += 1
+
+                chunk_size = 5
+                start_idx = (batch_index * chunk_size) % len(all_matching_spots)
+                end_idx = start_idx + chunk_size
+
+                if end_idx <= len(all_matching_spots):
+                    selected_spots = all_matching_spots[start_idx:end_idx]
+                else:
+                    selected_spots = all_matching_spots[start_idx:] + all_matching_spots[:end_idx % len(all_matching_spots)]
             else:
-                selected_spots = all_matching_spots[start_idx:] + all_matching_spots[:end_idx % len(all_matching_spots)]
-            
+                selected_spots = all_matching_spots
+
             grouped = {}
             for spot in selected_spots:
                 c_name = spot["city"].lower()
@@ -360,13 +373,15 @@ async def handle_itinerary_turn(request: "ChatRequest", verified_uid: str) -> di
         if not mentioned_cities:
             mentioned_cities = [c for c in draft.get("citiesCovered", []) if c in camanava_cities]
 
-        # Grounding data: intentionally called with history=None so this always returns
-        # the same stable first chunk of spots per city, rather than the rotating/paginated
-        # chunk the normal chat flow uses -- an itinerary needs a consistent option set
-        # to build against turn to turn, not a "show me different ones" rotation.
+        # Grounding data: called with paginate=False so this always returns EVERY verified
+        # spot per city, not just one 5-item rotating chunk -- an itinerary needs to recognize
+        # any place the user names, not only whichever chunk the normal chat last happened to
+        # show. (Previously this passed history=None expecting a "stable batch 0", but batch 0
+        # is still only the first 5 spots -- anything past that was wrongly reported as
+        # "not verified" even though it exists in the database.)
         verified_places = {}
         for c in (mentioned_cities or camanava_cities):
-            verified_places.update(get_city_data(c, None, None, set()))
+            verified_places.update(get_city_data(c, None, None, set(), paginate=False))
 
         # This was missing entirely before -- the itinerary LLM call had no memory of
         # anything said earlier in the conversation, only the structured draft object.
