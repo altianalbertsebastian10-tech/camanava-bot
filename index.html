@@ -1291,15 +1291,28 @@
         const banner = document.getElementById('itinerary-banner');
         if (!banner) return;
         const stops = (itineraryDraft && Array.isArray(itineraryDraft.stops)) ? itineraryDraft.stops : [];
+
         if (stops.length === 0) {
             banner.style.display = 'none';
-            return;
+        } else {
+            banner.style.display = 'flex';
+            document.getElementById('itinerary-banner-title').textContent =
+                itineraryDraft.title || 'Planning a trip';
+            document.getElementById('itinerary-banner-count').textContent =
+                stops.length + (stops.length === 1 ? ' stop' : ' stops');
         }
-        banner.style.display = 'flex';
-        document.getElementById('itinerary-banner-title').textContent =
-            itineraryDraft.title || 'Planning a trip';
-        document.getElementById('itinerary-banner-count').textContent =
-            stops.length + (stops.length === 1 ? ' stop' : ' stops');
+
+        // Keep an already-open timeline modal live: if the user adds, edits, or removes
+        // a stop mid-conversation, the modal should reflect that immediately, without
+        // needing to be closed and reopened to see the change.
+        const modal = document.getElementById('itinerary-preview-modal');
+        if (modal && modal.classList.contains('is-active')) {
+            if (itineraryDraft) {
+                openItineraryPreview();
+            } else {
+                closeItineraryPreview();
+            }
+        }
     }
 
     function clearItineraryDraft() {

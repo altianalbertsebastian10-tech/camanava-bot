@@ -262,14 +262,21 @@ async def handle_itinerary_turn(request: "ChatRequest", verified_uid: str) -> di
         ])[-60:]
         return reply, mood, new_draft, updated_history
 
-    # --- CANCEL ---
-    if has_stops and ITINERARY_CANCEL_PATTERN.search(user_msg):
+    # --- CANCEL --- (works even before any stop's been added -- an empty in-progress draft
+    # is still a draft, and the user should be able to back out of it any time)
+    if ITINERARY_CANCEL_PATTERN.search(user_msg):
         reply, mood, new_draft, updated_history = build_result(
             "No worries, I've cleared that itinerary draft. Want to start planning a new one?",
             "NEUTRAL", None
         )
 
     # --- CONFIRM / SAVE ---
+    elif ITINERARY_CONFIRM_PATTERN.search(user_msg) and not has_stops:
+        reply, mood, new_draft, updated_history = build_result(
+            "You haven't added any stops yet -- tell me where you'd like to go first and I'll build it out!",
+            "NEUTRAL", draft
+        )
+
     elif has_stops and ITINERARY_CONFIRM_PATTERN.search(user_msg):
         if not verified_uid or verified_uid in GUEST_LIKE_UIDS:
             reply, mood, new_draft, updated_history = build_result(
@@ -361,6 +368,13 @@ async def handle_itinerary_turn(request: "ChatRequest", verified_uid: str) -> di
         for c in (mentioned_cities or camanava_cities):
             verified_places.update(get_city_data(c, None, None, set()))
 
+        # This was missing entirely before -- the itinerary LLM call had no memory of
+        # anything said earlier in the conversation, only the structured draft object.
+        # That's exactly why "add that to my itinerary" (referring to places named a
+        # few turns earlier) used to fail: the model genuinely never saw them.
+        ITINERARY_LLM_CONTEXT_TURNS = 16
+        itinerary_context_history = request.history[-ITINERARY_LLM_CONTEXT_TURNS:]
+
         system_prompt = f"""You are Navi, helping a user build a multi-stop travel itinerary in the
 CAMANAVA region (Caloocan, Malabon, Navotas, Valenzuela).
 
@@ -373,21 +387,29 @@ VERIFIED AVAILABLE PLACES (JSON -- you may ONLY use place_id/name values that ap
 USER'S LATEST MESSAGE: {request.message}
 
 RULES:
-1. Update the draft itinerary based on the user's message and the conversation so far.
+1. Update the draft itinerary based on the user's message and the conversation so far. The user can ADD
+   new stops, but can just as naturally REMOVE a stop they already added ("actually skip the park") or
+   EDIT one ("move lunch to 1pm instead", "make day 2 start at the shrine instead of the market") -- when
+   that happens, modify or remove the matching entry in "stops" rather than just appending a new one.
 2. NEVER invent a place_id or place name. Only use entries from VERIFIED AVAILABLE PLACES. If the
    user asks for a place/city not in that list, say so naturally in your reply and suggest an
-   alternative from what IS available.
+   alternative from what IS available -- do not invent details (address, directions, what's nearby) to
+   compensate for a place not being in the data.
 3. Each stop needs: dayIndex (0-based), order (position within that day), time ("HH:MM", your best
    sensible estimate if the user didn't specify one), placeId, placeName, city, cityKey (lowercase city),
    and notes (short, can be empty string).
-4. Keep dayIndex/order consistent and non-conflicting as you add stops.
+4. Keep dayIndex/order consistent and non-conflicting as you add, remove, or reorder stops.
 5. If the draft has at least one stop and feels reasonably complete, end your reply by asking if
    they'd like you to save it to their itinerary.
 6. Keep the reply short, warm, and conversational -- this is a chat message, not a report.
-7. Add a "lang" field: "EN" or "TL", for whichever language dominates your "reply" text. This picks
+7. This itinerary-building mode stays active for the rest of the conversation once started, even across
+   messages that don't mention "itinerary" again -- that's expected, not a bug. If the user's latest
+   message is clearly unrelated to the trip (small talk, an off-topic question), respond naturally to it
+   AND gently check whether they want to keep building the itinerary, while leaving "draft" unchanged.
+8. Add a "lang" field: "EN" or "TL", for whichever language dominates your "reply" text. This picks
    which text-to-speech voice reads it aloud, and that voice only speaks one language well -- so lean
    into one language per reply rather than switching back and forth line by line.
-8. Respond with ONLY a single JSON object, no other text, in exactly this shape:
+9. Respond with ONLY a single JSON object, no other text, in exactly this shape:
 {{
   "reply": "<your conversational message to the user>",
   "lang": "EN",
@@ -405,7 +427,11 @@ RULES:
         try:
             completion = primary_client.chat.completions.create(
                 model="openai/gpt-oss-120b",
-                messages=[{"role": "system", "content": system_prompt}],
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    *itinerary_context_history,
+                    {"role": "user", "content": request.message}
+                ],
                 temperature=0.2,
                 max_tokens=1024,
                 response_format={"type": "json_object"}
@@ -414,7 +440,11 @@ RULES:
             print(f"[PRIMARY GROQ LIMIT HIT - itinerary] Switching to backup Groq account... Error: {primary_err}")
             completion = backup_client.chat.completions.create(
                 model="openai/gpt-oss-120b",
-                messages=[{"role": "system", "content": system_prompt}],
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    *itinerary_context_history,
+                    {"role": "user", "content": request.message}
+                ],
                 temperature=0.2,
                 max_tokens=1024,
                 response_format={"type": "json_object"}
@@ -537,7 +567,12 @@ async def chat(request: ChatRequest, user: dict = Depends(verify_firebase_token)
 
         # An itinerary is "in progress" either because the client is already carrying
         # a draft from a previous turn, or because this message just triggered one.
-        itinerary_in_progress = bool(request.itinerary_draft and request.itinerary_draft.get("stops"))
+        # An itinerary is "in progress" for the rest of the conversation once started --
+        # not just while it already has stops. Otherwise, the very first reply ("sure,
+        # tell me the places!") has zero stops yet, and the user's NEXT message (which
+        # naturally won't contain the word "itinerary" again) would incorrectly fall back
+        # to normal chat instead of continuing to build the draft.
+        itinerary_in_progress = request.itinerary_draft is not None
         if itinerary_in_progress or ITINERARY_TRIGGER_PATTERN.search(request.message.lower()):
             return await handle_itinerary_turn(request, verified_uid)
         
