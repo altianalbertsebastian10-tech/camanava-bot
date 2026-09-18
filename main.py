@@ -86,18 +86,8 @@ def verify_firebase_token(authorization: str = Header(None)):
         raise HTTPException(status_code=401, detail=f"Invalid or expired token: {str(e)}")
 
 # --- ADVANCED DYNAMIC DATA ROUTER WITH CATEGORY FILTERING & PAGINATION ---
-def get_city_data(target_city: str = None, history: list = None, category_filter: str = None, negated_cities: set = None, paginate: bool = True) -> dict:
-    """Fetches data from Firestore, filters by city, category, and handles multi-city pagination.
-
-    paginate=True (default): used by the normal chat flow. Rotates through matching spots in
-    chunks of 5 based on what's already been mentioned in `history`, so repeated "show me more"
-    style questions surface different spots each time.
-
-    paginate=False: used by the itinerary flow. Returns EVERY matching spot, not just one 5-item
-    chunk. The itinerary needs to recognize a place regardless of which chunk the normal chat
-    happened to show earlier -- that's what was causing verified places (e.g. a city's 6th+ spot)
-    to be reported as "not in the database" even though they exist.
-    """
+def get_city_data(target_city: str = None, history: list = None, category_filter: str = None, negated_cities: set = None) -> dict:
+    """Fetches data from Firestore, filters by city, category, and handles multi-city pagination."""
     if negated_cities is None:
         negated_cities = set()
         
@@ -143,24 +133,21 @@ def get_city_data(target_city: str = None, history: list = None, category_filter
             if not all_matching_spots:
                 return {}
 
-            if paginate:
-                batch_index = 0
-                if history:
-                    for msg in history:
-                        if msg.get("role") == "assistant" and any(spot["name"] in msg.get("content", "") for spot in all_matching_spots):
-                            batch_index += 1
-
-                chunk_size = 5
-                start_idx = (batch_index * chunk_size) % len(all_matching_spots)
-                end_idx = start_idx + chunk_size
-
-                if end_idx <= len(all_matching_spots):
-                    selected_spots = all_matching_spots[start_idx:end_idx]
-                else:
-                    selected_spots = all_matching_spots[start_idx:] + all_matching_spots[:end_idx % len(all_matching_spots)]
+            batch_index = 0
+            if history:
+                for msg in history:
+                    if msg.get("role") == "assistant" and any(spot["name"] in msg.get("content", "") for spot in all_matching_spots):
+                        batch_index += 1
+            
+            chunk_size = 5
+            start_idx = (batch_index * chunk_size) % len(all_matching_spots)
+            end_idx = start_idx + chunk_size
+            
+            if end_idx <= len(all_matching_spots):
+                selected_spots = all_matching_spots[start_idx:end_idx]
             else:
-                selected_spots = all_matching_spots
-
+                selected_spots = all_matching_spots[start_idx:] + all_matching_spots[:end_idx % len(all_matching_spots)]
+            
             grouped = {}
             for spot in selected_spots:
                 c_name = spot["city"].lower()
@@ -231,6 +218,21 @@ ITINERARY_CANCEL_PATTERN = re.compile(
 
 EMPTY_ITINERARY_DRAFT = {"title": "", "startDate": None, "citiesCovered": [], "stops": []}
 
+# Common shorthand/misspellings testers and real users actually type, per city. "caloocan"
+# already had kaloakan/kalookan variants handled inline everywhere -- centralizing that here
+# and adding "val"/"malabon" style shorthand, since a query like "val and malabon" would
+# previously fail to match Valenzuela at all (the regex only looked for the full word).
+CITY_ALIASES = {
+    "caloocan": r"(caloocan|kaloakan|kalookan)",
+    "malabon": r"malabon",
+    "navotas": r"navotas",
+    "valenzuela": r"(valenzuela|\bval\b)",
+}
+
+
+def city_regex_pattern(city: str) -> str:
+    return CITY_ALIASES.get(city, city)
+
 
 def persist_chat_session(verified_uid: str, session_id: str, updated_history: list, itinerary_draft: Optional[dict]):
     """Shared by both the normal chat path and the itinerary path. Writes the rolling
@@ -274,6 +276,12 @@ async def handle_itinerary_turn(request: "ChatRequest", verified_uid: str) -> di
             {"role": "assistant", "content": reply}
         ])[-60:]
         return reply, mood, new_draft, updated_history
+
+    # Set only in the real successful-write branch below. Kept separate from the reply
+    # TEXT on purpose -- a tester skimming chat bubbles can miss/misread wording, so the
+    # frontend shows a distinct, unmissable confirmation banner driven by this flag
+    # instead of trying to parse "did it say Saved?" out of a sentence.
+    saved_info = None
 
     # --- CANCEL --- (works even before any stop's been added -- an empty in-progress draft
     # is still a draft, and the user should be able to back out of it any time)
@@ -350,6 +358,11 @@ async def handle_itinerary_turn(request: "ChatRequest", verified_uid: str) -> di
                     "createdAt": firestore.SERVER_TIMESTAMP,
                 })
                 stop_count = len(stops)
+                saved_info = {
+                    "id": itinerary_ref.id,
+                    "title": title,
+                    "placesCount": stop_count
+                }
                 reply, mood, new_draft, updated_history = build_result(
                     f"Saved! \"{title}\" is now in your Itineraries tab with {stop_count} stop"
                     f"{'s' if stop_count != 1 else ''}. Have an amazing trip!",
@@ -367,21 +380,19 @@ async def handle_itinerary_turn(request: "ChatRequest", verified_uid: str) -> di
         camanava_cities = ["caloocan", "malabon", "navotas", "valenzuela"]
         mentioned_cities = []
         for city in camanava_cities:
-            city_pattern = r"(caloocan|kaloakan|kalookan)" if city == "caloocan" else city
+            city_pattern = city_regex_pattern(city)
             if re.search(city_pattern, user_msg):
                 mentioned_cities.append(city)
         if not mentioned_cities:
             mentioned_cities = [c for c in draft.get("citiesCovered", []) if c in camanava_cities]
 
-        # Grounding data: called with paginate=False so this always returns EVERY verified
-        # spot per city, not just one 5-item rotating chunk -- an itinerary needs to recognize
-        # any place the user names, not only whichever chunk the normal chat last happened to
-        # show. (Previously this passed history=None expecting a "stable batch 0", but batch 0
-        # is still only the first 5 spots -- anything past that was wrongly reported as
-        # "not verified" even though it exists in the database.)
+        # Grounding data: intentionally called with history=None so this always returns
+        # the same stable first chunk of spots per city, rather than the rotating/paginated
+        # chunk the normal chat flow uses -- an itinerary needs a consistent option set
+        # to build against turn to turn, not a "show me different ones" rotation.
         verified_places = {}
         for c in (mentioned_cities or camanava_cities):
-            verified_places.update(get_city_data(c, None, None, set(), paginate=False))
+            verified_places.update(get_city_data(c, None, None, set()))
 
         # This was missing entirely before -- the itinerary LLM call had no memory of
         # anything said earlier in the conversation, only the structured draft object.
@@ -406,25 +417,30 @@ RULES:
    new stops, but can just as naturally REMOVE a stop they already added ("actually skip the park") or
    EDIT one ("move lunch to 1pm instead", "make day 2 start at the shrine instead of the market") -- when
    that happens, modify or remove the matching entry in "stops" rather than just appending a new one.
-2. NEVER invent a place_id or place name. Only use entries from VERIFIED AVAILABLE PLACES. If the
+2. If the user names MULTIPLE cities (e.g. "Valenzuela and Malabon"), your draft must include at least
+   one stop from EACH city they named, as long as VERIFIED AVAILABLE PLACES has something for that city --
+   do not silently include only one of the cities they asked for. If one of the named cities genuinely has
+   nothing available in the verified data, say that specific city has nothing available right now instead
+   of quietly dropping it without mentioning it.
+3. NEVER invent a place_id or place name. Only use entries from VERIFIED AVAILABLE PLACES. If the
    user asks for a place/city not in that list, say so naturally in your reply and suggest an
    alternative from what IS available -- do not invent details (address, directions, what's nearby) to
    compensate for a place not being in the data.
-3. Each stop needs: dayIndex (0-based), order (position within that day), time ("HH:MM", your best
+4. Each stop needs: dayIndex (0-based), order (position within that day), time ("HH:MM", your best
    sensible estimate if the user didn't specify one), placeId, placeName, city, cityKey (lowercase city),
    and notes (short, can be empty string).
-4. Keep dayIndex/order consistent and non-conflicting as you add, remove, or reorder stops.
-5. If the draft has at least one stop and feels reasonably complete, end your reply by asking if
+5. Keep dayIndex/order consistent and non-conflicting as you add, remove, or reorder stops.
+6. If the draft has at least one stop and feels reasonably complete, end your reply by asking if
    they'd like you to save it to their itinerary.
-6. Keep the reply short, warm, and conversational -- this is a chat message, not a report.
-7. This itinerary-building mode stays active for the rest of the conversation once started, even across
+7. Keep the reply short, warm, and conversational -- this is a chat message, not a report.
+8. This itinerary-building mode stays active for the rest of the conversation once started, even across
    messages that don't mention "itinerary" again -- that's expected, not a bug. If the user's latest
    message is clearly unrelated to the trip (small talk, an off-topic question), respond naturally to it
    AND gently check whether they want to keep building the itinerary, while leaving "draft" unchanged.
-8. Add a "lang" field: "EN" or "TL", for whichever language dominates your "reply" text. This picks
+9. Add a "lang" field: "EN" or "TL", for whichever language dominates your "reply" text. This picks
    which text-to-speech voice reads it aloud, and that voice only speaks one language well -- so lean
    into one language per reply rather than switching back and forth line by line.
-9. Respond with ONLY a single JSON object, no other text, in exactly this shape:
+10. Respond with ONLY a single JSON object, no other text, in exactly this shape:
 {{
   "reply": "<your conversational message to the user>",
   "lang": "EN",
@@ -491,7 +507,8 @@ RULES:
         "response": reply,
         "audio": audio_base64,
         "history": updated_history,
-        "itinerary_draft": new_draft
+        "itinerary_draft": new_draft,
+        "itinerary_saved": saved_info
     }
 
 @app.get("/health")
@@ -604,12 +621,12 @@ async def chat(request: ChatRequest, user: dict = Depends(verify_firebase_token)
 
         for msg in messages_to_check:
             for city in camanava_cities:
-                city_pattern = r"(caloocan|kaloakan|kalookan)" if city == "caloocan" else city
+                city_pattern = city_regex_pattern(city)
                 if re.search(rf'\b(not|except|other than|but|outside|exclude|without|skip|no|anywhere but)\s+(in\s+|for\s+)?{city_pattern}\b', msg):
                     negated_cities.add(city)
 
         for city in camanava_cities:
-            city_pattern = r"(caloocan|kaloakan|kalookan)" if city == "caloocan" else city
+            city_pattern = city_regex_pattern(city)
             if re.search(city_pattern, user_msg) and city not in negated_cities:
                 target_city = city
                 break
@@ -634,7 +651,7 @@ async def chat(request: ChatRequest, user: dict = Depends(verify_firebase_token)
             for entry in reversed(request.history):
                 content = entry['content'].lower()
                 for city in camanava_cities:
-                    city_pattern = r"(caloocan|kaloakan|kalookan)" if city == "caloocan" else city
+                    city_pattern = city_regex_pattern(city)
                     if re.search(city_pattern, content) and city not in negated_cities:
                         target_city = city
                         break
@@ -808,14 +825,15 @@ Stay in character as Navi. Be someone worth talking to, not just a place-lookup 
             "response": response,
             "audio": audio_base64,
             "history": updated_history,
-            "itinerary_draft": None
+            "itinerary_draft": None,
+            "itinerary_saved": None
         }
         
     except Exception as e:
         import traceback
         print(f"CRITICAL CHAT ERROR: {e}")
         traceback.print_exc()
-        return {"response": "I'm having trouble processing that right now. Try again?", "history": request.history, "itinerary_draft": request.itinerary_draft}
+        return {"response": "I'm having trouble processing that right now. Try again?", "history": request.history, "itinerary_draft": request.itinerary_draft, "itinerary_saved": None}
 
 @app.get("/sessions")
 async def list_sessions(user: dict = Depends(verify_firebase_token)):

@@ -443,6 +443,40 @@
             background-color: rgba(34, 35, 40, 0.7);
         }
 
+        .itinerary-saved-toast {
+            position: fixed;
+            top: 14px;
+            left: 50%;
+            transform: translateX(-50%) translateY(-140%);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: #15361f;
+            border: 1px solid #2fae5c;
+            color: #6ee7a0;
+            padding: 10px 16px;
+            border-radius: 999px;
+            font-family: var(--font-body);
+            font-size: 0.82rem;
+            font-weight: 600;
+            box-shadow: 0 10px 30px -8px rgba(0,0,0,0.5);
+            z-index: 7000;
+            opacity: 0;
+            transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.35s ease;
+            pointer-events: none;
+            max-width: 90vw;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .itinerary-saved-toast svg { flex-shrink: 0; color: #6ee7a0; }
+
+        .itinerary-saved-toast.is-visible {
+            transform: translateX(-50%) translateY(0);
+            opacity: 1;
+        }
+
         .itinerary-banner {
             display: flex;
             align-items: center;
@@ -1112,6 +1146,11 @@
         </div>
     </div>
 
+    <div id="itinerary-saved-toast" class="itinerary-saved-toast">
+        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+        <span id="itinerary-saved-toast-text"></span>
+    </div>
+
     <div id="chat">
         <div class="welcome-spacer" id="welcome-spacer"></div>
         <div class="welcome-container" id="welcome-container">
@@ -1313,6 +1352,24 @@
                 closeItineraryPreview();
             }
         }
+    }
+
+    let itinerarySavedToastTimer = null;
+    function showItinerarySavedToast(info) {
+        const toast = document.getElementById('itinerary-saved-toast');
+        const text = document.getElementById('itinerary-saved-toast-text');
+        if (!toast || !text) return;
+
+        const count = typeof info.placesCount === 'number' ? info.placesCount : null;
+        text.textContent = 'Saved "' + (info.title || 'your trip') + '"' +
+            (count !== null ? ' \u2022 ' + count + (count === 1 ? ' stop' : ' stops') : '') +
+            ' to your Itineraries';
+
+        toast.classList.add('is-visible');
+        if (itinerarySavedToastTimer) clearTimeout(itinerarySavedToastTimer);
+        itinerarySavedToastTimer = setTimeout(() => {
+            toast.classList.remove('is-visible');
+        }, 4200);
     }
 
     function clearItineraryDraft() {
@@ -1863,6 +1920,13 @@
             history = data.history;
             itineraryDraft = data.itinerary_draft || null;
             updateItineraryBanner();
+
+            // A distinct, unmissable confirmation -- separate from the chat bubble text,
+            // since "cancel" and "saved" otherwise look identical (banner just disappears
+            // either way). This only fires on a REAL successful Firestore write.
+            if (data.itinerary_saved) {
+                showItinerarySavedToast(data.itinerary_saved);
+            }
 
             // Logged-in users are persisted server-side in Firestore (done inside /chat).
             // Guests (and local/dev bypass modes) only exist in this browser, so save locally.
