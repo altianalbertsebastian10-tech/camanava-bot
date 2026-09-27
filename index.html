@@ -443,40 +443,6 @@
             background-color: rgba(34, 35, 40, 0.7);
         }
 
-        .itinerary-saved-toast {
-            position: fixed;
-            top: 14px;
-            left: 50%;
-            transform: translateX(-50%) translateY(-140%);
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            background: #15361f;
-            border: 1px solid #2fae5c;
-            color: #6ee7a0;
-            padding: 10px 16px;
-            border-radius: 999px;
-            font-family: var(--font-body);
-            font-size: 0.82rem;
-            font-weight: 600;
-            box-shadow: 0 10px 30px -8px rgba(0,0,0,0.5);
-            z-index: 7000;
-            opacity: 0;
-            transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.35s ease;
-            pointer-events: none;
-            max-width: 90vw;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .itinerary-saved-toast svg { flex-shrink: 0; color: #6ee7a0; }
-
-        .itinerary-saved-toast.is-visible {
-            transform: translateX(-50%) translateY(0);
-            opacity: 1;
-        }
-
         .itinerary-banner {
             display: flex;
             align-items: center;
@@ -1146,11 +1112,6 @@
         </div>
     </div>
 
-    <div id="itinerary-saved-toast" class="itinerary-saved-toast">
-        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
-        <span id="itinerary-saved-toast-text"></span>
-    </div>
-
     <div id="chat">
         <div class="welcome-spacer" id="welcome-spacer"></div>
         <div class="welcome-container" id="welcome-container">
@@ -1237,6 +1198,7 @@
             localStorage.removeItem('displayName');
         }
         document.getElementById('login-gate').style.display = 'none';
+        restoreLatestSession();
     };
 
     window.enableGuestMode = function() {
@@ -1246,12 +1208,16 @@
     localStorage.setItem('uid', 'guest_user');
     localStorage.removeItem('displayName');
     document.getElementById('login-gate').style.display = 'none';
+    restoreLatestSession();
     };
 
     // 3. ITAGO ANG LOGIN GATE KUNG MAY TOKEN NA
     window.addEventListener('DOMContentLoaded', () => {
         if (authToken) {
             document.getElementById('login-gate').style.display = 'none';
+            // URL-param auth (?token=...&uid=...) is already resolved by this point,
+            // since that parsing runs synchronously above, before this listener fires.
+            restoreLatestSession();
         } else {
             // Bigyan ng 1 second allowance bago ipakita ang block screen (in case naglo-load pa)
             setTimeout(() => {
@@ -1284,6 +1250,7 @@
 
     let currentSessionId = 'session_' + Date.now();
     let localHistories = JSON.parse(localStorage.getItem('navi_histories')) || [];
+    let hasRestoredSession = false; // guards against restoring twice if multiple auth paths fire
 
     let sessionToDelete = null;
 
@@ -1330,46 +1297,15 @@
         const banner = document.getElementById('itinerary-banner');
         if (!banner) return;
         const stops = (itineraryDraft && Array.isArray(itineraryDraft.stops)) ? itineraryDraft.stops : [];
-
         if (stops.length === 0) {
             banner.style.display = 'none';
-        } else {
-            banner.style.display = 'flex';
-            document.getElementById('itinerary-banner-title').textContent =
-                itineraryDraft.title || 'Planning a trip';
-            document.getElementById('itinerary-banner-count').textContent =
-                stops.length + (stops.length === 1 ? ' stop' : ' stops');
+            return;
         }
-
-        // Keep an already-open timeline modal live: if the user adds, edits, or removes
-        // a stop mid-conversation, the modal should reflect that immediately, without
-        // needing to be closed and reopened to see the change.
-        const modal = document.getElementById('itinerary-preview-modal');
-        if (modal && modal.classList.contains('is-active')) {
-            if (itineraryDraft) {
-                openItineraryPreview();
-            } else {
-                closeItineraryPreview();
-            }
-        }
-    }
-
-    let itinerarySavedToastTimer = null;
-    function showItinerarySavedToast(info) {
-        const toast = document.getElementById('itinerary-saved-toast');
-        const text = document.getElementById('itinerary-saved-toast-text');
-        if (!toast || !text) return;
-
-        const count = typeof info.placesCount === 'number' ? info.placesCount : null;
-        text.textContent = 'Saved "' + (info.title || 'your trip') + '"' +
-            (count !== null ? ' \u2022 ' + count + (count === 1 ? ' stop' : ' stops') : '') +
-            ' to your Itineraries';
-
-        toast.classList.add('is-visible');
-        if (itinerarySavedToastTimer) clearTimeout(itinerarySavedToastTimer);
-        itinerarySavedToastTimer = setTimeout(() => {
-            toast.classList.remove('is-visible');
-        }, 4200);
+        banner.style.display = 'flex';
+        document.getElementById('itinerary-banner-title').textContent =
+            itineraryDraft.title || 'Planning a trip';
+        document.getElementById('itinerary-banner-count').textContent =
+            stops.length + (stops.length === 1 ? ' stop' : ' stops');
     }
 
     function clearItineraryDraft() {
@@ -1552,6 +1488,43 @@
             wrapper.appendChild(delBtn);
             list.appendChild(wrapper);
         });
+    }
+
+    // Called once, right after we know who's logged in (or that it's a guest), so
+    // reopening the chatbot view picks up right where the last conversation left off
+    // instead of always starting blank. This is what "close and reopen retains chat
+    // history" actually needs -- the storage/session system already existed, nothing
+    // was ever automatically loading it back on a fresh page load.
+    async function restoreLatestSession() {
+        if (hasRestoredSession) return;
+        hasRestoredSession = true;
+
+        try {
+            let sessions;
+            if (isLoggedIn()) {
+                const res = await fetch('https://camanava-bot.onrender.com/sessions', {
+                    headers: { 'Authorization': 'Bearer ' + authToken }
+                });
+                if (!res.ok) return;
+                const data = await res.json();
+                sessions = data.sessions || [];
+            } else {
+                const currentUid = localStorage.getItem('uid') || 'guest_user';
+                const storageKey = 'navi_histories_' + currentUid;
+                sessions = JSON.parse(localStorage.getItem(storageKey)) || [];
+            }
+
+            // No prior conversation for this account/device -- leave the normal
+            // fresh-chat welcome message as-is, nothing to restore.
+            if (!sessions.length) return;
+
+            // Both sources are already newest-first: /sessions is ordered DESC by
+            // timestamp server-side, and saveToLocalHistory() unshifts new entries.
+            await loadSession(sessions[0].id);
+        } catch (err) {
+            console.error('Failed to restore last session:', err);
+            // Fail silently into the default fresh-chat state -- better than a broken UI.
+        }
     }
 
     async function loadSession(sessionId) {
@@ -1920,13 +1893,6 @@
             history = data.history;
             itineraryDraft = data.itinerary_draft || null;
             updateItineraryBanner();
-
-            // A distinct, unmissable confirmation -- separate from the chat bubble text,
-            // since "cancel" and "saved" otherwise look identical (banner just disappears
-            // either way). This only fires on a REAL successful Firestore write.
-            if (data.itinerary_saved) {
-                showItinerarySavedToast(data.itinerary_saved);
-            }
 
             // Logged-in users are persisted server-side in Firestore (done inside /chat).
             // Guests (and local/dev bypass modes) only exist in this browser, so save locally.
