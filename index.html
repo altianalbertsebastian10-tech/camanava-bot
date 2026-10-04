@@ -1063,7 +1063,7 @@
 
     <div id="sidebar" class="sidebar-panel">
         <div style="padding: 20px; border-bottom: 1px solid #2a2d35;">
-            <button onclick="startNewChat()" style="width: 100%; padding: 12px; background: #2a2d35; color: white; border: 1px solid #3f434e; border-radius: 8px; cursor: pointer; font-family: 'DM Sans', sans-serif;">+ New Chat</button>
+            <div style="color: #ffffff; font-family: 'DM Sans', sans-serif; font-size: 1.05rem; font-weight: 700;">Chat history</div>
         </div>
         
         <div id="history-list" style="flex: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px;">
@@ -1098,6 +1098,12 @@
         </div>
 
         <div class="tech-stats">
+            <!-- New Chat: always visible in the header, no need to open the sidebar -->
+            <button class="header-mic-btn" onclick="startNewChat()" title="New chat" aria-label="New chat">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16">
+                    <path d="M8 2a.75.75 0 0 1 .75.75v4.5h4.5a.75.75 0 0 1 0 1.5h-4.5v4.5a.75.75 0 0 1-1.5 0v-4.5h-4.5a.75.75 0 0 1 0-1.5h4.5v-4.5A.75.75 0 0 1 8 2"/>
+                </svg>
+            </button>
             <!-- Voice Trigger for Gemini Live Mode -->
             <button class="header-mic-btn" onclick="openLiveMode()" title="Start Live Session">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16">
@@ -1284,12 +1290,17 @@
     }
 
     function startNewChat() {
+        if (isNaviThinking) return; // don't wipe the screen while a reply is in flight
+        if (activeAudio) clearTTSState();
+        hideAmbientGlow();
         currentSessionId = 'session_' + Date.now();
         history = []; // Clear current active chat context
         itineraryDraft = null;
         updateItineraryBanner();
         document.getElementById('chat').innerHTML = ''; // Clear chat UI
         addMessageToUI('bot', "Hi! I'm Navi. What new adventure are we planning today?");
+        // Now reachable from the header too: only close the sidebar if it's actually open.
+        if (!document.getElementById('sidebar').classList.contains('is-active')) return;
         toggleSidebar();
     }
 
@@ -1770,7 +1781,8 @@
         input.disabled = false;
         updateStatusDisplay('idle');
         toggleSendButtonState();
-        input.focus();
+        // Don't focus the text box during Live Mode -- on mobile that pops the keyboard over the orb.
+        if (!isLiveModeActive) input.focus();
         forceUIRefreshScroll();
     }
 
@@ -1919,13 +1931,34 @@
         }
     }
 
-    // --- GEMINI LIVE STYLE VOICE LOOP ---
-    
+    // --- LIVE VOICE MODE ---
+    // Hands-free loop: listen -> auto-detect end of speech -> transcribe -> Navi replies -> speak -> listen.
+    // Tapping the orb still works as a manual "send now" (while listening) or "interrupt" (while Navi speaks).
+
     let isLiveModeActive = false;
-    let liveMediaRecorder;
+    let liveStream = null;            // kept open for the whole session, released on close
+    let liveMediaRecorder = null;     // a fresh recorder is created per utterance (more robust across browsers)
     let liveAudioChunks = [];
-    let liveState = 'idle'; // idle, listening, thinking, speaking, error
+    let liveMimeType = '';
+    let liveState = 'idle';           // idle, listening, thinking, speaking, error
     let liveAudioPlayer = null;
+    let liveForceSend = false;        // set when the user taps the orb to send early
+    let liveResumeTimer = null;
+
+    // Voice-activity detection (VAD) -- decides when the user has finished talking.
+    let liveMicSource = null;
+    let liveMicAnalyser = null;
+    let liveMicBuf = null;
+    let liveVadTimer = null;
+    let liveNoiseFloor = 0.01;
+    let liveSpeechDetected = false;
+    let liveSpeechStart = 0;
+    let liveLastVoiceAt = 0;
+    let liveListenStart = 0;
+
+    const LIVE_SILENCE_MS = 1300;        // this much quiet after speech => send automatically
+    const LIVE_MIN_SPEECH_MS = 350;      // shorter blips (coughs, clicks) don't count as speech
+    const LIVE_MAX_UTTERANCE_MS = 30000; // safety cap on one recording
 
     const overlay = document.getElementById('live-overlay');
     const orb = document.getElementById('live-orb');
@@ -1936,107 +1969,229 @@
 
     function updateTranscript(text) {
         const transcriptEl = document.getElementById('live-transcript');
-        
-        // 1. Fade out the current text and slide it down slightly
+
+        // Fade the current text out, swap it, fade the new text in
         transcriptEl.style.opacity = '0';
         transcriptEl.style.transform = 'translateY(5px)';
-        
-        // 2. Wait for the fade out to finish (300ms), then swap the text
+
         clearTimeout(transcriptTimeout);
         transcriptTimeout = setTimeout(() => {
             transcriptEl.innerText = text;
-            
             if (text.trim() !== "") {
-                // 3. Fade the new text back in smoothly
                 transcriptEl.style.opacity = '1';
                 transcriptEl.style.transform = 'translateY(0)';
             }
-        }, 300); 
+        }, 300);
+    }
+
+    function setLiveState(state, message) {
+        liveState = state;
+        statusText.innerText = message;
+
+        orb.className = 'live-orb';
+        if (state === 'listening') orb.classList.add('state-listening');
+        if (state === 'thinking')  orb.classList.add('state-thinking');
+        if (state === 'speaking')  orb.classList.add('state-speaking');
+
+        // Return to normal size smoothly whenever we're not driving the orb from audio levels
+        if (state !== 'speaking' && state !== 'listening') {
+            orb.style.setProperty('--audio-scale', 1);
+        }
+    }
+
+    function micLevel() {
+        if (!liveMicAnalyser || !liveMicBuf) return 0;
+        liveMicAnalyser.getByteTimeDomainData(liveMicBuf);
+        let sum = 0;
+        for (let i = 0; i < liveMicBuf.length; i++) {
+            const v = (liveMicBuf[i] - 128) / 128;
+            sum += v * v;
+        }
+        return Math.sqrt(sum / liveMicBuf.length);
+    }
+
+    function stopVad() {
+        if (liveVadTimer) { clearInterval(liveVadTimer); liveVadTimer = null; }
+    }
+
+    function startVad() {
+        stopVad();
+        // setInterval (not requestAnimationFrame) so detection keeps running if the tab loses focus briefly
+        liveVadTimer = setInterval(() => {
+            if (!isLiveModeActive || liveState !== 'listening' || !liveMicAnalyser) return;
+
+            const level = micLevel();
+            const now = performance.now();
+            const threshold = Math.max(0.02, liveNoiseFloor * 2.5 + 0.01);
+            const voiced = level > threshold;
+
+            if (voiced) {
+                if (!liveSpeechStart) liveSpeechStart = now;
+                liveLastVoiceAt = now;
+                if (now - liveSpeechStart >= LIVE_MIN_SPEECH_MS) liveSpeechDetected = true;
+            } else {
+                // Track the room's background noise level so a noisy cafe doesn't count as speech
+                liveNoiseFloor = liveNoiseFloor * 0.95 + level * 0.05;
+                if (!liveSpeechDetected) liveSpeechStart = 0;
+            }
+
+            // The orb breathes with the user's voice while listening
+            orb.style.setProperty('--audio-scale', (1 + Math.min(level * 3, 0.3)).toFixed(3));
+
+            const silentLongEnough = liveSpeechDetected && (now - liveLastVoiceAt) > LIVE_SILENCE_MS;
+            const tooLong = (now - liveListenStart) > LIVE_MAX_UTTERANCE_MS;
+            if (silentLongEnough || tooLong) {
+                stopVad();
+                if (liveMediaRecorder && liveMediaRecorder.state === 'recording') {
+                    liveForceSend = tooLong;
+                    liveMediaRecorder.stop();
+                }
+            }
+        }, 60);
     }
 
     async function openLiveMode() {
+        if (isLiveModeActive) return;
         if (activeAudio) clearTTSState();
         isLiveModeActive = true;
         overlay.classList.add('is-active');
         updateTranscript("");
-        
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            
-            let options = { mimeType: 'audio/webm' };
-            if (!MediaRecorder.isTypeSupported('audio/webm')) {
-                options = { mimeType: 'audio/mp4' }; 
-            }
+        setLiveState('thinking', "Connecting microphone...");
 
-            liveMediaRecorder = new MediaRecorder(stream, options);
-            
-            liveMediaRecorder.ondataavailable = event => {
-                if (event.data.size > 0) liveAudioChunks.push(event.data);
-            };
-            
-            liveMediaRecorder.onstop = async () => {
-                if (!isLiveModeActive) return; 
-                
-                setLiveState('thinking', "Transcribing...");
-                
-                const audioBlob = new Blob(liveAudioChunks, { type: options.mimeType });
-                liveAudioChunks = [];
-                const formData = new FormData();
-                
-                // Dynamically assign the correct extension based on the browser
-                const ext = options.mimeType.includes('mp4') ? 'm4a' : 'webm';
-                formData.append("file", audioBlob, `voice.${ext}`);
-                
-                try {
-                    const res = await fetch('https://camanava-bot.onrender.com/transcribe', {
-                        method: 'POST',
-                        body: formData
-                    });
-                    const data = await res.json();
-                    
-                    if (data.text && data.text.trim() !== "") {
-                        updateTranscript(`"${data.text}"`);
-                        setLiveState('thinking', "Navi is thinking...");
-                        send(data.text); 
-                    } else {
-                        setLiveState('listening', "Didn't catch that. Tap when done speaking.");
-                        liveMediaRecorder.start(); 
-                    }
-                } catch (err) {
-                    console.error("Transcription error:", err);
-                    setLiveState('error', "Transcription failed. Tap to retry.");
-                }
-            };
-            
-            // Start the loop!
+        try {
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                throw new Error('getUserMedia unsupported');
+            }
+            const stream = await navigator.mediaDevices.getUserMedia({
+                audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+            });
+
+            // User closed the overlay while the permission prompt was open: release the mic and stop.
+            if (!isLiveModeActive) {
+                stream.getTracks().forEach(t => t.stop());
+                return;
+            }
+            liveStream = stream;
+
+            liveMimeType = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg;codecs=opus']
+                .find(t => window.MediaRecorder && MediaRecorder.isTypeSupported(t)) || '';
+
+            // Mic -> analyser (for end-of-speech detection). Not connected to the speakers.
+            initAudio();
+            liveMicSource = audioCtx.createMediaStreamSource(liveStream);
+            liveMicAnalyser = audioCtx.createAnalyser();
+            liveMicAnalyser.fftSize = 1024;
+            liveMicBuf = new Uint8Array(liveMicAnalyser.fftSize);
+            liveMicSource.connect(liveMicAnalyser);
+            liveNoiseFloor = 0.01;
+
             startLiveListening();
-            
         } catch (err) {
             console.error("Microphone error:", err);
-            alert("Microphone access is required for Live Mode.");
             closeLiveMode();
+            alert("Microphone access is required for Live Mode.");
         }
     }
 
     function startLiveListening() {
-        if (!isLiveModeActive || !liveMediaRecorder) return;
+        if (!isLiveModeActive || !liveStream) return;
+        clearTimeout(liveResumeTimer);
+        stopVad();
+
         liveAudioChunks = [];
-        setLiveState('listening', "Listening... Tap orb to send.");
+        liveForceSend = false;
+        liveSpeechDetected = false;
+        liveSpeechStart = 0;
+        liveLastVoiceAt = 0;
+        liveListenStart = performance.now();
+
+        try {
+            liveMediaRecorder = liveMimeType
+                ? new MediaRecorder(liveStream, { mimeType: liveMimeType })
+                : new MediaRecorder(liveStream);
+        } catch (e) {
+            console.error("Recorder error:", e);
+            setLiveState('error', "Microphone unavailable. Tap to retry.");
+            return;
+        }
+
+        const recorder = liveMediaRecorder;
+        recorder.ondataavailable = e => { if (e.data && e.data.size > 0) liveAudioChunks.push(e.data); };
+        recorder.onstop = () => handleUtteranceStop(recorder);
+        recorder.start();
+
+        setLiveState('listening', "Listening... just speak");
         updateTranscript("");
-        liveMediaRecorder.start();
+        startVad();
+    }
+
+    async function handleUtteranceStop(recorder) {
+        stopVad();
+        // Ignore stops from an old recorder or after the overlay was closed
+        if (!isLiveModeActive || recorder !== liveMediaRecorder) return;
+
+        const chunks = liveAudioChunks;
+        liveAudioChunks = [];
+        const forced = liveForceSend;
+        liveForceSend = false;
+
+        // Nothing but background noise: quietly go back to listening instead of sending silence
+        if (!liveSpeechDetected && !forced) { startLiveListening(); return; }
+
+        const blob = new Blob(chunks, { type: recorder.mimeType || liveMimeType || 'audio/webm' });
+        if (blob.size < 1000) {
+            startLiveListening();
+            setLiveState('listening', "Didn't catch that. Go ahead, I'm listening.");
+            return;
+        }
+
+        setLiveState('thinking', "Transcribing...");
+        const ext = blob.type.includes('mp4') ? 'm4a' : (blob.type.includes('ogg') ? 'ogg' : 'webm');
+        const formData = new FormData();
+        formData.append("file", blob, `voice.${ext}`);
+        // No language is sent: the server auto-detects it, so any visitor can speak their own language.
+
+        try {
+            const res = await fetch('https://camanava-bot.onrender.com/transcribe', {
+                method: 'POST',
+                body: formData
+            });
+            if (!res.ok) throw new Error('Transcribe HTTP ' + res.status);
+            const data = await res.json();
+            if (!isLiveModeActive) return;
+
+            const text = (data.text || '').trim();
+            if (text) {
+                updateTranscript(`"${text}"`);
+                setLiveState('thinking', "Navi is thinking...");
+                send(text);
+            } else {
+                startLiveListening();
+                setLiveState('listening', "Didn't catch that. Go ahead, I'm listening.");
+            }
+        } catch (err) {
+            console.error("Transcription error:", err);
+            if (isLiveModeActive) setLiveState('error', "Transcription failed. Tap to try again.");
+        }
+    }
+
+    function interruptNavi() {
+        if (liveAudioPlayer) {
+            liveAudioPlayer.pause();
+            liveAudioPlayer = null;
+        }
+        startLiveListening();
     }
 
     function handleOrbTap() {
         if (liveState === 'listening') {
-            // Stop recording and process
-            liveMediaRecorder.stop();
-        } else if (liveState === 'speaking') {
-            // Interrupt AI
-            if (liveAudioPlayer) {
-                liveAudioPlayer.pause();
-                liveAudioPlayer = null;
+            // Manual "send now" -- don't wait for the silence timer
+            if (liveMediaRecorder && liveMediaRecorder.state === 'recording') {
+                liveForceSend = true;
+                liveMediaRecorder.stop();
             }
-            startLiveListening();
+        } else if (liveState === 'speaking') {
+            interruptNavi();
         } else if (liveState === 'error' || liveState === 'idle') {
             startLiveListening();
         }
@@ -2044,74 +2199,77 @@
 
     function handleLiveResponse(text, audioBase64) {
         if (!isLiveModeActive) return;
-        isNaviThinking = false; 
-        
+        isNaviThinking = false;
+
         const cleanText = text.replace(/\*\*(.*?)\*\*/g, '$1').replace(/\*/g, '').trim();
         updateTranscript(cleanText);
-        addMessageToUI('bot', text, audioBase64); 
-        
+        addMessageToUI('bot', text, audioBase64);
+
         if (audioBase64) {
-            setLiveState('speaking', "Navi is speaking... Tap to interrupt.");
+            setLiveState('speaking', "Navi is speaking... tap to interrupt");
             liveAudioPlayer = new Audio("data:audio/mp3;base64," + audioBase64);
-            
-            // Hook the audio up to the live visualizer!
+            const player = liveAudioPlayer;
+
+            // Hook the audio up to the orb visualizer
             try {
                 initAudio();
                 if (currentAudioSource) currentAudioSource.disconnect();
-                currentAudioSource = audioCtx.createMediaElementSource(liveAudioPlayer);
+                currentAudioSource = audioCtx.createMediaElementSource(player);
                 currentAudioSource.connect(analyser);
                 analyser.connect(audioCtx.destination);
-            } catch(e) { console.log("Web Audio Context skipped:", e); }
+            } catch (e) { console.log("Web Audio Context skipped:", e); }
 
-            // Start the visualizer loop the moment she speaks
-            liveAudioPlayer.onplay = () => pulseWithAudio();
-            
-            liveAudioPlayer.onended = () => {
-                if (isLiveModeActive) startLiveListening(); 
-            };
-            liveAudioPlayer.onerror = () => {
-                if (isLiveModeActive) startLiveListening(); 
-            };
-            
-            liveAudioPlayer.play().catch(e => {
+            player.onplay = () => pulseWithAudio();
+            player.onended = () => { if (isLiveModeActive && player === liveAudioPlayer) startLiveListening(); };
+            player.onerror = () => { if (isLiveModeActive && player === liveAudioPlayer) startLiveListening(); };
+            player.play().catch(e => {
                 console.error("Live Audio error:", e);
-                startLiveListening();
+                if (isLiveModeActive) startLiveListening();
             });
         } else {
-            setTimeout(startLiveListening, 2000);
-        }
-    }
-
-    function setLiveState(state, message) {
-        liveState = state;
-        statusText.innerText = message;
-        
-        orb.className = 'live-orb'; // Reset classes
-        if (state === 'listening') orb.classList.add('state-listening');
-        if (state === 'thinking')  orb.classList.add('state-thinking');
-        if (state === 'speaking')  orb.classList.add('state-speaking');
-
-        // Force scale back to 1 to trigger the graceful CSS transition when audio stops
-        if (state !== 'speaking') {
-            orb.style.setProperty('--audio-scale', 1);
+            // No audio came back (TTS hiccup): give the user time to read, then resume listening
+            setLiveState('speaking', "Navi says... tap to reply");
+            clearTimeout(liveResumeTimer);
+            liveResumeTimer = setTimeout(
+                () => { if (isLiveModeActive && liveState === 'speaking') startLiveListening(); },
+                Math.min(9000, 1800 + cleanText.length * 45)
+            );
         }
     }
 
     function closeLiveMode() {
         isLiveModeActive = false;
         overlay.classList.remove('is-active');
-        
+
+        stopVad();
+        clearTimeout(liveResumeTimer);
+
         if (liveMediaRecorder && liveMediaRecorder.state !== 'inactive') {
-            liveMediaRecorder.stop();
+            try { liveMediaRecorder.stop(); } catch (e) {}
         }
+        liveMediaRecorder = null;
+        liveAudioChunks = [];
+
+        // Release the microphone so the browser's "recording" indicator turns off
+        if (liveStream) {
+            liveStream.getTracks().forEach(t => t.stop());
+            liveStream = null;
+        }
+        try { if (liveMicSource) liveMicSource.disconnect(); } catch (e) {}
+        liveMicSource = null;
+        liveMicAnalyser = null;
+
         if (liveAudioPlayer) {
             liveAudioPlayer.pause();
             liveAudioPlayer = null;
         }
-        
-        // Ensure standard chat is unlocked
-        isNaviThinking = false;
-        unlockChat();
+
+        liveState = 'idle';
+        orb.className = 'live-orb';
+        orb.style.setProperty('--audio-scale', 1);
+
+        // If a reply is still on its way, it will unlock the chat itself when it lands.
+        if (!document.getElementById('input').disabled) toggleSendButtonState();
     }
 
     // --- DYNAMIC PLACEHOLDER TYPING ANIMATION ---

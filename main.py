@@ -6,7 +6,7 @@ import emoji
 import tempfile
 import re
 from groq import Groq
-from fastapi import FastAPI, UploadFile, File, Header, HTTPException, Depends
+from fastapi import FastAPI, UploadFile, File, Form, Header, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
@@ -84,6 +84,112 @@ def verify_firebase_token(authorization: str = Header(None)):
         return decoded_token  # Returns dict containing 'uid', 'email', etc.
     except Exception as e:
         raise HTTPException(status_code=401, detail=f"Invalid or expired token: {str(e)}")
+
+# --- FULL PLACE INDEX + NAME MATCHING ---
+# ROOT CAUSE of "I don't have verified details about <place>" for places that ARE in the
+# database: get_city_data() only hands the model a rotating chunk of 5 spots per request, so
+# a place the user names directly was usually not in that chunk, and rule 2 of the prompt then
+# (correctly) told the model to admit it had nothing. The fix is to look the named place up
+# across the WHOLE database and give the model its full record explicitly.
+import difflib
+
+_PLACES_CACHE = {"ts": 0.0, "spots": []}
+_PLACES_CACHE_TTL = 300  # seconds -- avoids re-streaming the whole collection on every message
+
+# Words that appear in lots of place names; matching on these alone would flood results
+# (e.g. every "... Church" matching a user saying "church"), so they never count as the
+# distinctive part of a name. City names are included for the same reason.
+_GENERIC_NAME_WORDS = {
+    "the", "and", "village", "fishing", "port", "park", "church", "parish", "shrine", "chapel",
+    "plaza", "restaurant", "city", "museum", "market", "public", "national", "saint", "santa",
+    "santo", "barangay", "brgy", "hall", "cafe", "house", "resort", "garden", "gardens",
+    "caloocan", "malabon", "navotas", "valenzuela", "kaloakan", "kalookan",
+}
+
+
+def _norm_text(s) -> str:
+    return re.sub(r"\s+", " ", re.sub(r"[^a-z0-9\s]", " ", str(s).lower())).strip()
+
+
+def load_all_places() -> list:
+    """Every place in the database as clean dicts, cached briefly. Falls back to knowledge.json."""
+    now = time.time()
+    if _PLACES_CACHE["spots"] and now - _PLACES_CACHE["ts"] < _PLACES_CACHE_TTL:
+        return _PLACES_CACHE["spots"]
+
+    spots = []
+    if firebase_active and db is not None:
+        try:
+            for doc in db.collection("places").stream():
+                data = doc.to_dict()
+                spots.append({
+                    "place_id": doc.id,
+                    "name": data.get("name", "Unknown Spot"),
+                    "description": data.get("description", ""),
+                    "category": data.get("category", ""),
+                    "address": data.get("address", ""),
+                    "city": str(data.get("city", "")).title(),
+                })
+        except Exception as e:
+            print(f"[PLACE INDEX ERROR] {e}")
+            spots = []
+
+    if not spots:
+        if _PLACES_CACHE["spots"]:
+            return _PLACES_CACHE["spots"]  # stale data beats no data
+        try:
+            with open("knowledge.json", "r", encoding="utf-8") as f:
+                knowledge = json.load(f)
+            for city, items in knowledge.items():
+                for s in items:
+                    if isinstance(s, dict):
+                        spots.append({
+                            "place_id": s.get("id", s.get("name", "")),
+                            "name": s.get("name", "Unknown Spot"),
+                            "description": s.get("description", ""),
+                            "category": s.get("category", ""),
+                            "address": s.get("address", ""),
+                            "city": str(city).title(),
+                        })
+        except Exception:
+            pass
+
+    if spots:
+        _PLACES_CACHE["spots"] = spots
+        _PLACES_CACHE["ts"] = now
+    return spots
+
+
+def find_mentioned_places(text: str, limit: int = 3) -> list:
+    """Places whose name the text mentions: exact name, or the distinctive word(s) of the
+    name (tolerating small spelling typos)."""
+    text_n = _norm_text(text)
+    if not text_n:
+        return []
+    padded = f" {text_n} "
+    words = list(set(text_n.split()))
+
+    scored = []
+    for spot in load_all_places():
+        name_n = _norm_text(spot.get("name", ""))
+        if not name_n:
+            continue
+        if f" {name_n} " in padded:
+            scored.append((2.0 + len(name_n) / 100.0, spot))
+            continue
+        tokens = [t for t in name_n.split() if len(t) >= 4 and t not in _GENERIC_NAME_WORDS]
+        if not tokens:
+            continue
+        hits = 0
+        for t in tokens:
+            if t in words or (len(t) >= 5 and difflib.get_close_matches(t, words, n=1, cutoff=0.84)):
+                hits += 1
+        if hits and hits / len(tokens) >= 0.5:
+            scored.append((hits / len(tokens), spot))
+
+    scored.sort(key=lambda x: x[0], reverse=True)
+    return [s for _, s in scored[:limit]]
+
 
 # --- ADVANCED DYNAMIC DATA ROUTER WITH CATEGORY FILTERING & PAGINATION ---
 def get_city_data(target_city: str = None, history: list = None, category_filter: str = None, negated_cities: set = None) -> dict:
@@ -439,7 +545,10 @@ RULES:
    AND gently check whether they want to keep building the itinerary, while leaving "draft" unchanged.
 9. Add a "lang" field: "EN" or "TL", for whichever language dominates your "reply" text. This picks
    which text-to-speech voice reads it aloud, and that voice only speaks one language well -- so lean
-   into one language per reply rather than switching back and forth line by line.
+   into one language per reply rather than switching back and forth line by line. Write "reply" in the
+   language the user writes in and stay in it for the whole conversation (plain English if they write
+   English or it's unclear -- never assume a visitor understands Tagalog); use Tagalog only if the user
+   does. Set "lang" to "TL" only for Tagalog replies, otherwise "EN". Place names stay as in the data.
 10. Respond with ONLY a single JSON object, no other text, in exactly this shape:
 {{
   "reply": "<your conversational message to the user>",
@@ -561,7 +670,7 @@ async def generate_speech_base64(text: str, mood: str, lang: str = "EN") -> str:
         return ""
 
 @app.post("/transcribe")
-async def transcribe_audio(file: UploadFile = File(...)):
+async def transcribe_audio(file: UploadFile = File(...), language: Optional[str] = Form(None)):
     temp_audio_path = None
     try:
         ext = os.path.splitext(file.filename)[1]
@@ -573,13 +682,21 @@ async def transcribe_audio(file: UploadFile = File(...)):
             temp_audio_path = temp_audio.name
         
         with open(temp_audio_path, "rb") as audio_file:
-            transcription = primary_client.audio.transcriptions.create(
-                file=(temp_audio_path, audio_file.read()),
-                model="whisper-large-v3",
-                language="en"
-            )
-        
-        return {"text": transcription.text}
+            # No hard-coded language: Whisper auto-detects, so foreign visitors and Tagalog
+            # speakers are transcribed correctly. A client may still pass an ISO code to force one.
+            kwargs = {
+                "file": (temp_audio_path, audio_file.read()),
+                "model": "whisper-large-v3",
+            }
+            if language:
+                kwargs["language"] = language
+            transcription = primary_client.audio.transcriptions.create(**kwargs)
+
+        text = (transcription.text or "").strip()
+        # Whisper tends to "hear" these phrases in near-silence; treat them as no speech.
+        if text.lower().strip(" .!") in {"thank you", "thanks for watching", "you", "bye"}:
+            text = ""
+        return {"text": text}
     except Exception as e:
         print(f"Transcription Error: {e}")
         return {"text": ""}
@@ -659,15 +776,26 @@ async def chat(request: ChatRequest, user: dict = Depends(verify_firebase_token)
                     break
 
         category_filter = None
-        if any(w in user_msg for w in ["park", "parks", "green space", "plaza"]):
+        if re.search(r"\b(parks?|green space|plaza)\b", user_msg):
             category_filter = "park"
-        elif any(w in user_msg for w in ["restaurant", "food", "eat", "dining", "pork", "kainan"]):
+        elif re.search(r"\b(restaurants?|food|eat|dining|pork|kainan)\b", user_msg):
             category_filter = "restaurant"
-        elif any(w in user_msg for w in ["church", "chapel", "shrine", "parish", "temple"]):
+        elif re.search(r"\b(church|chapel|shrine|parish|temple)\b", user_msg):
             category_filter = "church"
-        elif any(w in user_msg for w in ["fish", "fishing", "port"]):
+        elif re.search(r"\b(fish|fishing|port)\b", user_msg):
             category_filter = "fishing"
 
+
+        # Look up any place the user names directly across the WHOLE database, not just the
+        # rotating 5-spot chunk. If the current message names nothing, fall back to places named
+        # in the last couple of messages so follow-ups like "how do I get there?" still resolve.
+        named_places = find_mentioned_places(request.message)
+        if not named_places and request.history:
+            recent_text = " ".join(m.get("content", "") for m in request.history[-2:])
+            named_places = find_mentioned_places(recent_text)
+        if named_places and not target_city:
+            target_city = str(named_places[0].get("city", "")).lower() or None
+        named_context = json.dumps(named_places, indent=2) if named_places else "[]"
 
         relevant_data = get_city_data(target_city, request.history, category_filter, negated_cities)
         context = json.dumps(relevant_data, indent=2)
@@ -682,11 +810,12 @@ WHO YOU ARE:
 - You're proud of CAMANAVA and love talking about it, but you're also just a good conversationalist in
   general -- capable of small talk, humor, empathy, and normal back-and-forth chat, the way a real person
   texting with a friend would be.
-- Taglish is your default, natural way of speaking -- mixing English and Tagalog the way most CAMANAVA
-  locals actually talk in everyday conversation. This is your main voice, not an occasional flourish.
-- EXCEPTION: if the user's messages have consistently been English-only, or they signal they don't
-  understand Tagalog (e.g. "sa English na lang", "I don't understand Tagalog", visible confusion about a
-  Tagalog word you used), switch fully to English and stay there for the rest of the conversation.
+- LANGUAGE (strict): reply in the language the user is writing in, and stay in that one language for the
+  whole conversation unless the user asks you to switch or clearly switches themselves. If the user writes
+  in English, or you can't tell, reply in plain English -- no Tagalog words, no Taglish. Many users are
+  tourists or foreigners, so never assume they understand Tagalog. Only use Tagalog/Taglish if the user
+  writes in it first, and then mirror their level. If they write in another language (e.g. Korean,
+  Japanese), reply in that language as best you can. Place names always stay exactly as written in the data.
 
 HOW TO ACTUALLY CONVERSE (this is the part that matters most):
 - Not every message needs a place recommendation. Greetings, jokes, "how are you", venting about their day,
@@ -712,9 +841,19 @@ USER QUERY: {request.message}
 VERIFIED DATABASE FACTS (places you're allowed to recommend by name):
 {context}
 
+PLACES THE USER IS ASKING ABOUT BY NAME (matched in the database -- these ARE verified; [] means the
+user didn't name a specific place):
+{named_context}
+
 GROUND RULES (these still apply, always):
-1. When you DO name a specific place, it must come from VERIFIED DATABASE FACTS above -- never invent a
+1. When you DO name a specific place, it must come from VERIFIED DATABASE FACTS or PLACES THE USER IS
+   ASKING ABOUT BY NAME above -- never invent a
    place, address, or detail that isn't there.
+2a. If the user asks about a place by name and it appears in PLACES THE USER IS ASKING ABOUT BY NAME,
+   it IS verified. Never say you lack verified details about it. Tell them what the data holds
+   (what it is, its category, its address, what the description says) in your own words. Only say a
+   SPECIFIC detail is missing (price, menu, opening hours) when that exact detail isn't in the record,
+   and say it about that detail only, not about the whole place.
 2. If VERIFIED DATABASE FACTS is empty ({{}}) or has nothing matching what the user is actually asking
    for, that is not something to work around by inventing a plausible-sounding answer -- it is a hard
    stop. Say so plainly and honestly (e.g. "I don't have a specific spot verified for that right now")
@@ -740,10 +879,10 @@ GROUND RULES (these still apply, always):
 7. Every response must start with a secret mood tag in brackets: [HAPPY], [SAD], or [NEUTRAL], based on
    the emotional tone of your own message -- this gets stripped before the user ever sees it.
 8. Immediately after the mood tag, add a second secret tag: [EN] or [TL], for whichever language
-   dominates THIS reply (English/mostly-English -> [EN], Tagalog/mostly-Tagalog -> [TL]). This picks
+   dominates THIS reply (Tagalog/mostly-Tagalog -> [TL]; English or any other language -> [EN]). This picks
    which text-to-speech voice reads your reply aloud, and that voice only speaks one language well --
    so within a single reply, lean into one language rather than switching back and forth line by line.
-   Light, natural Taglish within a sentence is fine either way. Example start: [HAPPY][TL]
+   Do not mix languages unless the user does. Example start: [HAPPY][EN]
 9. If real-time weather data is provided, weave it in naturally where it's actually relevant (e.g. "it's
    32°C in Valenzuela right now, so..."), don't force it into unrelated replies.
 
