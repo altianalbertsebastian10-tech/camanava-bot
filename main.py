@@ -301,6 +301,20 @@ class ChatRequest(BaseModel):
     # Client keeps this alive across turns (like `history`) while an itinerary is
     # being built. None means "no itinerary in progress right now".
     itinerary_draft: Optional[Dict] = None
+    # False = reply with text immediately and let the client fetch voice on demand via /tts.
+    # (Generating speech used to block every reply by 1-3 seconds, even for users who never listen.)
+    want_audio: bool = True
+
+
+class TTSRequest(BaseModel):
+    text: str
+    mood: str = "NEUTRAL"
+    lang: str = "EN"
+
+
+def clean_for_speech(text: str) -> str:
+    t = emoji.replace_emoji(text or "", replace='')
+    return t.replace('*', '').replace('#', '').replace(':', ',').strip()
 
 
 # --- ITINERARY INTENT DETECTION ---
@@ -610,9 +624,7 @@ RULES:
 
         reply, mood, new_draft, updated_history = build_result(reply_text, "NEUTRAL", candidate_draft)
 
-    audio_text = emoji.replace_emoji(reply, replace='')
-    audio_text = audio_text.replace('*', '').replace('#', '').replace(':', ',')
-    audio_base64 = await generate_speech_base64(audio_text, mood, lang)
+    audio_base64 = await generate_speech_base64(clean_for_speech(reply), mood, lang) if request.want_audio else ""
 
     persist_chat_session(verified_uid, request.session_id, updated_history, new_draft)
 
@@ -621,7 +633,9 @@ RULES:
         "audio": audio_base64,
         "history": updated_history,
         "itinerary_draft": new_draft,
-        "itinerary_saved": saved_info
+        "itinerary_saved": saved_info,
+        "mood": mood,
+        "lang": lang
     }
 
 # --- SCOPE GUARD ---
@@ -774,6 +788,17 @@ async def generate_speech_base64(text: str, mood: str, lang: str = "EN") -> str:
         print(f"Edge-TTS Error: {e}")
         return ""
 
+@app.post("/tts")
+async def tts(req: TTSRequest, user: dict = Depends(verify_firebase_token)):
+    """On-demand voice for a reply the client already displayed."""
+    text = clean_for_speech(req.text)[:1500]
+    if not text:
+        return {"audio": ""}
+    lang = req.lang if req.lang in ("EN", "TL") else "EN"
+    mood = req.mood.upper() if req.mood.upper() in ("HAPPY", "SAD", "NEUTRAL") else "NEUTRAL"
+    return {"audio": await generate_speech_base64(text, mood, lang)}
+
+
 @app.post("/transcribe")
 async def transcribe_audio(file: UploadFile = File(...), language: Optional[str] = Form(None)):
     temp_audio_path = None
@@ -833,14 +858,16 @@ async def chat(request: ChatRequest, user: dict = Depends(verify_firebase_token)
                 {"role": "user", "content": request.message},
                 {"role": "assistant", "content": reply_text}
             ])[-60:]
-            audio_b64 = await generate_speech_base64(reply_text, "NEUTRAL", reply_lang)
+            audio_b64 = await generate_speech_base64(reply_text, "NEUTRAL", reply_lang) if request.want_audio else ""
             persist_chat_session(verified_uid, request.session_id, history_out, request.itinerary_draft)
             return {
                 "response": reply_text,
                 "audio": audio_b64,
                 "history": history_out,
                 "itinerary_draft": request.itinerary_draft,  # keep any trip in progress untouched
-                "itinerary_saved": None
+                "itinerary_saved": None,
+                "mood": "NEUTRAL",
+                "lang": reply_lang
             }
 
         itinerary_in_progress = request.itinerary_draft is not None
@@ -1082,10 +1109,8 @@ Stay in character as Navi. Be someone worth talking to, not just a place-lookup 
             lang = "EN"
             mood = "NEUTRAL"
 
-        audio_text = emoji.replace_emoji(response, replace='')
-        audio_text = audio_text.replace('*', '').replace('#', '').replace(':', ',')
+        audio_base64 = await generate_speech_base64(clean_for_speech(response), mood, lang) if request.want_audio else ""
 
-        audio_base64 = await generate_speech_base64(audio_text, mood, lang)
 
         # Keep the FULL conversation here (not truncated to 4) so the client can
         # actually persist and reload a whole session. LLM context length is
@@ -1105,7 +1130,9 @@ Stay in character as Navi. Be someone worth talking to, not just a place-lookup 
             "audio": audio_base64,
             "history": updated_history,
             "itinerary_draft": None,
-            "itinerary_saved": None
+            "itinerary_saved": None,
+            "mood": mood,
+            "lang": lang
         }
         
     except Exception as e:

@@ -4,12 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>CamaNaviGo: Chat</title>
-    <link rel="icon" type="image/png" href="https://raw.githubusercontent.com/altianalbertsebastian10-tech/camanava-bot/main/navi_avatar.png">
+    <link rel="icon" type="image/png" href="https://cdn.jsdelivr.net/gh/altianalbertsebastian10-tech/camanava-bot@main/navi_avatar.png">
     
     <!-- Lumen Edge Typography: DM Sans -->
+    <script>try{if((navigator.hardwareConcurrency||8)<=4||(navigator.deviceMemory||8)<=4)document.documentElement.classList.add('lite-mode');}catch(e){}</script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
     
     <style>
         :root {
@@ -83,16 +84,19 @@
             overflow: hidden;
             pointer-events: none;
             opacity: 0.85;
-            animation: glow-hue-cycle 22s linear infinite;
             transition: opacity 1.4s cubic-bezier(0.15, 0.83, 0.66, 1);
-            will-change: opacity, filter;
-            /* Dissolve toward the bottom instead of stopping at a hard box edge */
-            -webkit-mask-image: linear-gradient(to bottom, black 0%, black 50%, transparent 88%);
-            mask-image: linear-gradient(to bottom, black 0%, black 50%, transparent 88%);
+            will-change: opacity;
         }
 
         .ambient-glow.is-hidden {
             opacity: 0;
+        }
+        .ambient-glow.is-hidden .glow-blob { animation-play-state: paused; }
+        /* Static fade toward the bottom (replaces the old mask-image, which forced a re-composite every frame) */
+        .ambient-glow::after {
+            content: '';
+            position: absolute; inset: 0;
+            background: linear-gradient(to bottom, transparent 45%, var(--void) 90%);
         }
 
         .glow-blob {
@@ -100,9 +104,10 @@
             width: min(62vw, 460px);
             height: min(62vw, 460px);
             border-radius: 50%;
-            filter: blur(75px);
-            mix-blend-mode: screen;
-            opacity: 0.5;
+            /* No blur filter / blend mode: the radial gradient already fades out softly, and
+               animating transform alone stays on the GPU (cheap even on old phones). */
+            opacity: 0.55;
+            will-change: transform;
         }
 
         .glow-blob-1 {
@@ -135,11 +140,6 @@
             animation: glow-drift-4 20s ease-in-out infinite;
         }
 
-        @keyframes glow-hue-cycle {
-            0%   { filter: hue-rotate(0deg); }
-            100% { filter: hue-rotate(360deg); }
-        }
-
         @keyframes glow-drift-1 {
             0%, 100% { transform: translate(0, 0) scale(1); }
             50%      { transform: translate(6%, 8%) scale(1.12); }
@@ -166,6 +166,12 @@
                 animation: none;
             }
         }
+
+        /* LITE MODE: set by a tiny script for devices with <=4 CPU cores / <=4 GB RAM. Keeps the
+           look but removes the always-running decorative animation and entrance effects. */
+        html.lite-mode .ambient-glow { display: none; }
+        html.lite-mode .msg { animation: none; opacity: 1; transform: none; }
+        html.lite-mode .live-orb .loader { animation-duration: 12s; }
 
         .top-nav {
             position: absolute;
@@ -376,15 +382,16 @@
 
         .cube {
             width: 35px; height: 35px;
-            background: var(--muted);
+            background: var(--fore);
+            opacity: 0.3;
             border-radius: 8px;
-            transition: all 0.3s ease;
+            transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease, opacity 0.3s ease;
             animation: pulse 1.6s ease-in-out infinite;
         }
 
         @keyframes pulse {
-            0%, 100% { transform: scale(1); background: var(--slate); }
-            50% { transform: scale(1.2); background: var(--fore); box-shadow: 0 0 20px rgba(255,255,255,0.2); }
+            0%, 100% { transform: scale(1); opacity: 0.3; }
+            50% { transform: scale(1.2); opacity: 1; }
         }
 
         @keyframes rotateLoader {
@@ -403,9 +410,7 @@
 
         .footer-container {
             padding: 16px 24px 20px;
-            background: rgba(18, 19, 22, 0.55);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
+            background: rgba(18, 19, 22, 0.97);
             border-top: 1px solid rgba(255,255,255,0.06);
             display: flex; flex-direction: column; gap: 12px;
             z-index: 200;
@@ -426,21 +431,19 @@
             display: flex; 
             align-items: center;
             gap: 12px;
-            background-color: rgba(26, 27, 31, 0.55);
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
+            background-color: #1a1b1f;
             border: 1px solid rgba(255,255,255,0.08);
             border-radius: var(--radius-box);
             padding: 6px 6px 6px 18px;
             box-shadow: var(--rim-inset);
-            transition: all 0.25s cubic-bezier(0.15, 0.83, 0.66, 1);
+            transition: background-color 0.25s cubic-bezier(0.15, 0.83, 0.66, 1), border-color 0.25s cubic-bezier(0.15, 0.83, 0.66, 1), color 0.25s cubic-bezier(0.15, 0.83, 0.66, 1), box-shadow 0.25s cubic-bezier(0.15, 0.83, 0.66, 1), transform 0.25s cubic-bezier(0.15, 0.83, 0.66, 1), opacity 0.25s cubic-bezier(0.15, 0.83, 0.66, 1);
             box-sizing: border-box;
         }
 
         .input-bar:focus-within {
             border-color: rgba(255,255,255,0.16);
             box-shadow: var(--focus-ring);
-            background-color: rgba(34, 35, 40, 0.7);
+            background-color: #222328;
         }
 
         .itinerary-banner {
@@ -448,9 +451,7 @@
             align-items: center;
             justify-content: space-between;
             gap: 10px;
-            background-color: rgba(34, 35, 40, 0.55);
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
+            background-color: #222328;
             border: 1px solid rgba(255,255,255,0.08);
             border-radius: var(--radius-inner);
             padding: 8px 12px;
@@ -521,9 +522,7 @@
             display: flex;
             position: fixed;
             inset: 0;
-            background: rgba(0,0,0,0.75);
-            backdrop-filter: blur(4px);
-            -webkit-backdrop-filter: blur(4px);
+            background: rgba(0,0,0,0.82);
             z-index: 6500;
             align-items: flex-end;
             justify-content: center;
@@ -724,9 +723,7 @@
         .sidebar-overlay {
             position: fixed;
             inset: 0;
-            background: rgba(0,0,0,0.6);
-            backdrop-filter: blur(2px);
-            -webkit-backdrop-filter: blur(2px);
+            background: rgba(0,0,0,0.7);
             z-index: 4999;
             opacity: 0;
             pointer-events: none;
@@ -781,7 +778,7 @@
             border: 1px solid transparent;
             cursor: not-allowed;
             display: flex; align-items: center; justify-content: center;
-            transition: all 0.25s cubic-bezier(0.15, 0.83, 0.66, 1);
+            transition: background-color 0.25s cubic-bezier(0.15, 0.83, 0.66, 1), border-color 0.25s cubic-bezier(0.15, 0.83, 0.66, 1), color 0.25s cubic-bezier(0.15, 0.83, 0.66, 1), box-shadow 0.25s cubic-bezier(0.15, 0.83, 0.66, 1), transform 0.25s cubic-bezier(0.15, 0.83, 0.66, 1), opacity 0.25s cubic-bezier(0.15, 0.83, 0.66, 1);
             flex-shrink: 0;
         }
         
@@ -808,7 +805,7 @@
             display: inline-flex; align-items: center; gap: 8px;
             font-family: var(--font-body);
             font-size: 0.8rem; font-weight: 500;
-            transition: all 0.2s ease;
+            transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
         }
 
         .bubble-tts-btn:hover { background-color: var(--slate); color: var(--fore); }
@@ -837,7 +834,7 @@
             font-weight: 500;
             text-transform: uppercase;
             cursor: pointer;
-            transition: all 0.2s ease;
+            transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
         }
 
         .header-mic-btn:hover {
@@ -856,8 +853,6 @@
             position: absolute;
             inset: 0;
             background: rgba(18, 19, 22, 0.98);
-            backdrop-filter: blur(24px);
-            -webkit-backdrop-filter: blur(24px);
             z-index: 3000;
             display: flex;
             flex-direction: column;
@@ -921,6 +916,8 @@
             z-index: 0;
             /* Default state: Listening (Slow rotate) */
             animation: loader-rotate 6s linear infinite; 
+            box-shadow: 0 10px 20px 0 rgba(255,255,255,0.8) inset, 0 20px 30px 0 #00d2ff inset, 0 60px 60px 0 #3a7bd5 inset;
+            will-change: transform;
         }
 
         .live-orb svg { 
@@ -951,18 +948,8 @@
 
         /* Beautiful AI Blue colorways */
         @keyframes loader-rotate {
-            0% {
-                transform: rotate(90deg);
-                box-shadow: 0 10px 20px 0 rgba(255,255,255,0.8) inset, 0 20px 30px 0 #00d2ff inset, 0 60px 60px 0 #3a7bd5 inset;
-            }
-            50% {
-                transform: rotate(270deg);
-                box-shadow: 0 10px 20px 0 rgba(255,255,255,0.8) inset, 0 20px 10px 0 #0072ff inset, 0 40px 60px 0 #00c6ff inset;
-            }
-            100% {
-                transform: rotate(450deg);
-                box-shadow: 0 10px 20px 0 rgba(255,255,255,0.8) inset, 0 20px 30px 0 #00d2ff inset, 0 60px 60px 0 #3a7bd5 inset;
-            }
+            from { transform: rotate(90deg); }
+            to   { transform: rotate(450deg); }
         }
 
         .live-status-text {
@@ -1029,7 +1016,7 @@
     </div>
 
     <!-- DELETE CONFIRMATION MODAL -->
-    <div id="delete-confirm-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 6000; align-items: center; justify-content: center; backdrop-filter: blur(4px);">
+    <div id="delete-confirm-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 6000; align-items: center; justify-content: center;">
         <div style="background: #121316; padding: 24px; border-radius: 12px; border: 1px solid #2a2d35; text-align: center; width: 85%; max-width: 320px; font-family: 'DM Sans', sans-serif;">
             <h3 style="margin-top: 0; color: #ffffff; font-size: 1.25rem;">Delete Chat?</h3>
             <p style="color: #8b8f9a; font-size: 0.9rem; margin-bottom: 24px; line-height: 1.5; font-family: 'DM Sans', sans-serif;">Are you sure you want to delete this chat history?</p>
@@ -1089,7 +1076,7 @@
     <div class="top-nav">
         <div class="top-identity">
             <button class="avatar-wrap" id="navi-avatar-wrap" onclick="toggleSidebar()" aria-label="Open chat history">
-                <img src="https://raw.githubusercontent.com/altianalbertsebastian10-tech/camanava-bot/main/navi_avatar.png" 
+                <img src="https://cdn.jsdelivr.net/gh/altianalbertsebastian10-tech/camanava-bot@main/navi_avatar.png" 
                     class="avatar" 
                     id="navi-avatar" 
                     alt="">
@@ -1672,8 +1659,26 @@
         }
     }
 
-    function playNaviVoice(btn) {
-        const base64Audio = btn.getAttribute('data-audio');
+    async function playNaviVoice(btn) {
+        let base64Audio = btn.getAttribute('data-audio');
+        if (!base64Audio && btn._tts) {
+            if (btn._loadingTTS) return;
+            btn._loadingTTS = true;
+            const label = btn.innerHTML;
+            btn.innerHTML = ICON_SPEAK + " ...";
+            try {
+                const res = await fetch('https://camanava-bot.onrender.com/tts', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
+                    body: JSON.stringify(btn._tts)
+                });
+                const d = await res.json();
+                base64Audio = d.audio || '';
+                if (base64Audio) btn.setAttribute('data-audio', base64Audio);
+            } catch (e) { console.error('TTS fetch failed:', e); }
+            btn._loadingTTS = false;
+            btn.innerHTML = label;
+        }
         if (!base64Audio) return; 
 
         if (currentActiveButton === btn && activeAudio) {
@@ -1747,7 +1752,7 @@
     document.querySelector('.chat-shell').addEventListener('wheel', (e) => {
         // Let independently-scrollable surfaces (live transcript, sidebar history,
         // itinerary preview) handle their own wheel scrolling instead of hijacking it.
-        if (e.target.closest('#live-overlay, #sidebar, .itinerary-preview-panel')) return;
+        if (e.target.closest('#chat, #live-overlay, #sidebar, .itinerary-preview-panel')) return;
         const chat = document.getElementById('chat');
         chat.scrollTop += e.deltaY;
         e.preventDefault();
@@ -1786,7 +1791,7 @@
         forceUIRefreshScroll();
     }
 
-    function addMessageToUI(sender, text, audioBase64 = null) {
+    function addMessageToUI(sender, text, audioBase64 = null, ttsMeta = null) {
         const chat = document.getElementById('chat');
         const wrapper = document.createElement('div');
         
@@ -1816,14 +1821,18 @@
             const finishTypewriter = () => {
                 if (typewriterDone) return;
                 typewriterDone = true;
-                clearInterval(typewriter);
+                typewriter.cancel();
                 pendingTypewriters.delete(finishTypewriter);
                 containerDiv.innerHTML = innerHTMLContent;
-                if (audioBase64) {
+                if (audioBase64 || ttsMeta) {
                     const btn = document.createElement('button');
                     btn.className = 'bubble-tts-btn';
                     btn.innerHTML = ICON_SPEAK + " Engage";
-                    btn.setAttribute('data-audio', audioBase64);
+                    if (audioBase64) btn.setAttribute('data-audio', audioBase64);
+                    // No audio yet: remember what to speak; it is generated only if the user taps Engage.
+                    if (!audioBase64 && ttsMeta) {
+                        btn._tts = { text: text, mood: ttsMeta.mood || 'NEUTRAL', lang: ttsMeta.lang || 'EN' };
+                    }
                     btn.onclick = function() { playNaviVoice(this); };
                     containerDiv.appendChild(btn);
                 }
@@ -1831,10 +1840,13 @@
             };
             pendingTypewriters.add(finishTypewriter);
 
-            // Reveal several characters per tick, scaled to reply length so even a long answer
-            // finishes in about a second instead of crawling out one character at a time.
-            const charsPerTick = Math.max(3, Math.ceil(innerHTMLContent.length / 90));
-            const typewriter = setInterval(() => {
+            // Frame-synced reveal (rAF): never works faster than the screen can paint, and finishes in
+            // roughly 40 frames however long the reply is.
+            const charsPerTick = Math.max(3, Math.ceil(innerHTMLContent.length / 40));
+            let rafId = 0;
+            const typewriter = { cancel: () => cancelAnimationFrame(rafId) };
+            const step = () => {
+                if (typewriterDone) return;
                 if (index < innerHTMLContent.length) {
                     for (let n = 0; n < charsPerTick && index < innerHTMLContent.length; n++) {
                         if (innerHTMLContent[index] === '<') {
@@ -1845,10 +1857,12 @@
                     }
                     containerDiv.innerHTML = innerHTMLContent.slice(0, index);
                     chat.scrollTop = chat.scrollHeight;
+                    rafId = requestAnimationFrame(step);
                 } else {
                     finishTypewriter();
                 }
-            }, 12);
+            };
+            rafId = requestAnimationFrame(step);
         }
         forceUIRefreshScroll();
     }
@@ -1895,7 +1909,7 @@
                 'Content-Type': 'application/json',
                 'Authorization': 'Bearer ' + authToken // <-- Added this header
             },
-            body: JSON.stringify({ message: msg, history, session_id: currentSessionId, itinerary_draft: itineraryDraft })
+            body: JSON.stringify({ message: msg, history, session_id: currentSessionId, itinerary_draft: itineraryDraft, want_audio: isLiveModeActive })
         });
 
         if (res.status === 401) {
@@ -1921,7 +1935,7 @@
             if (isLiveModeActive) {
                 handleLiveResponse(data.response, data.audio);
             } else {
-                addMessageToUI('bot', data.response, data.audio);
+                addMessageToUI('bot', data.response, data.audio, { mood: data.mood, lang: data.lang });
             }
             
         } catch (err) {
