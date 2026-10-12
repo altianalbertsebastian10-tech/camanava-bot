@@ -5,6 +5,7 @@ import edge_tts
 import emoji
 import tempfile
 import re
+import random
 from groq import Groq
 from fastapi import FastAPI, UploadFile, File, Form, Header, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
@@ -652,19 +653,76 @@ SCOPE_BLOCK_PATTERN = re.compile(
 
 _TAGALOG_HINTS = re.compile(r"\b(ano|sino|paano|saan|ang|ng|mga|po|ba|mo|ko|natin|kayo|ikaw|gawa|kaya)\b", re.IGNORECASE)
 
-SCOPE_REPLY_EN = ("I'm Navi, your CAMANAVA travel guide, so I can only help with places, food, events and "
-                  "trips around Caloocan, Malabon, Navotas and Valenzuela. Want me to suggest a spot to visit?")
-SCOPE_REPLY_TL = ("Ako si Navi, ang travel guide mo sa CAMANAVA, kaya sa mga lugar, pagkain at biyahe lang sa "
-                  "Caloocan, Malabon, Navotas at Valenzuela ako makakatulong. Gusto mo ba ng mairerekomenda kong pasyalan?")
+_CODE_ONLY = re.compile(
+    r"\bcode\s+snippets?\b|\bsource\s+code\b|\b(write|give|show|generate|make|create)\s+(me\s+)?(a\s+|an\s+|some\s+|the\s+)?(\w+\s+)?(code|script|program|function|class|query)\b|"
+    r"\b(coding|programming|python|javascript|typescript|html|css|sql|c\+\+|php|golang|rust|nodejs|node\.js|reactjs|react\.js|regex|algorithm|api\s+key)\b|```|\b(give|gimme)\s+(me\s+)?(a\s+)?code\b",
+    re.IGNORECASE,
+)
+_INJECTION_ONLY = re.compile(
+    r"\b(ignore|forget|disregard)\s+(all\s+|your\s+|the\s+)?(previous|prior|above|earlier)\s+(instructions?|rules|prompts?)\b|"
+    r"\b(system|hidden|initial|original)\s+(prompt|instructions?|message)\b|\b(jailbreak|dan mode|developer mode)\b",
+    re.IGNORECASE,
+)
+
+# Several phrasings per situation so Navi never sounds like a broken record. Identity replies are honest
+# that Navi is an AI (never deny it) but share no model/stack/creator details.
+SCOPE_REPLIES = {
+    "EN": {
+        "identity": [
+            "Yep, I'm an AI! The technical stuff isn't my department though, CAMANAVA is. Craving food, a quiet park, or a day trip?",
+            "You got me, I'm an AI. I keep the under-the-hood details to myself and stick to what I do best: Caloocan, Malabon, Navotas and Valenzuela. Where should we explore?",
+            "That one's behind the curtain! What I can tell you is where the good spots are around CAMANAVA. In the mood for something to eat, or somewhere to chill?",
+            "No tech talk from me. Tell me what you're in the mood for and I'll point you somewhere good.",
+            "I'll skip that one and stay in my lane. What kind of place are you after today?",
+        ],
+        "code": [
+            "Code isn't my thing, I'm a tour guide, not a programmer! But if you want help planning a trip, I'm all yours.",
+            "I can't help with coding here, but I can map out a day in Malabon or Valenzuela if you like.",
+            "Sorry, no code from me. Places, food and itineraries are my specialty though.",
+            "That's off my route! Want food spots or a place to hang out instead?",
+        ],
+        "injection": [
+            "Nice try! I'm staying in guide mode. Anywhere in CAMANAVA you want to explore?",
+            "My rules stay as they are. What can I help you find around Caloocan, Malabon, Navotas or Valenzuela?",
+            "Not going to budge on that one. Want a recommendation instead?",
+        ],
+    },
+    "TL": {
+        "identity": [
+            "Oo, AI ako! Pero hindi ko pinag-uusapan ang teknikal na detalye, CAMANAVA ang forte ko. Gusto mo ba ng kainan o pasyalan?",
+            "Ayun, AI nga ako. Sa Caloocan, Malabon, Navotas at Valenzuela na lang tayo mag-focus. Saan mo gustong pumunta?",
+            "Hindi ko iyan sasagutin, pero marami akong alam na magagandang lugar dito sa CAMANAVA. Ano'ng trip mo ngayon?",
+        ],
+        "code": [
+            "Hindi ako marunong mag-code, tour guide lang ako! Pero kung trip ang pag-uusapan, game ako.",
+            "Wala akong maitutulong sa coding, pero matutulungan kitang mag-plano ng lakad. Gusto mo?",
+            "Sorry, hindi iyan sakop ko. Pagkain at pasyalan sa CAMANAVA, doon ako magaling!",
+        ],
+        "injection": [
+            "Nice try! Nasa guide mode lang ako. Saan mo gustong mamasyal?",
+            "Hindi magbabago ang rules ko. Ano'ng hanap mong lugar sa CAMANAVA?",
+        ],
+    },
+}
+SCOPE_REPLY_EN = SCOPE_REPLIES["EN"]["identity"][0]  # also used as the code-block safety net below
 
 
-def scope_reply_for(message: str):
-    """Returns (reply, lang) if the message is out of scope, else None."""
+def scope_reply_for(message: str, history: list = None):
+    """Returns (reply, lang) if the message is out of scope, else None. Picks a phrasing that
+    hasn't already been used in this conversation so repeated attempts get a fresh reply."""
     if not SCOPE_BLOCK_PATTERN.search(message or ""):
         return None
-    if len(_TAGALOG_HINTS.findall(message)) >= 2:
-        return SCOPE_REPLY_TL, "TL"
-    return SCOPE_REPLY_EN, "EN"
+    lang = "TL" if len(_TAGALOG_HINTS.findall(message)) >= 2 else "EN"
+    if _INJECTION_ONLY.search(message):
+        kind = "injection"
+    elif _CODE_ONLY.search(message):
+        kind = "code"
+    else:
+        kind = "identity"
+    pool = SCOPE_REPLIES[lang][kind]
+    used = {e.get("content", "") for e in (history or []) if e.get("role") == "assistant"}
+    fresh = [r for r in pool if r not in used]
+    return random.choice(fresh or pool), lang
 
 
 @app.get("/health")
@@ -768,7 +826,7 @@ async def chat(request: ChatRequest, user: dict = Depends(verify_firebase_token)
         # tell me the places!") has zero stops yet, and the user's NEXT message (which
         # naturally won't contain the word "itinerary" again) would incorrectly fall back
         # to normal chat instead of continuing to build the draft.
-        scoped = scope_reply_for(request.message)
+        scoped = scope_reply_for(request.message, request.history)
         if scoped:
             reply_text, reply_lang = scoped
             history_out = (request.history + [
