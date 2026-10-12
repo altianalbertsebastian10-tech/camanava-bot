@@ -1831,19 +1831,24 @@
             };
             pendingTypewriters.add(finishTypewriter);
 
+            // Reveal several characters per tick, scaled to reply length so even a long answer
+            // finishes in about a second instead of crawling out one character at a time.
+            const charsPerTick = Math.max(3, Math.ceil(innerHTMLContent.length / 90));
             const typewriter = setInterval(() => {
                 if (index < innerHTMLContent.length) {
-                    if (innerHTMLContent[index] === '<') {
-                        const tagEnd = innerHTMLContent.indexOf('>', index);
-                        if (tagEnd !== -1) index = tagEnd;
+                    for (let n = 0; n < charsPerTick && index < innerHTMLContent.length; n++) {
+                        if (innerHTMLContent[index] === '<') {
+                            const tagEnd = innerHTMLContent.indexOf('>', index);
+                            if (tagEnd !== -1) index = tagEnd;
+                        }
+                        index++;
                     }
-                    containerDiv.innerHTML = innerHTMLContent.slice(0, index + 1);
-                    index++;
+                    containerDiv.innerHTML = innerHTMLContent.slice(0, index);
                     chat.scrollTop = chat.scrollHeight;
                 } else {
                     finishTypewriter();
                 }
-            }, 15);
+            }, 12);
         }
         forceUIRefreshScroll();
     }
