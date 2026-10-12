@@ -849,6 +849,49 @@
             fill: currentColor; 
         }
 
+        /* Pill-shaped header buttons, each with its own look */
+        .header-mic-btn {
+            border-radius: 999px;
+            padding: 7px 14px;
+            gap: 7px;
+            letter-spacing: 0.08em;
+        }
+        .header-mic-btn:active { transform: scale(0.95); }
+        .header-mic-btn:focus-visible { outline: 2px solid var(--fore); outline-offset: 2px; }
+        .header-mic-btn .btn-label { display: none; }
+        @media (min-width: 481px) {
+            .header-mic-btn .btn-label { display: inline; }
+        }
+
+        /* New chat: solid white pill (primary action) */
+        .header-mic-btn.btn-new {
+            background-color: var(--fore);
+            color: var(--void);
+            border-color: var(--fore);
+            font-weight: 700;
+        }
+        .header-mic-btn.btn-new:hover {
+            background-color: var(--lumen);
+            color: var(--void);
+            border-color: var(--lumen);
+            box-shadow: 0 0 14px rgba(255,255,255,0.22);
+        }
+
+        /* Live mode: blue-tinted pill matching the live screen accent */
+        .header-mic-btn.btn-live {
+            margin-left: -10px; /* pulls it closer to New chat (16px gap -> 6px) */
+            background-color: rgba(77,163,255,0.14);
+            color: #8cc4ff;
+            border-color: rgba(77,163,255,0.55);
+            font-weight: 600;
+        }
+        .header-mic-btn.btn-live:hover {
+            background-color: rgba(77,163,255,0.26);
+            color: #fff;
+            border-color: #4da3ff;
+            box-shadow: 0 0 14px rgba(77,163,255,0.35);
+        }
+
         /* --- LIVE VOICE SCREEN ---
            Concept: Manila Bay at dusk. Deep navy water, a cool teal swell for listening, an amber
            lantern glow while Navi thinks, and a coral sunset while Navi speaks. Everything that
@@ -1193,16 +1236,18 @@
 
         <div class="tech-stats">
             <!-- New Chat: always visible in the header, no need to open the sidebar -->
-            <button class="header-mic-btn" onclick="startNewChat()" title="New chat" aria-label="New chat">
+            <button class="header-mic-btn btn-new" onclick="startNewChat()" title="New chat" aria-label="New chat">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16">
                     <path d="M8 2a.75.75 0 0 1 .75.75v4.5h4.5a.75.75 0 0 1 0 1.5h-4.5v4.5a.75.75 0 0 1-1.5 0v-4.5h-4.5a.75.75 0 0 1 0-1.5h4.5v-4.5A.75.75 0 0 1 8 2"/>
                 </svg>
+                <span class="btn-label">New</span>
             </button>
             <!-- Voice Trigger for Gemini Live Mode -->
-            <button class="header-mic-btn" onclick="openLiveMode()" title="Start Live Session">
+            <button class="header-mic-btn btn-live" onclick="openLiveMode()" title="Start Live Session" aria-label="Start live session">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16">
                     <path fill-rule="evenodd" d="M8.5 2a.5.5 0 0 1 .5.5v11a.5.5 0 0 1-1 0v-11a.5.5 0 0 1 .5-.5m-2 2a.5.5 0 0 1 .5.5v7a.5.5 0 0 1-1 0v-7a.5.5 0 0 1 .5-.5m4 0a.5.5 0 0 1 .5.5v7a.5.5 0 0 1-1 0v-7a.5.5 0 0 1 .5-.5m-6 1.5A.5.5 0 0 1 5 6v4a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m8 0a.5.5 0 0 1 .5.5v4a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m-10 1A.5.5 0 0 1 3 7v2a.5.5 0 0 1-1 0V7a.5.5 0 0 1 .5-.5m12 0a.5.5 0 0 1 .5.5v2a.5.5 0 0 1-1 0V7a.5.5 0 0 1 .5-.5"/>
                 </svg>
+                <span class="btn-label">Live</span>
                 
             </button>
             <div class="status-indicator">
@@ -2129,6 +2174,7 @@
     }
 
     function setLiveState(state, message) {
+        const prevState = liveState;
         liveState = state;
         statusText.innerText = message;
 
@@ -2142,6 +2188,13 @@
         if (state !== 'speaking' && state !== 'listening') {
             orb.style.setProperty('--audio-scale', 1);
         }
+
+        // Audio/haptic cues on state changes
+        if (state === 'listening' && prevState !== 'listening') {
+            if (liveSilentNextListen) liveSilentNextListen = false;
+            else liveCue('listen');
+        }
+        if (state === 'error' && prevState !== 'error') liveCue('error');
     }
 
     function micLevel() {
@@ -2195,10 +2248,55 @@
         }, 60);
     }
 
+    // --- LIVE MODE FEEDBACK (synthesized sounds + haptics, no audio files needed) ---
+    const LIVE_SOUNDS = true;          // set to false to silence all live mode cues
+    const LIVE_HAPTICS = true;         // vibration (Android/Chrome; iOS Safari ignores it)
+    let liveSilentNextListen = false;  // skip the "listening" cue when another cue just played
+
+    function liveTone(freq, delay, dur, vol, type, endFreq) {
+        const t0 = audioCtx.currentTime + delay;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type || 'sine';
+        osc.frequency.setValueAtTime(freq, t0);
+        if (endFreq) osc.frequency.exponentialRampToValueAtTime(endFreq, t0 + dur);
+        gain.gain.setValueAtTime(0.0001, t0);
+        gain.gain.exponentialRampToValueAtTime(vol, t0 + 0.012);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);   // straight to speakers, so it doesn't disturb the orb visualizer
+        osc.start(t0);
+        osc.stop(t0 + dur + 0.03);
+    }
+
+    function liveCue(name) {
+        if (LIVE_HAPTICS && navigator.vibrate) {
+            const pattern = { start: 15, listen: 8, sent: 10, interrupt: [10, 40, 10], end: 20,
+                              error: [30, 60, 30], mute: 12, unmute: 12 }[name];
+            try { if (pattern) navigator.vibrate(pattern); } catch (e) {}
+        }
+        if (!LIVE_SOUNDS) return;
+        try {
+            initAudio();
+            switch (name) {
+                case 'start':     liveTone(523, 0, 0.12, 0.12); liveTone(784, 0.09, 0.18, 0.12); break;  // rising chime
+                case 'listen':    liveTone(880, 0, 0.10, 0.08); break;                                   // soft "go ahead" blip
+                case 'sent':      liveTone(988, 0, 0.06, 0.07, 'triangle'); liveTone(1319, 0.05, 0.08, 0.06, 'triangle'); break;
+                case 'interrupt': liveTone(700, 0, 0.13, 0.10, 'sine', 420); break;                      // quick downward swoop
+                case 'mute':      liveTone(330, 0, 0.08, 0.10); break;
+                case 'unmute':    liveTone(520, 0, 0.08, 0.10); break;
+                case 'end':       liveTone(784, 0, 0.12, 0.11); liveTone(523, 0.09, 0.2, 0.11); break;   // falling chime
+                case 'error':     liveTone(220, 0, 0.22, 0.10, 'triangle', 180); break;
+            }
+        } catch (e) { /* audio blocked or unsupported: fail silently */ }
+    }
+
     async function openLiveMode() {
         if (isLiveModeActive) return;
         if (activeAudio) clearTTSState();
         isLiveModeActive = true;
+        liveCue('start');
+        liveSilentNextListen = true;   // the start chime already covers the first "listening"
         liveMuted = false;
         document.getElementById('live-mute-btn').classList.remove('is-on'); document.getElementById('live-mute-label').textContent = 'Mute';
         overlay.classList.add('is-active');
@@ -2269,7 +2367,8 @@
 
         setLiveState('listening', liveMuted ? "Mic is muted" : "Listening... just speak");
         updateTranscript("");
-        startVad();
+        // Brief delay so the "listening" cue isn't picked up by the mic as speech
+        setTimeout(() => { if (isLiveModeActive && liveState === 'listening') startVad(); }, 250);
     }
 
     async function handleUtteranceStop(recorder) {
@@ -2292,6 +2391,7 @@
             return;
         }
 
+        liveCue('sent');
         setLiveState('thinking', "Transcribing...");
         const ext = blob.type.includes('mp4') ? 'm4a' : (blob.type.includes('ogg') ? 'ogg' : 'webm');
         const formData = new FormData();
@@ -2331,10 +2431,12 @@
         document.getElementById('live-mute-label').textContent = liveMuted ? 'Unmute' : 'Mute';
         btn.setAttribute('aria-label', liveMuted ? 'Unmute microphone' : 'Mute microphone');
         if (liveState === 'listening') setLiveState('listening', liveMuted ? "Mic is muted" : "Listening... just speak");
-        if (navigator.vibrate) { try { navigator.vibrate(12); } catch (e) {} }
+        liveCue(liveMuted ? 'mute' : 'unmute');
     }
 
     function interruptNavi() {
+        liveCue('interrupt');
+        liveSilentNextListen = true;
         if (liveAudioPlayer) {
             liveAudioPlayer.pause();
             liveAudioPlayer = null;
@@ -2397,6 +2499,7 @@
     }
 
     function closeLiveMode() {
+        liveCue('end');
         isLiveModeActive = false;
         overlay.classList.remove('is-active');
 
