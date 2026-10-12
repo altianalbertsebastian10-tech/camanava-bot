@@ -6,6 +6,19 @@
     <title>CamaNaviGo: Chat</title>
     <link rel="icon" type="image/png" href="https://cdn.jsdelivr.net/gh/altianalbertsebastian10-tech/camanava-bot@main/navi_avatar.png">
     
+    <meta name="theme-color" content="#121316">
+    <script>
+        /* Theme bootstrap: saved choice ('light' | 'dark'), otherwise follow the device setting. Runs before paint to avoid a flash. */
+        (function () {
+            var t = 'dark';
+            try {
+                var saved = localStorage.getItem('navi_theme');
+                if (saved === 'light' || saved === 'dark') t = saved;
+                else if (window.matchMedia && matchMedia('(prefers-color-scheme: light)').matches) t = 'light';
+            } catch (e) {}
+            document.documentElement.setAttribute('data-theme', t);
+        })();
+    </script>
     <!-- Lumen Edge Typography: DM Sans -->
     <script>try{if((navigator.hardwareConcurrency||8)<=4||(navigator.deviceMemory||8)<=4)document.documentElement.classList.add('lite-mode');}catch(e){}</script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -14,29 +27,171 @@
     
     <style>
         :root {
-            /* Lumen Edge Palette (Luminance Only) */
-            --void: #121316;
-            --graph: #1a1b1f;
-            --panel: #222328;
-            --slate: #31333a;
-            --hairline: #42454d;
-            --muted: #8b8f9a;
-            --fore: #ffffff;
-            --lumen: #e2e8f0;
-
             /* Typography */
             --font-display: 'DM Sans', sans-serif;
             --font-body: 'DM Sans', sans-serif;
             --font-mono: 'DM Sans', sans-serif;
 
-            /* Core Lumen Effects */
-            --radius-box: 14px;
-            --radius-inner: 7px;
+            /* Shape */
+            --radius-box: 18px;
+            --radius-inner: 10px;
+        }
+
+        /* ===== THEME TOKENS =====
+           Dark is the default. Light is applied with <html data-theme="light"> (set from the saved
+           choice, or from the device setting when nothing is saved). Every color in the UI comes
+           from these variables, so both themes stay consistent. */
+        :root, html[data-theme="dark"] {
+            color-scheme: dark;
+            --void: #121316;        /* page background */
+            --graph: #1a1b1f;       /* cards, bot bubbles, inputs */
+            --panel: #222328;
+            --slate: #31333a;
+            --hairline: #42454d;
+            --muted: #8b8f9a;       /* secondary text */
+            --fore: #ffffff;        /* primary text / primary buttons */
+            --lumen: #e2e8f0;
+
+            --surface: #121316;     /* sidebar, modals, sheets */
+            --border: #2a2d35;
+            --hover: #2a2d35;
+            --line-soft: rgba(255,255,255,0.08);
+            --line-strong: rgba(255,255,255,0.16);
+            --footer-bg: rgba(18,19,22,0.97);
+            --scrim: rgba(0,0,0,0.78);
+            --wash: rgba(255,255,255,0.03);
+            --glow: rgba(255,255,255,0.15);
+
+            --user-bg: #31333a;
+            --user-fg: #ffffff;
+            --user-border: #42454d;
+
+            --ok: #3ddc97;
+            --warn: #fbbf24;
+            --info: #60a5fa;
+            --danger: #ff6b6b;
+
+            --live-bg: rgba(77,163,255,0.14);
+            --live-fg: #8cc4ff;
+            --live-border: rgba(77,163,255,0.55);
+            --live-bg-h: rgba(77,163,255,0.26);
+            --live-fg-h: #ffffff;
+            --live-border-h: #4da3ff;
+            --live-glow: rgba(77,163,255,0.35);
+
             --rim-inset: inset 0 1px 0 rgba(255,255,255,0.06);
             --horizon-glow: 0 20px 40px -10px rgba(255,255,255,0.04);
-            
-            /* The Lumen Focus Signal */
+            --shell-shadow: 0 40px 100px rgba(0,0,0,0.9), inset 0 1px 0 rgba(255,255,255,0.06);
             --focus-ring: 0 0 0 1px var(--slate), 0 0 20px rgba(255,255,255,0.1);
+        }
+
+        html[data-theme="light"] {
+            color-scheme: light;
+            --void: #f5f6f8;
+            --graph: #ffffff;
+            --panel: #f0f2f5;
+            --slate: #e3e6eb;
+            --hairline: #cfd4dc;
+            --muted: #5b6370;       /* 5.6:1 on the page background (WCAG AA) */
+            --fore: #13161b;
+            --lumen: #2a303a;
+
+            --surface: #ffffff;
+            --border: #e2e5ea;
+            --hover: #eef0f3;
+            --line-soft: rgba(19,22,27,0.10);
+            --line-strong: rgba(19,22,27,0.24);
+            --footer-bg: rgba(245,246,248,0.96);
+            --scrim: rgba(15,18,24,0.45);
+            --wash: rgba(19,22,27,0.03);
+            --glow: rgba(19,22,27,0.18);
+
+            --user-bg: #e6eaf0;
+            --user-fg: #13161b;
+            --user-border: #dce1e8;
+
+            --ok: #16a34a;
+            --warn: #d97706;
+            --info: #2563eb;
+            --danger: #d92d20;
+
+            --live-bg: rgba(37,99,235,0.09);
+            --live-fg: #1d4ed8;
+            --live-border: rgba(37,99,235,0.38);
+            --live-bg-h: rgba(37,99,235,0.16);
+            --live-fg-h: #1e3a8a;
+            --live-border-h: #2563eb;
+            --live-glow: rgba(37,99,235,0.22);
+
+            --rim-inset: inset 0 1px 0 rgba(255,255,255,0.9);
+            --horizon-glow: 0 8px 24px -14px rgba(16,24,40,0.22);
+            --shell-shadow: 0 30px 80px -24px rgba(16,24,40,0.30), 0 0 0 1px rgba(16,24,40,0.04);
+            --focus-ring: 0 0 0 1px var(--hairline), 0 0 0 4px rgba(19,22,27,0.08);
+        }
+
+        /* Smooth cross-fade when switching themes (class is added briefly by JS) */
+        html.theme-anim *, html.theme-anim *::before, html.theme-anim *::after {
+            transition: background-color 0.28s ease, color 0.28s ease, border-color 0.28s ease, box-shadow 0.28s ease, fill 0.28s ease !important;
+        }
+
+
+        /* ===== MOTION =====
+           Small, quiet fades and slides on every state change. All of it is opacity/transform only,
+           so it stays smooth on older phones. Keyframes only define the starting point ("from"), and
+           fill-mode "backwards", so elements settle on their normal styles when the motion ends. */
+        @keyframes fadeFrom   { from { opacity: 0; } }
+        @keyframes fadeUp     { from { opacity: 0; transform: translateY(10px); } }
+        @keyframes popFrom    { from { opacity: 0; transform: translateY(8px) scale(0.97); } }
+        @keyframes slideInRow { from { opacity: 0; transform: translateX(-10px); } }
+        @keyframes fadeOutTo  { to   { opacity: 0; } }
+        @keyframes popOutTo   { to   { opacity: 0; transform: translateY(6px) scale(0.97); } }
+        @keyframes iconPop    { 0% { transform: scale(0.5); opacity: 0; } 60% { transform: scale(1.18); opacity: 1; } 100% { transform: scale(1); } }
+
+        .welcome-eyebrow     { animation: fadeUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.05s backwards; }
+        .welcome-title-large { animation: fadeUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.16s backwards; }
+        .welcome-title-sub   { animation: fadeUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.28s backwards; }
+
+        .msg-actions    { animation: fadeFrom 0.4s ease 0.25s backwards; }
+        .stopped-note   { animation: fadeUp 0.3s ease backwards; }
+        .edit-box       { animation: popFrom 0.25s cubic-bezier(0.16, 1, 0.3, 1) backwards; }
+        .edit-box.is-leaving { animation: popOutTo 0.15s ease forwards; }
+        .itinerary-banner { animation: fadeUp 0.3s ease backwards; }
+        .itinerary-banner.is-leaving { animation: popOutTo 0.2s ease forwards; }
+        .history-item   { animation: slideInRow 0.35s cubic-bezier(0.16, 1, 0.3, 1) backwards; }
+        .history-empty  { animation: fadeFrom 0.3s ease backwards; }
+        .bubble-tts-btn.swap-in { animation: fadeFrom 0.25s ease backwards; }
+        .msg-action.is-done svg { animation: iconPop 0.38s ease; }
+
+        /* Modals: fade the backdrop, lift the card (they are shown/hidden with display, so the
+           animation replays every time they open) */
+        #delete-confirm-modal { animation: fadeFrom 0.2s ease backwards; }
+        #delete-confirm-modal > div { animation: popFrom 0.28s cubic-bezier(0.16, 1, 0.3, 1) backwards; }
+        #delete-confirm-modal.is-closing { animation: fadeOutTo 0.18s ease forwards; }
+        #delete-confirm-modal.is-closing > div { animation: popOutTo 0.18s ease forwards; }
+        #login-gate { transition: opacity 0.35s ease; }
+
+        /* Buttons that had no press / hover feedback */
+        .avatar-wrap { transition: transform 0.15s ease, border-color 0.2s ease, background-color 0.2s ease; }
+        .avatar-wrap:hover { border-color: var(--line-strong); }
+        .avatar-wrap:active { transform: scale(0.94); }
+        .itinerary-preview-save, .edit-actions button, .theme-seg button { transition: opacity 0.2s ease, background-color 0.2s ease, color 0.2s ease, transform 0.15s ease; }
+        .itinerary-preview-save:active, .edit-actions button:active, .theme-seg button:active { transform: scale(0.97); }
+
+        @media (prefers-reduced-motion: reduce) {
+            .welcome-eyebrow, .welcome-title-large, .welcome-title-sub, .msg-actions, .stopped-note, .edit-box,
+            .itinerary-banner, .history-item, .history-empty, .bubble-tts-btn.swap-in, .msg-action.is-done svg,
+            #delete-confirm-modal, #delete-confirm-modal > div { animation: none !important; }
+            .send-pill svg, .btn-theme svg { transition: opacity 0.01s; }
+        }
+
+        /* keep the sun/moon and send/stop icon morphs while the theme cross-fade runs */
+        html.theme-anim .btn-theme svg, html.theme-anim .send-pill svg {
+            transition: opacity 0.25s ease, transform 0.45s cubic-bezier(0.16, 1, 0.3, 1), fill 0.28s ease !important;
+        }
+
+        .sr-only {
+            position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+            overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0;
         }
 
         body {
@@ -69,7 +224,7 @@
             position: absolute;
             top: 0; left: 0; right: 0; bottom: 0;
             z-index: -2;
-            background: radial-gradient(1200px circle at 50% 120%, rgba(255,255,255,0.03), transparent 60%);
+            background: radial-gradient(1200px circle at 50% 120%, var(--wash), transparent 60%);
         }
 
         /* --- AMBIENT WELCOME GLOW ---
@@ -140,6 +295,8 @@
             animation: glow-drift-4 20s ease-in-out infinite;
         }
 
+        html[data-theme="light"] .glow-blob { opacity: 0.4; }
+
         @keyframes glow-drift-1 {
             0%, 100% { transform: translate(0, 0) scale(1); }
             50%      { transform: translate(6%, 8%) scale(1.12); }
@@ -171,8 +328,6 @@
            look but removes the always-running decorative animation and entrance effects. */
         html.lite-mode .ambient-glow { display: none; }
         html.lite-mode .msg { animation: none; opacity: 1; transform: none; }
-        html.lite-mode .live-aura, html.lite-mode .orb-ring.r2 { display: none; }
-        html.lite-mode .orb-sheen { animation: none; }
 
         .top-nav {
             position: absolute;
@@ -194,10 +349,11 @@
         }
 
         .avatar-wrap {
-            width: 34px; height: 34px;
-            border-radius: var(--radius-inner);
+            width: 38px; height: 38px;
+            border-radius: 12px;
+            cursor: pointer;
             background: var(--graph);
-            border: 1px solid var(--slate);
+            border: 1px solid var(--line-soft);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -226,11 +382,10 @@
             align-items: center;
             gap: 16px;
             font-family: var(--font-mono);
-            font-size: 0.65rem;
+            font-size: 0.8rem;
             color: var(--muted);
             font-weight: 500;
-            letter-spacing: 0.12em;
-            text-transform: uppercase;
+            letter-spacing: 0;
         }
 
         .status-indicator {
@@ -240,10 +395,19 @@
         }
 
         .pulse-dot {
-            width: 6px; height: 6px;
-            background-color: var(--fore);
+            width: 8px; height: 8px;
+            background-color: var(--ok);
             border-radius: 50%;
-            box-shadow: 0 0 10px rgba(255,255,255,0.8);
+            box-shadow: 0 0 8px var(--ok);
+            transition: background-color 0.3s ease, box-shadow 0.3s ease;
+        }
+        .status-indicator[data-mode="thinking"] .pulse-dot { background-color: var(--warn); box-shadow: 0 0 8px var(--warn); animation: dot-pulse 1.1s ease-in-out infinite; }
+        .status-indicator[data-mode="speaking"] .pulse-dot { background-color: var(--info); box-shadow: 0 0 8px var(--info); animation: dot-pulse 0.9s ease-in-out infinite; }
+        @keyframes dot-pulse { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.35); opacity: 0.6; } }
+        /* The status word is spoken to screen readers always, and shown on wider screens */
+        .status-label { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; }
+        @media (min-width: 481px) {
+            .status-label { position: static; width: auto; height: auto; margin: 0; overflow: visible; clip: auto; }
         }
 
         #chat {
@@ -272,10 +436,10 @@
 
         .welcome-eyebrow {
             font-family: var(--font-mono);
-            font-size: 0.65rem;
+            font-size: 0.75rem;
             color: var(--muted);
-            font-weight: 500;
-            letter-spacing: 0.15em;
+            font-weight: 600;
+            letter-spacing: 0.1em;
             text-transform: uppercase;
             margin-bottom: 16px;
             display: flex;
@@ -318,7 +482,7 @@
 
         .msg {
             max-width: 85%;
-            padding: 18px 22px;
+            padding: 14px 18px;
             font-size: 0.95rem;
             line-height: 1.55;
             border-radius: var(--radius-box);
@@ -330,30 +494,75 @@
 
         @keyframes bubblePop { to { opacity: 1; transform: translateY(0); } }
 
+        /* --- Your message: bubble + small copy / edit icons --- */
+        .user-turn {
+            align-self: flex-end;
+            display: flex; flex-direction: column; align-items: flex-end;
+            gap: 4px;
+            max-width: 85%;
+        }
+        .user-turn .user-msg { max-width: 100%; align-self: flex-end; }
+        .msg-actions { display: flex; gap: 2px; opacity: 0.75; transition: opacity 0.2s ease; }
+        .user-turn:hover .msg-actions, .msg-actions:focus-within { opacity: 1; }
+        .msg-action {
+            width: 30px; height: 30px; padding: 0;
+            display: flex; align-items: center; justify-content: center;
+            background: transparent; border: none; border-radius: 8px;
+            color: var(--muted); cursor: pointer;
+            transition: background-color 0.2s ease, color 0.2s ease, transform 0.15s ease;
+        }
+        .msg-action:hover { background: var(--hover); color: var(--fore); }
+        .msg-action:active { transform: scale(0.92); }
+        .msg-action svg { width: 15px; height: 15px; }
+        .msg-action:disabled { opacity: 0.35; cursor: not-allowed; background: transparent; color: var(--muted); }
+        .msg-action.is-done { color: var(--ok); }
+
+        .user-turn.is-editing { max-width: 100%; width: 100%; align-self: stretch; }
+        .edit-box {
+            width: 100%; box-sizing: border-box;
+            display: flex; flex-direction: column; gap: 10px;
+            padding: 12px 14px;
+            background: var(--graph);
+            border: 1px solid var(--line-strong);
+            border-radius: var(--radius-box);
+            box-shadow: var(--focus-ring);
+        }
+        .edit-box textarea {
+            width: 100%; box-sizing: border-box; resize: none;
+            min-height: 24px; max-height: 40vh;
+            background: transparent; border: none; outline: none; padding: 0; margin: 0;
+            color: var(--fore); font-family: var(--font-body); font-size: 0.95rem; line-height: 1.5;
+        }
+        .edit-actions { display: flex; justify-content: flex-end; gap: 8px; }
+        .edit-actions button {
+            min-height: 36px; padding: 8px 16px; border-radius: 999px; cursor: pointer;
+            font-family: var(--font-body); font-size: 0.85rem; font-weight: 600;
+            transition: opacity 0.2s ease, background-color 0.2s ease;
+        }
+        .edit-cancel { background: transparent; color: var(--muted); border: 1px solid var(--line-soft); }
+        .edit-cancel:hover { color: var(--fore); background: var(--hover); }
+        .edit-save { background: var(--fore); color: var(--void); border: 1px solid var(--fore); }
+        .edit-save:hover { opacity: 0.88; }
+        .edit-save:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        .stopped-note { align-self: flex-start; padding: 0 4px; font-size: 0.8rem; color: var(--muted); }
+        @media (prefers-reduced-motion: reduce) { .msg { animation: none; opacity: 1; transform: none; } .pulse-dot { animation: none !important; } }
+
         .bot-msg {
             align-self: flex-start;
-            background: radial-gradient(150% 100% at 50% 100%, var(--panel) 0%, var(--graph) 100%);
-            border: 1px solid transparent;
+            background: var(--graph);
+            border: 1px solid var(--line-soft);
             color: var(--fore);
-            border-top-left-radius: 4px;
-            box-shadow: var(--rim-inset), var(--horizon-glow);
-        }
-
-        .bot-msg::after {
-            content: "";
-            position: absolute;
-            bottom: -1px; left: 15%; right: 15%;
-            height: 1px;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+            border-top-left-radius: 6px;
+            box-shadow: var(--horizon-glow);
         }
 
         .user-msg {
             align-self: flex-end;
-            background-color: var(--slate);
-            color: var(--fore);
-            border: 1px solid var(--hairline);
-            border-top-right-radius: 4px;
-            box-shadow: var(--rim-inset);
+            background-color: var(--user-bg);
+            color: var(--user-fg);
+            border: 1px solid var(--user-border);
+            border-top-right-radius: 6px;
         }
 
         .typing-bubble {
@@ -410,20 +619,19 @@
         strong { font-family: var(--font-display); font-weight: 700; color: var(--fore); }
 
         .footer-container {
-            padding: 16px 24px 20px;
-            background: rgba(18, 19, 22, 0.97);
-            border-top: 1px solid rgba(255,255,255,0.06);
+            padding: 14px 20px calc(16px + env(safe-area-inset-bottom));
+            background: var(--footer-bg);
+            border-top: 1px solid var(--line-soft);
             display: flex; flex-direction: column; gap: 12px;
             z-index: 200;
         }
 
         .disclaimer-text {
             font-family: var(--font-mono);
-            font-size: 0.65rem;
+            font-size: 0.75rem;
             color: var(--muted);
-            font-weight: 500;
-            letter-spacing: 0.08em;
-            text-transform: uppercase;
+            font-weight: 400;
+            letter-spacing: 0.01em;
             text-align: center;
         }
 
@@ -432,19 +640,19 @@
             display: flex; 
             align-items: center;
             gap: 12px;
-            background-color: #1a1b1f;
-            border: 1px solid rgba(255,255,255,0.08);
-            border-radius: var(--radius-box);
-            padding: 6px 6px 6px 18px;
+            background-color: var(--graph);
+            border: 1px solid var(--line-soft);
+            border-radius: 28px;
+            padding: 6px 6px 6px 20px;
             box-shadow: var(--rim-inset);
             transition: background-color 0.25s cubic-bezier(0.15, 0.83, 0.66, 1), border-color 0.25s cubic-bezier(0.15, 0.83, 0.66, 1), color 0.25s cubic-bezier(0.15, 0.83, 0.66, 1), box-shadow 0.25s cubic-bezier(0.15, 0.83, 0.66, 1), transform 0.25s cubic-bezier(0.15, 0.83, 0.66, 1), opacity 0.25s cubic-bezier(0.15, 0.83, 0.66, 1);
             box-sizing: border-box;
         }
 
         .input-bar:focus-within {
-            border-color: rgba(255,255,255,0.16);
+            border-color: var(--line-strong);
             box-shadow: var(--focus-ring);
-            background-color: #222328;
+            background-color: var(--graph);
         }
 
         .itinerary-banner {
@@ -452,8 +660,8 @@
             align-items: center;
             justify-content: space-between;
             gap: 10px;
-            background-color: #222328;
-            border: 1px solid rgba(255,255,255,0.08);
+            background-color: var(--panel);
+            border: 1px solid var(--line-soft);
             border-radius: var(--radius-inner);
             padding: 8px 12px;
             box-shadow: var(--rim-inset);
@@ -523,7 +731,7 @@
             display: flex;
             position: fixed;
             inset: 0;
-            background: rgba(0,0,0,0.82);
+            background: var(--scrim);
             z-index: 6500;
             align-items: flex-end;
             justify-content: center;
@@ -541,7 +749,7 @@
             width: 100%;
             max-width: 480px;
             max-height: 78vh;
-            background: var(--void);
+            background: var(--surface);
             border: 1px solid var(--slate);
             border-bottom: none;
             border-radius: 20px 20px 0 0;
@@ -645,7 +853,7 @@
             width: 11px; height: 11px;
             border-radius: 50%;
             background: var(--lumen);
-            border: 2px solid var(--void);
+            border: 2px solid var(--surface);
             box-shadow: 0 0 0 1px var(--hairline);
         }
 
@@ -724,7 +932,7 @@
         .sidebar-overlay {
             position: fixed;
             inset: 0;
-            background: rgba(0,0,0,0.7);
+            background: var(--scrim);
             z-index: 4999;
             opacity: 0;
             pointer-events: none;
@@ -742,8 +950,8 @@
             top: 0;
             width: 280px;
             height: 100%;
-            background: #121316;
-            border-right: 1px solid #2a2d35;
+            background: var(--surface);
+            border-right: 1px solid var(--border);
             z-index: 5000;
             display: flex;
             flex-direction: column;
@@ -774,8 +982,8 @@
         .send-pill {
             background-color: var(--slate);
             color: var(--muted);
-            width: 36px; height: 36px;
-            border-radius: 8px;
+            width: 40px; height: 40px;
+            border-radius: 50%;
             border: 1px solid transparent;
             cursor: not-allowed;
             display: flex; align-items: center; justify-content: center;
@@ -787,9 +995,19 @@
             background-color: var(--fore);
             color: var(--void);
             border: none;
-            box-shadow: 0 0 20px rgba(255,255,255,0.15);
+            box-shadow: 0 0 20px var(--glow);
             cursor: pointer;
         }
+
+        .send-pill { position: relative; }
+        .send-pill svg {
+            position: absolute; top: 50%; left: 50%; margin: -8px 0 0 -8px;
+            transition: opacity 0.2s ease, transform 0.32s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .send-pill .ico-stop { opacity: 0; transform: scale(0.4) rotate(-90deg); }
+        .send-pill.is-stop .ico-send { opacity: 0; transform: scale(0.4) rotate(90deg); }
+        .send-pill.is-stop .ico-stop { opacity: 1; transform: none; }
+        .send-pill.is-stop { cursor: pointer; }
 
         .send-pill.active:hover { filter: brightness(0.9); transform: scale(1.02); }
         .send-pill.active:active { transform: scale(0.96); }
@@ -817,7 +1035,7 @@
             color: var(--void);
             background-color: var(--fore);
             border-color: var(--fore);
-            box-shadow: 0 0 15px rgba(255,255,255,0.15);
+            box-shadow: 0 0 15px var(--glow);
         }
 
         /* --- Header Voice Trigger --- */
@@ -830,10 +1048,11 @@
             display: inline-flex;
             align-items: center;
             gap: 6px;
-            font-family: var(--font-mono);
-            font-size: 0.65rem;
+            font-family: var(--font-body);
+            font-size: 0.8rem;
             font-weight: 500;
-            text-transform: uppercase;
+            text-transform: none;
+            min-height: 36px;
             cursor: pointer;
             transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
         }
@@ -852,9 +1071,9 @@
         /* Pill-shaped header buttons, each with its own look */
         .header-mic-btn {
             border-radius: 999px;
-            padding: 7px 14px;
+            padding: 8px 14px;
             gap: 7px;
-            letter-spacing: 0.08em;
+            letter-spacing: 0.01em;
         }
         .header-mic-btn:active { transform: scale(0.95); }
         .header-mic-btn:focus-visible { outline: 2px solid var(--fore); outline-offset: 2px; }
@@ -874,32 +1093,62 @@
             background-color: var(--lumen);
             color: var(--void);
             border-color: var(--lumen);
-            box-shadow: 0 0 14px rgba(255,255,255,0.22);
+            box-shadow: 0 0 14px var(--glow);
         }
 
         /* Live mode: blue-tinted pill matching the live screen accent */
         .header-mic-btn.btn-live {
             margin-left: -10px; /* pulls it closer to New chat (16px gap -> 6px) */
-            background-color: rgba(77,163,255,0.14);
-            color: #8cc4ff;
-            border-color: rgba(77,163,255,0.55);
+            background-color: var(--live-bg);
+            color: var(--live-fg);
+            border-color: var(--live-border);
             font-weight: 600;
         }
         .header-mic-btn.btn-live:hover {
-            background-color: rgba(77,163,255,0.26);
-            color: #fff;
-            border-color: #4da3ff;
-            box-shadow: 0 0 14px rgba(77,163,255,0.35);
+            background-color: var(--live-bg-h);
+            color: var(--live-fg-h);
+            border-color: var(--live-border-h);
+            box-shadow: 0 0 14px var(--live-glow);
         }
 
+        /* Theme toggle: quiet round icon button (shows the mode you'd switch to) */
+        .header-mic-btn.btn-theme {
+            padding: 0; width: 36px; height: 36px; justify-content: center;
+            background-color: transparent; color: var(--muted); border-color: var(--line-soft);
+        }
+        .header-mic-btn.btn-theme:hover { background-color: var(--hover); color: var(--fore); border-color: var(--line-strong); box-shadow: none; }
+        .header-mic-btn.btn-theme svg { width: 17px; height: 17px; }
+        .header-mic-btn.btn-theme { position: relative; }
+        .header-mic-btn.btn-theme svg {
+            position: absolute; top: 50%; left: 50%; margin: -8.5px 0 0 -8.5px;
+            transition: opacity 0.25s ease, transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .btn-theme .ico-moon { opacity: 1; transform: none; }
+        .btn-theme .ico-sun  { opacity: 0; transform: scale(0.5) rotate(-90deg); }
+        html[data-theme="dark"] .btn-theme .ico-moon { opacity: 0; transform: scale(0.5) rotate(90deg); }
+        html[data-theme="dark"] .btn-theme .ico-sun  { opacity: 1; transform: none; }
+
+        /* Appearance control (sidebar) */
+        .theme-label { margin-top: 18px; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.04em; color: var(--muted); }
+        .theme-seg { display: flex; gap: 4px; padding: 4px; margin-top: 8px; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; }
+        .theme-seg button {
+            flex: 1; min-height: 38px; padding: 8px 6px; border: none; border-radius: 8px;
+            background: transparent; color: var(--muted); cursor: pointer;
+            font-family: var(--font-body); font-size: 0.82rem; font-weight: 600;
+            transition: background-color 0.2s ease, color 0.2s ease;
+        }
+        .theme-seg button:hover { color: var(--fore); }
+        .theme-seg button[aria-pressed="true"] { background: var(--fore); color: var(--void); }
+
         /* --- LIVE VOICE SCREEN ---
-           Concept: Manila Bay at dusk. Deep navy water, a cool teal swell for listening, an amber
-           lantern glow while Navi thinks, and a coral sunset while Navi speaks. Everything that
-           moves is transform/opacity only, so it stays smooth on old phones. */
+           Pure black stage with a living light-wave (canvas) that rises from the bottom. The wave
+           reacts to the mic while listening and to Navi's voice while speaking. */
         #live-overlay {
             position: absolute;
             inset: 0;
-            background: #060d1f;
+            background: #000;
+            color: #fff;
+            color-scheme: dark;
             z-index: 3000;
             display: flex;
             flex-direction: column;
@@ -909,7 +1158,8 @@
             pointer-events: none;
             transition: opacity 0.4s cubic-bezier(0.15, 0.83, 0.66, 1);
             overflow: hidden;
-            padding: 0 0 calc(120px + env(safe-area-inset-bottom));
+            --stage-h: clamp(240px, 42vh, 380px);
+            padding: 0 0 calc(var(--stage-h) + 96px + env(safe-area-inset-bottom));
             box-sizing: border-box;
         }
 
@@ -917,34 +1167,6 @@
             opacity: 1;
             pointer-events: auto;
         }
-
-        /* Soft colored light behind everything; intensity follows the state */
-        .live-aura { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
-        .aura {
-            position: absolute;
-            border-radius: 50%;
-            will-change: transform, opacity;
-            transition: opacity 1s ease;
-        }
-        .aura-cool {
-            width: 150%; height: 62%; left: -25%; bottom: -22%;
-            background: radial-gradient(closest-side, rgba(56,132,255,0.34), transparent);
-            animation: aura-drift-a 17s ease-in-out infinite;
-            opacity: 0.9;
-        }
-        .aura-warm {
-            width: 140%; height: 58%; right: -30%; top: -20%;
-            background: radial-gradient(closest-side, rgba(64,110,255,0.30), transparent);
-            animation: aura-drift-b 21s ease-in-out infinite;
-            opacity: 0.35;
-        }
-        #live-overlay[data-state="thinking"] .aura-warm,
-        #live-overlay[data-state="speaking"] .aura-warm { opacity: 0.95; }
-        #live-overlay[data-state="thinking"] .aura-cool,
-        #live-overlay[data-state="speaking"] .aura-cool { opacity: 0.35; }
-
-        @keyframes aura-drift-a { 0%,100% { transform: translate3d(0,0,0) scale(1); } 50% { transform: translate3d(6%,-5%,0) scale(1.08); } }
-        @keyframes aura-drift-b { 0%,100% { transform: translate3d(0,0,0) scale(1); } 50% { transform: translate3d(-7%,6%,0) scale(1.1); } }
 
         .live-badge {
             position: absolute;
@@ -975,106 +1197,31 @@
         #live-overlay[data-state="speaking"] .live-badge-dot { background: #4da3ff; box-shadow: 0 0 10px rgba(77,163,255,0.95); }
         #live-overlay[data-state="error"] .live-badge-dot { background: #8b8f9a; box-shadow: none; }
 
-        /* --- ORB --- */
-        .live-orb-container {
-            position: relative; width: 240px; height: 240px;
-            display: flex; align-items: center; justify-content: center;
-            opacity: 0;
-            transform: scale(0.82);
-            transition: opacity 0.5s ease 0.08s, transform 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.08s;
-        }
-        #live-overlay.is-active .live-orb-container { opacity: 1; transform: scale(1); }
-
-        .orb-ring {
-            position: absolute;
-            width: 148px; height: 148px;
-            border-radius: 50%;
-            border: 1.5px solid rgba(255,255,255,0.22);
-            opacity: 0;
-            will-change: transform, opacity;
-            animation: orb-ripple 3.6s cubic-bezier(0.2, 0.6, 0.3, 1) infinite;
-        }
-        .orb-ring.r2 { animation-delay: 1.8s; }
-        #live-overlay[data-state="speaking"] .orb-ring { animation-duration: 2s; }
-        #live-overlay[data-state="speaking"] .orb-ring.r2 { animation-delay: 1s; }
-        #live-overlay[data-state="thinking"] .orb-ring,
-        #live-overlay[data-state="error"] .orb-ring { animation-play-state: paused; opacity: 0; }
-        @keyframes orb-ripple {
-            0%   { transform: scale(1);   opacity: 0.38; }
-            100% { transform: scale(1.75); opacity: 0; }
-        }
-
+        /* --- LIVE WAVE STAGE ---
+           A canvas (drawn in JS, see liveWave) of layered glowing waves on pure black.
+           The wrapper keeps id="live-orb" so tap-to-send / interrupt and the audio-level hook
+           (--audio-scale) keep working. */
         .live-orb {
-            width: 148px; height: 148px;
-            border-radius: 50%;
+            position: absolute;
+            left: 0; right: 0;
+            bottom: calc(92px + env(safe-area-inset-bottom));
+            height: var(--stage-h);
             cursor: pointer;
-            display: flex; align-items: center; justify-content: center;
-            position: relative;
             -webkit-tap-highlight-color: transparent;
-            /* The mic / voice level drives this variable from JS */
-            transform: scale(var(--audio-scale, 1));
-            transition: transform 0.6s cubic-bezier(0.15, 0.83, 0.66, 1), opacity 0.5s ease;
-        }
-
-        /* Three stacked color cores; the state fades between them (no color animation = no repaint) */
-        .orb-core {
-            position: absolute; inset: 0;
-            border-radius: 50%;
+            -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 10%, #000 70%, transparent 100%);
+            mask-image: linear-gradient(to bottom, transparent 0%, #000 10%, #000 70%, transparent 100%);
             opacity: 0;
-            transition: opacity 0.7s ease;
+            transform: translateY(36px);
+            transition: opacity 0.8s ease 0.1s, transform 1s cubic-bezier(0.16, 1, 0.3, 1) 0.1s, filter 0.6s ease;
         }
-        .orb-core.c-listen {
-            background: radial-gradient(circle at 34% 28%, #e3f1ff 0%, #7cc0ff 22%, #2f7cf0 58%, #14308a 100%);
-            box-shadow: 0 0 70px rgba(56,132,255,0.42), inset 0 -10px 28px rgba(6,16,60,0.45);
-        }
-        .orb-core.c-think {
-            background: radial-gradient(circle at 34% 28%, #e8efff 0%, #8fb0ff 25%, #3f66e8 60%, #13237a 100%);
-            box-shadow: 0 0 70px rgba(70,110,255,0.45), inset 0 -10px 28px rgba(8,16,70,0.45);
-        }
-        .orb-core.c-speak {
-            background: radial-gradient(circle at 34% 28%, #f0fbff 0%, #5ce1ff 25%, #1a8cff 60%, #0a2a8a 100%);
-            box-shadow: 0 0 80px rgba(40,170,255,0.5), inset 0 -10px 28px rgba(4,18,70,0.45);
-        }
-        #live-overlay[data-state="listening"] .c-listen,
-        #live-overlay[data-state="thinking"]  .c-think,
-        #live-overlay[data-state="speaking"]  .c-speak { opacity: 1; }
-        #live-overlay[data-state="error"] .live-orb { opacity: 0.45; }
-        #live-overlay[data-state="error"] .c-listen { opacity: 1; filter: grayscale(1); }
-
-        /* A slow light sweep gives the sphere depth */
-        .orb-sheen {
-            position: absolute; inset: 0; border-radius: 50%;
-            background: linear-gradient(115deg, transparent 32%, rgba(255,255,255,0.14) 50%, transparent 68%);
-            animation: orb-sheen 9s linear infinite;
-            will-change: transform;
-        }
-        @keyframes orb-sheen { to { transform: rotate(360deg); } }
-        .live-orb::after {
-            content: ''; position: absolute; top: 12%; left: 18%; width: 34%; height: 22%;
-            border-radius: 50%;
-            background: radial-gradient(closest-side, rgba(255,255,255,0.55), transparent);
-            transform: rotate(-24deg);
-            pointer-events: none;
-        }
-        .live-orb svg {
-            position: relative; z-index: 10;
-            width: 28px; height: 28px; fill: #fff; opacity: 0; transition: opacity 0.2s;
-        }
-        .live-orb:hover svg { opacity: 0.55; }
-
-        .live-orb.state-thinking {
-            animation: orb-think-pulse 1.1s infinite alternate ease-in-out;
-            pointer-events: none;
-        }
-        .live-orb.state-speaking { transition: transform 0.05s linear, opacity 0.5s ease; }
-        @keyframes orb-think-pulse {
-            0%   { transform: scale(0.95); }
-            100% { transform: scale(1.05); }
-        }
+        #live-overlay.is-active .live-orb { opacity: 1; transform: translateY(0); }
+        #live-overlay[data-state="error"] .live-orb { opacity: 0.35; filter: grayscale(1); }
+        .live-orb:focus-visible { outline: 2px solid rgba(255,255,255,0.6); outline-offset: -4px; }
+        #live-wave { display: block; width: 100%; height: 100%; pointer-events: none; }
 
         /* --- STATUS + TRANSCRIPT --- */
         .live-status-text {
-            margin-top: 28px;
+            margin-top: 0;
             font-family: var(--font-display);
             font-size: 1rem;
             font-weight: 500;
@@ -1140,16 +1287,13 @@
         .live-ctl.end { background: #f0453a; border-color: #f0453a; }
         .live-ctl.end svg { width: 26px; height: 26px; }
 
-        @media (prefers-reduced-motion: reduce) {
-            .aura, .orb-ring, .orb-sheen { animation: none; }
-        }
 
         @media (min-width: 481px) {
             .chat-shell {
                 height: 90vh;
                 border-radius: 20px;
                 border: 1px solid var(--slate);
-                box-shadow: 0 40px 100px rgba(0,0,0,0.9), inset 0 1px 0 rgba(255,255,255,0.06);
+                box-shadow: var(--shell-shadow);
             }
             #live-overlay { border-radius: 20px; }
         }
@@ -1157,22 +1301,22 @@
 </head>
 <body>
     <!-- LOGIN GATE OVERLAY -->
-    <div id="login-gate" style="display: flex; position: absolute; inset: 0; background: #121316; z-index: 4000; flex-direction: column; align-items: center; justify-content: center; padding: 24px; text-align: center;">
-        <h2 style="font-family: 'DM Sans', sans-serif; font-size: 2rem; margin-bottom: 12px; color: #ffffff;">Authentication Required</h2>
-        <p style="color: #8b8f9a; font-size: 0.95rem; line-height: 1.5;">Please log in through the NaviGo! mobile application to access Navi.</p>
-        <button onclick="enableGuestMode()" style="margin-top: 20px; padding: 10px 24px; background: #2a2d35; color: #ffffff; border: 1px solid #3f434e; border-radius: 8px; cursor: pointer; font-family: 'DM Sans', sans-serif; transition: background 0.2s;">
+    <div id="login-gate" style="display: flex; position: absolute; inset: 0; background: var(--surface); z-index: 4000; flex-direction: column; align-items: center; justify-content: center; padding: 24px; text-align: center;">
+        <h2 style="font-family: 'DM Sans', sans-serif; font-size: 2rem; margin-bottom: 12px; color: var(--fore);">Authentication Required</h2>
+        <p style="color: var(--muted); font-size: 0.95rem; line-height: 1.5;">Please log in through the NaviGo! mobile application to access Navi.</p>
+        <button onclick="enableGuestMode()" style="margin-top: 20px; padding: 10px 24px; background: var(--panel); color: var(--fore); border: 1px solid var(--hairline); border-radius: 8px; cursor: pointer; font-family: 'DM Sans', sans-serif; transition: background 0.2s;">
             Continue as Guest
         </button>
     </div>
 
     <!-- DELETE CONFIRMATION MODAL -->
-    <div id="delete-confirm-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 6000; align-items: center; justify-content: center;">
-        <div style="background: #121316; padding: 24px; border-radius: 12px; border: 1px solid #2a2d35; text-align: center; width: 85%; max-width: 320px; font-family: 'DM Sans', sans-serif;">
-            <h3 style="margin-top: 0; color: #ffffff; font-size: 1.25rem;">Delete Chat?</h3>
-            <p style="color: #8b8f9a; font-size: 0.9rem; margin-bottom: 24px; line-height: 1.5; font-family: 'DM Sans', sans-serif;">Are you sure you want to delete this chat history?</p>
+    <div id="delete-confirm-modal" style="display: none; position: fixed; inset: 0; background: var(--scrim); z-index: 6000; align-items: center; justify-content: center;">
+        <div style="background: var(--surface); padding: 24px; border-radius: 12px; border: 1px solid var(--border); text-align: center; width: 85%; max-width: 320px; font-family: 'DM Sans', sans-serif;">
+            <h3 style="margin-top: 0; color: var(--fore); font-size: 1.25rem;">Delete Chat?</h3>
+            <p style="color: var(--muted); font-size: 0.9rem; margin-bottom: 24px; line-height: 1.5; font-family: 'DM Sans', sans-serif;">Are you sure you want to delete this chat history?</p>
             <div style="display: flex; flex-direction: column; gap: 12px;">
-                <button id="confirm-delete-btn" style="padding: 12px; background: #31333a; color: #ffffff; border: none; border-radius: 8px; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 0.95rem; transition: background 0.2s;">Yes, I want to delete it</button>
-                <button onclick="closeDeleteModal()" style="padding: 12px; background: transparent; color: #8b8f9a; border: 1px solid #3f434e; border-radius: 8px; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 0.95rem; transition: background 0.2s;">Not at all</button>
+                <button id="confirm-delete-btn" style="padding: 12px; background: var(--slate); color: var(--fore); border: none; border-radius: 8px; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 0.95rem; transition: background 0.2s;">Yes, I want to delete it</button>
+                <button onclick="closeDeleteModal()" style="padding: 12px; background: transparent; color: var(--muted); border: 1px solid var(--hairline); border-radius: 8px; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 0.95rem; transition: background 0.2s;">Not at all</button>
             </div>
         </div>
     </div>
@@ -1199,17 +1343,23 @@
     <div id="sidebar-overlay" class="sidebar-overlay" onclick="toggleSidebar()"></div>
 
     <div id="sidebar" class="sidebar-panel">
-        <div style="padding: 20px; border-bottom: 1px solid #2a2d35;">
-            <div style="color: #ffffff; font-family: 'DM Sans', sans-serif; font-size: 1.05rem; font-weight: 700;">Chat history</div>
+        <div style="padding: 20px; border-bottom: 1px solid var(--border);">
+            <div style="color: var(--fore); font-family: 'DM Sans', sans-serif; font-size: 1.05rem; font-weight: 700;">Chat history</div>
         </div>
         
         <div id="history-list" style="flex: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px;">
             <!-- Chat history items will load here -->
         </div>
         
-        <div style="padding: 20px; border-top: 1px solid #2a2d35; color: #8b8f9a; font-family: 'DM Sans', sans-serif; font-size: 0.9rem;">
+        <div style="padding: 20px; border-top: 1px solid var(--border); color: var(--muted); font-family: 'DM Sans', sans-serif; font-size: 0.9rem;">
             Logged in as:<br>
-            <strong id="current-user-display" style="color: #ffffff;">Guest</strong>
+            <strong id="current-user-display" style="color: var(--fore);">Guest</strong>
+            <div class="theme-label" id="theme-label">Appearance</div>
+            <div class="theme-seg" role="group" aria-labelledby="theme-label">
+                <button type="button" data-pref="system" aria-pressed="false" onclick="setThemePref('system')">Auto</button>
+                <button type="button" data-pref="light" aria-pressed="false" onclick="setThemePref('light')">Light</button>
+                <button type="button" data-pref="dark" aria-pressed="false" onclick="setThemePref('dark')">Dark</button>
+            </div>
         </div>
     </div>
 
@@ -1235,6 +1385,11 @@
         </div>
 
         <div class="tech-stats">
+            <!-- Light / dark quick toggle (full Auto/Light/Dark choice lives in the sidebar) -->
+            <button class="header-mic-btn btn-theme" id="theme-toggle" onclick="toggleTheme()" title="Switch theme" aria-label="Switch theme">
+                <svg class="ico-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+                <svg class="ico-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+            </button>
             <!-- New Chat: always visible in the header, no need to open the sidebar -->
             <button class="header-mic-btn btn-new" onclick="startNewChat()" title="New chat" aria-label="New chat">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16">
@@ -1250,13 +1405,14 @@
                 <span class="btn-label">Live</span>
                 
             </button>
-            <div class="status-indicator">
-                <div class="pulse-dot"></div>
-                <span id="status-tag">SYSTEM ONLINE</span>
+            <div class="status-indicator" role="status" data-mode="idle">
+                <div class="pulse-dot" aria-hidden="true"></div>
+                <span id="status-tag" class="status-label">Online</span>
             </div>
         </div>
     </div>
 
+    <div id="sr-announce" class="sr-only" role="status" aria-live="polite"></div>
     <div id="chat">
         <div class="welcome-spacer" id="welcome-spacer"></div>
         <div class="welcome-container" id="welcome-container">
@@ -1278,9 +1434,10 @@
             <button class="itinerary-banner-clear" onclick="clearItineraryDraft()">Discard</button>
         </div>
         <div class="input-bar">
-            <input id="input" type="text" placeholder="" onkeydown="handleKeyPress(event)" oninput="toggleSendButtonState()" autocomplete="off">
-            <button id="send-btn" class="send-pill" onclick="send()" disabled>
-                <svg viewBox="0 0 24 24"><path d="M4 12l1.41 1.41L11 7.83V20h2V7.83l5.58 5.59L20 12l-8-8-8 8z" fill="currentColor"/></svg>
+            <input id="input" type="text" placeholder="" aria-label="Message Navi" onkeydown="handleKeyPress(event)" oninput="toggleSendButtonState()" autocomplete="off">
+            <button id="send-btn" class="send-pill" onclick="handleSendClick()" disabled aria-label="Send message" title="Send">
+                <svg class="ico-send" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12l1.41 1.41L11 7.83V20h2V7.83l5.58 5.59L20 12l-8-8-8 8z" fill="currentColor"/></svg>
+                <svg class="ico-stop" viewBox="0 0 24 24" aria-hidden="true"><rect x="6.5" y="6.5" width="11" height="11" rx="2.5" fill="currentColor"/></svg>
             </button>
         </div>
         <div class="disclaimer-text">Navi is an AI and can make mistakes</div>
@@ -1288,27 +1445,14 @@
 
     <!-- GEMINI LIVE STYLE OVERLAY -->
     <div id="live-overlay" data-state="idle">
-        <div class="live-aura" aria-hidden="true">
-            <div class="aura aura-cool"></div>
-            <div class="aura aura-warm"></div>
-        </div>
-
         <div class="live-badge"><span class="live-badge-dot"></span>Live with Navi</div>
-
-        <div class="live-orb-container">
-            <span class="orb-ring r1" aria-hidden="true"></span>
-            <span class="orb-ring r2" aria-hidden="true"></span>
-            <div id="live-orb" class="live-orb" onclick="handleOrbTap()" role="button" aria-label="Tap to send or interrupt">
-                <div class="orb-core c-listen"></div>
-                <div class="orb-core c-think"></div>
-                <div class="orb-core c-speak"></div>
-                <div class="orb-sheen"></div>
-                <svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"></rect></svg>
-            </div>
-        </div>
 
         <div id="live-status" class="live-status-text" aria-live="polite">Connecting...</div>
         <div id="live-transcript" class="live-transcript"></div>
+
+        <div id="live-orb" class="live-orb" onclick="handleOrbTap()" role="button" aria-label="Tap to send or interrupt">
+            <canvas id="live-wave" aria-hidden="true"></canvas>
+        </div>
 
         <div class="live-controls">
             <button id="live-mute-btn" class="live-ctl" onclick="toggleLiveMute()" aria-label="Mute microphone" aria-pressed="false">
@@ -1344,6 +1488,76 @@
         window.history.replaceState({}, document.title, window.location.pathname);
     }
 
+
+    // --- MOTION HELPERS ---
+    const prefersReducedMotion = () => !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+
+    // Cross-fade a text change (old text slides up and fades, new text rises in).
+    // Safe to call repeatedly; the same text is ignored and rapid changes cancel the previous fade.
+    function swapText(el, text) {
+        if (!el) return;
+        if (el._swapTarget === text) return;
+        el._swapTarget = text;
+        if (el._swapAnims) el._swapAnims.forEach(a => { try { a.cancel(); } catch (e) {} });
+        el._swapAnims = [];
+        if (!el.animate || prefersReducedMotion() || el.textContent === text) { el.textContent = text; return; }
+        const out = el.animate(
+            [{ opacity: 1, transform: 'translateY(0)' }, { opacity: 0, transform: 'translateY(-4px)' }],
+            { duration: 130, easing: 'ease-in', fill: 'forwards' });
+        el._swapAnims = [out];
+        out.onfinish = () => {
+            if (el._swapTarget !== text) return;
+            el.textContent = text;
+            const inn = el.animate(
+                [{ opacity: 0, transform: 'translateY(5px)' }, { opacity: 1, transform: 'translateY(0)' }],
+                { duration: 240, easing: 'cubic-bezier(0.16, 1, 0.3, 1)' });
+            el._swapAnims = [inn];
+            out.cancel();
+        };
+    }
+
+    // Fade a set of elements out, then remove them and run a callback
+    function fadeOutAndRemove(nodes, done) {
+        if (!nodes.length || !nodes[0].animate || prefersReducedMotion()) {
+            nodes.forEach(n => n.remove());
+            if (done) done();
+            return;
+        }
+        let pending = nodes.length;
+        nodes.forEach(n => {
+            const a = n.animate(
+                [{ opacity: 1, transform: 'translateY(0)' }, { opacity: 0, transform: 'translateY(-6px)' }],
+                { duration: 190, easing: 'ease', fill: 'forwards' });
+            a.onfinish = () => { n.remove(); if (--pending === 0 && done) done(); };
+        });
+    }
+
+    // Replace a button's content with a quick fade (used for the Engage / Off voice button)
+    function swapContent(btn, html) {
+        btn.innerHTML = html;
+        btn.classList.remove('swap-in');
+        void btn.offsetWidth;
+        btn.classList.add('swap-in');
+    }
+
+    // Login screen: fade in/out (instant = skip the fade, e.g. on first load when already signed in)
+    function setLoginGate(show, instant) {
+        const g = document.getElementById('login-gate');
+        if (!g) return;
+        clearTimeout(g._t);
+        if (show) {
+            if (instant) { g.style.opacity = '1'; g.style.display = 'flex'; return; }
+            g.style.opacity = '0';
+            g.style.display = 'flex';
+            requestAnimationFrame(() => requestAnimationFrame(() => { g.style.opacity = '1'; }));
+        } else if (instant || prefersReducedMotion()) {
+            g.style.display = 'none';
+        } else {
+            g.style.opacity = '0';
+            g._t = setTimeout(() => { g.style.display = 'none'; }, 360);
+        }
+    }
+
     // 2. KUNIN ANG TOKEN MULA SA LOCAL STORAGE
     let authToken = localStorage.getItem('authToken') || '';
 
@@ -1369,7 +1583,7 @@
     localStorage.setItem('authToken', guestToken);
     localStorage.setItem('uid', 'guest_user');
     localStorage.removeItem('displayName');
-    document.getElementById('login-gate').style.display = 'none';
+    setLoginGate(false);   // fades out
     restoreLatestSession();
     };
 
@@ -1384,7 +1598,7 @@
             // Bigyan ng 1 second allowance bago ipakita ang block screen (in case naglo-load pa)
             setTimeout(() => {
                 if (!localStorage.getItem('authToken')) {
-                    document.getElementById('login-gate').style.display = 'flex';
+                    setLoginGate(true);
                 }
             }, 1000);
         }
@@ -1431,8 +1645,69 @@
             closeDeleteModal();
         } else if (sidebar.classList.contains('is-active')) {
             toggleSidebar();
+        } else if (isNaviThinking && !isLiveModeActive) {
+            stopResponse();
         }
     });
+
+
+    // --- THEME (light / dark / auto) ---
+    // Saved choice lives in localStorage ('light' | 'dark'); no saved value means "Auto" (follow the device).
+    const themeMQ = window.matchMedia ? window.matchMedia('(prefers-color-scheme: light)') : null;
+
+    function getThemePref() {
+        try { const v = localStorage.getItem('navi_theme'); return (v === 'light' || v === 'dark') ? v : 'system'; }
+        catch (e) { return 'system'; }
+    }
+
+    function resolveTheme(pref) {
+        if (pref === 'light' || pref === 'dark') return pref;
+        return (themeMQ && themeMQ.matches) ? 'light' : 'dark';
+    }
+
+    function syncTheme(animate) {
+        const pref = getThemePref();
+        const theme = resolveTheme(pref);
+        const root = document.documentElement;
+        if (animate) {
+            root.classList.add('theme-anim');
+            setTimeout(() => root.classList.remove('theme-anim'), 350);
+        }
+        root.setAttribute('data-theme', theme);
+
+        const meta = document.querySelector('meta[name="theme-color"]');
+        if (meta) meta.setAttribute('content', theme === 'light' ? '#f5f6f8' : '#121316');
+
+        document.querySelectorAll('.theme-seg button').forEach(b =>
+            b.setAttribute('aria-pressed', String(b.dataset.pref === pref)));
+
+        const toggle = document.getElementById('theme-toggle');
+        if (toggle) {
+            const label = theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme';
+            toggle.setAttribute('aria-label', label);
+            toggle.title = label;
+        }
+    }
+
+    function setThemePref(pref) {
+        try {
+            if (pref === 'light' || pref === 'dark') localStorage.setItem('navi_theme', pref);
+            else localStorage.removeItem('navi_theme');
+        } catch (e) {}
+        syncTheme(true);
+    }
+
+    function toggleTheme() {
+        setThemePref(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+    }
+
+    // Auto mode: follow the device when it changes while the page is open
+    if (themeMQ) {
+        const onSystemChange = () => { if (getThemePref() === 'system') syncTheme(true); };
+        if (themeMQ.addEventListener) themeMQ.addEventListener('change', onSystemChange);
+        else if (themeMQ.addListener) themeMQ.addListener(onSystemChange);
+    }
+    syncTheme(false);
 
     function toggleSidebar() {
     const sidebar = document.getElementById('sidebar');
@@ -1464,10 +1739,15 @@
         const banner = document.getElementById('itinerary-banner');
         if (!banner) return;
         const stops = (itineraryDraft && Array.isArray(itineraryDraft.stops)) ? itineraryDraft.stops : [];
+        clearTimeout(banner._t);
         if (stops.length === 0) {
-            banner.style.display = 'none';
+            if (banner.style.display === 'none' || banner.classList.contains('is-leaving')) return;
+            if (prefersReducedMotion()) { banner.style.display = 'none'; return; }
+            banner.classList.add('is-leaving');
+            banner._t = setTimeout(() => { banner.style.display = 'none'; banner.classList.remove('is-leaving'); }, 210);
             return;
         }
+        banner.classList.remove('is-leaving');
         banner.style.display = 'flex';
         document.getElementById('itinerary-banner-title').textContent =
             itineraryDraft.title || 'Planning a trip';
@@ -1602,7 +1882,7 @@
 
     async function renderHistoryList() {
         const list = document.getElementById('history-list');
-        list.innerHTML = '<div style="padding:10px;color:#8b8f9a;font-size:0.85rem;">Loading...</div>';
+        list.innerHTML = '<div style="padding:10px;color:var(--muted);font-size:0.85rem;">Loading...</div>';
 
         const currentUid = localStorage.getItem('uid') || 'guest_user';
         const displayName = localStorage.getItem('displayName');
@@ -1613,18 +1893,20 @@
 
         list.innerHTML = '';
         if (userHistories.length === 0) {
-            list.innerHTML = '<div style="padding:10px;color:#8b8f9a;font-size:0.85rem;">No saved chats yet.</div>';
+            list.innerHTML = '<div class="history-empty" style="padding:10px;color:var(--muted);font-size:0.85rem;">No saved chats yet.</div>';
         }
 
-        userHistories.forEach(hist => {
+        userHistories.forEach((hist, rowIndex) => {
             // Create a wrapper for the list item
             const wrapper = document.createElement('div');
             wrapper.style.cssText = "position: relative; display: flex; align-items: center; border-radius: 5px; transition: background 0.2s; user-select: none; -webkit-user-select: none;";
+            wrapper.className = 'history-item';
+            wrapper.style.animationDelay = (Math.min(rowIndex, 8) * 45) + 'ms';   // rows glide in one after another
             
             // The main chat history button
             const btn = document.createElement('button');
             btn.innerText = hist.preview;
-            btn.style.cssText = "flex: 1; padding: 10px; background: transparent; color: white; border: none; text-align: left; cursor: pointer; border-radius: 5px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;";
+            btn.style.cssText = "flex: 1; padding: 10px; background: transparent; color: var(--fore); border: none; text-align: left; cursor: pointer; border-radius: 5px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;";
             
             // ADDED: This makes the button actually load the old chat!
             btn.onclick = () => loadSession(hist.id);
@@ -1635,14 +1917,14 @@
             const delBtn = document.createElement('button');
             delBtn.innerHTML = `<svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>`;
             delBtn.setAttribute('aria-label', 'Delete chat');
-            delBtn.style.cssText = "display: block; opacity: 0.45; padding: 10px; background: transparent; color: #8b8f9a; border: none; cursor: pointer; transition: color 0.2s, opacity 0.2s;";
-            delBtn.onmouseover = () => { delBtn.style.color = '#ff4a4a'; delBtn.style.opacity = '1'; };
-            delBtn.onmouseout = () => { delBtn.style.color = '#8b8f9a'; delBtn.style.opacity = '0.45'; };
+            delBtn.style.cssText = "display: block; opacity: 0.45; padding: 10px; background: transparent; color: var(--muted); border: none; cursor: pointer; transition: color 0.2s, opacity 0.2s;";
+            delBtn.onmouseover = () => { delBtn.style.color = 'var(--danger)'; delBtn.style.opacity = '1'; };
+            delBtn.onmouseout = () => { delBtn.style.color = 'var(--muted)'; delBtn.style.opacity = '0.45'; };
             delBtn.onfocus = () => { delBtn.style.opacity = '1'; };
             delBtn.onblur = () => { delBtn.style.opacity = '0.45'; };
 
             // --- DESKTOP HOVER LOGIC (row highlight only; delete icon is already visible) ---
-            wrapper.onmouseenter = () => { wrapper.style.background = '#2a2d35'; };
+            wrapper.onmouseenter = () => { wrapper.style.background = 'var(--hover)'; };
             wrapper.onmouseleave = () => { wrapper.style.background = 'transparent'; };
             
             // Trigger the delete modal
@@ -1743,10 +2025,7 @@
             const wrapper = document.createElement('div');
             
             if (sender === 'user') {
-                const userMsgDiv = document.createElement('div');
-                userMsgDiv.className = 'msg user-msg';
-                userMsgDiv.innerText = msg.content;
-                chat.appendChild(userMsgDiv);
+                chat.appendChild(createUserTurn(msg.content));
             } else {
                 wrapper.style.display = 'flex';
                 wrapper.style.flexDirection = 'column';
@@ -1776,6 +2055,8 @@
     function openDeleteModal(sessionId) {
         sessionToDelete = sessionId;
         const modal = document.getElementById('delete-confirm-modal');
+        clearTimeout(modal._t);
+        modal.classList.remove('is-closing');
         modal.style.display = 'flex';
         
         document.getElementById('confirm-delete-btn').onclick = () => {
@@ -1786,7 +2067,15 @@
 
     function closeDeleteModal() {
         sessionToDelete = null;
-        document.getElementById('delete-confirm-modal').style.display = 'none';
+        const modal = document.getElementById('delete-confirm-modal');
+        if (modal.style.display !== 'flex') return;
+        if (prefersReducedMotion()) { modal.style.display = 'none'; return; }
+        modal.classList.add('is-closing');
+        clearTimeout(modal._t);
+        modal._t = setTimeout(() => {
+            modal.style.display = 'none';
+            modal.classList.remove('is-closing');
+        }, 190);
     }
 
     async function executeDelete(sessionId) {
@@ -1818,7 +2107,7 @@
     function clearTTSState() {
         if (currentActiveButton) {
             currentActiveButton.classList.remove('playing-active');
-            currentActiveButton.innerHTML = ICON_SPEAK;
+            swapContent(currentActiveButton, ICON_SPEAK);
             currentActiveButton = null;
         }
         updateStatusDisplay('idle');
@@ -1859,7 +2148,7 @@
 
         currentActiveButton = btn;
         btn.classList.add('playing-active');
-        btn.innerHTML = ICON_STOP + " Off";
+        swapContent(btn, ICON_STOP + " Off");
         updateStatusDisplay('speaking');
 
         activeAudio = new Audio("data:audio/mp3;base64," + base64Audio);
@@ -1889,19 +2178,53 @@
 
     function updateStatusDisplay(mode) {
         const tag = document.getElementById('status-tag');
-        if      (mode === 'thinking') tag.innerHTML = 'PROCESSING';
-        else if (mode === 'speaking') tag.innerHTML = 'STREAMING';
-        else                          tag.innerHTML = 'SYSTEM ONLINE';
+        const indicator = tag.closest('.status-indicator');
+        if      (mode === 'thinking') swapText(tag, 'Thinking');
+        else if (mode === 'speaking') swapText(tag, 'Responding');
+        else                          swapText(tag, 'Online');
+        if (indicator) indicator.dataset.mode = (mode === 'thinking' || mode === 'speaking') ? mode : 'idle';
     }
 
     function handleKeyPress(e) {
-        if (e.key === 'Enter' && !e.isComposing && !document.getElementById('send-btn').disabled) send();
+        if (e.key === 'Enter' && !e.isComposing && !isNaviThinking && !document.getElementById('send-btn').disabled) send();
+    }
+
+    // While a reply is in progress the send button becomes a Stop button.
+    function handleSendClick() {
+        if (isNaviThinking) stopResponse();
+        else send();
+    }
+
+    let currentRequest = null;        // AbortController for the in-flight /chat request
+    let stopActiveTypewriter = null;  // stops the reply that is currently being typed out
+
+    function stopResponse() {
+        if (!isNaviThinking || isLiveModeActive) return;
+        if (currentRequest) {                 // still waiting on the server: cancel the request
+            currentRequest.abort();
+            currentRequest = null;
+        } else if (stopActiveTypewriter) {    // reply is being revealed: stop where it is
+            stopActiveTypewriter();
+        }
     }
 
     function toggleSendButtonState() {
         const input   = document.getElementById('input');
         const sendBtn = document.getElementById('send-btn');
-        if (isNaviThinking) return;
+        const busy = isNaviThinking;
+
+        sendBtn.classList.toggle('is-stop', busy);
+        document.querySelectorAll('#chat .msg-action.edit').forEach(b => { b.disabled = busy; });
+
+        if (busy) {
+            sendBtn.disabled = false;
+            sendBtn.classList.add('active');
+            sendBtn.setAttribute('aria-label', 'Stop response');
+            sendBtn.title = 'Stop';
+            return;
+        }
+        sendBtn.setAttribute('aria-label', 'Send message');
+        sendBtn.title = 'Send';
         if (input.value.trim().length > 0) {
             sendBtn.disabled = false;
             sendBtn.classList.add('active');
@@ -1914,7 +2237,8 @@
     function forceUIRefreshScroll() {
         const chat = document.getElementById('chat');
         requestAnimationFrame(() => requestAnimationFrame(() => {
-            chat.scrollTop = chat.scrollHeight;
+            if (chat.scrollTo && !prefersReducedMotion()) chat.scrollTo({ top: chat.scrollHeight, behavior: 'smooth' });
+            else chat.scrollTop = chat.scrollHeight;
         }));
     }
 
@@ -1960,15 +2284,186 @@
         forceUIRefreshScroll();
     }
 
+
+    // --- YOUR MESSAGE: copy + edit ---
+    const ICON_COPY  = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></svg>`;
+    const ICON_EDIT  = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>`;
+    const ICON_CHECK = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>`;
+
+    function announce(text) {
+        const el = document.getElementById('sr-announce');
+        if (!el) return;
+        el.textContent = '';
+        setTimeout(() => { el.textContent = text; }, 30);
+    }
+
+    async function copyText(text) {
+        try {
+            if (navigator.clipboard && window.isSecureContext) {
+                await navigator.clipboard.writeText(text);
+                return true;
+            }
+        } catch (e) { /* fall through to the legacy path */ }
+        try {
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            ta.setAttribute('readonly', '');
+            ta.style.cssText = 'position:fixed;top:-1000px;opacity:0;';
+            document.body.appendChild(ta);
+            ta.select();
+            const ok = document.execCommand('copy');
+            ta.remove();
+            return ok;
+        } catch (e) { return false; }
+    }
+
+    // One of your messages: the bubble plus small Copy / Edit icons underneath
+    function createUserTurn(text) {
+        const turn = document.createElement('div');
+        turn.className = 'user-turn';
+        turn._text = text;
+
+        const bubble = document.createElement('div');
+        bubble.className = 'msg user-msg';
+        bubble.innerText = text;
+
+        const actions = document.createElement('div');
+        actions.className = 'msg-actions';
+
+        const copyBtn = document.createElement('button');
+        copyBtn.type = 'button';
+        copyBtn.className = 'msg-action copy';
+        copyBtn.title = 'Copy';
+        copyBtn.setAttribute('aria-label', 'Copy message');
+        copyBtn.innerHTML = ICON_COPY;
+        copyBtn.onclick = async () => {
+            const ok = await copyText(turn._text);
+            if (!ok) return;
+            copyBtn.innerHTML = ICON_CHECK;
+            copyBtn.classList.add('is-done');
+            copyBtn.title = 'Copied';
+            copyBtn.setAttribute('aria-label', 'Copied');
+            announce('Message copied');
+            clearTimeout(copyBtn._t);
+            copyBtn._t = setTimeout(() => {
+                copyBtn.innerHTML = ICON_COPY;
+                copyBtn.classList.remove('is-done');
+                copyBtn.title = 'Copy';
+                copyBtn.setAttribute('aria-label', 'Copy message');
+            }, 1600);
+        };
+
+        const editBtn = document.createElement('button');
+        editBtn.type = 'button';
+        editBtn.className = 'msg-action edit';
+        editBtn.title = 'Edit';
+        editBtn.setAttribute('aria-label', 'Edit message');
+        editBtn.innerHTML = ICON_EDIT;
+        editBtn.disabled = isNaviThinking;
+        editBtn.onclick = () => startEditTurn(turn);
+
+        actions.append(copyBtn, editBtn);
+        turn.append(bubble, actions);
+        return turn;
+    }
+
+    // Edit in place: swap the bubble for a small editor, then resend from that point
+    function startEditTurn(turn) {
+        if (isNaviThinking || turn.classList.contains('is-editing')) return;
+        turn.classList.add('is-editing');
+        const bubble = turn.querySelector('.user-msg');
+        const actions = turn.querySelector('.msg-actions');
+        bubble.style.display = 'none';
+        actions.style.display = 'none';
+
+        const box = document.createElement('div');
+        box.className = 'edit-box';
+
+        const ta = document.createElement('textarea');
+        ta.rows = 1;
+        ta.value = turn._text;
+        ta.setAttribute('aria-label', 'Edit your message');
+
+        const row = document.createElement('div');
+        row.className = 'edit-actions';
+        const cancel = document.createElement('button');
+        cancel.type = 'button'; cancel.className = 'edit-cancel'; cancel.textContent = 'Cancel';
+        const save = document.createElement('button');
+        save.type = 'button'; save.className = 'edit-save'; save.textContent = 'Send';
+        row.append(cancel, save);
+
+        const autosize = () => {
+            ta.style.height = 'auto';
+            ta.style.height = Math.min(ta.scrollHeight, window.innerHeight * 0.4) + 'px';
+        };
+        const close = () => {
+            const finish = () => {
+                box.remove();
+                bubble.style.display = '';
+                actions.style.display = '';
+                turn.classList.remove('is-editing');
+            };
+            if (prefersReducedMotion()) { finish(); return; }
+            box.classList.add('is-leaving');
+            setTimeout(finish, 150);
+        };
+        const submit = () => {
+            const v = ta.value.trim();
+            if (!v || isNaviThinking) return;
+            resendFromTurn(turn, v);
+        };
+
+        ta.oninput = () => { autosize(); save.disabled = !ta.value.trim(); };
+        ta.onkeydown = (e) => {
+            if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); submit(); }
+            else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(); }
+        };
+        cancel.onclick = close;
+        save.onclick = submit;
+
+        box.append(ta, row);
+        turn.append(box);
+        autosize();
+        ta.focus();
+        ta.setSelectionRange(ta.value.length, ta.value.length);
+    }
+
+    // Rewind the chat to just before this message, then send the edited text
+    let editResendPending = false;
+    function resendFromTurn(turn, newText) {
+        if (isNaviThinking || editResendPending) return;
+        const chat = document.getElementById('chat');
+        const turns = Array.from(chat.querySelectorAll('.user-turn'));
+        // Messages that never reached the server (stopped / failed) have no matching history entry
+        const confirmedBefore = turns.slice(0, turns.indexOf(turn)).filter(t => !t.dataset.pending).length;
+
+        let seen = 0, cut = history.length;
+        for (let i = 0; i < history.length; i++) {
+            if (history[i].role === 'user') {
+                if (seen === confirmedBefore) { cut = i; break; }
+                seen++;
+            }
+        }
+        history = history.slice(0, cut);
+
+        const doomed = [turn];
+        while (doomed[doomed.length - 1].nextSibling) doomed.push(doomed[doomed.length - 1].nextSibling);
+        editResendPending = true;                 // block other sends while the old messages fade out
+        if (activeAudio) clearTTSState();
+        fadeOutAndRemove(doomed, () => {
+            editResendPending = false;
+            send(newText);
+        });
+    }
+
     function addMessageToUI(sender, text, audioBase64 = null, ttsMeta = null) {
         const chat = document.getElementById('chat');
         const wrapper = document.createElement('div');
+        let userTurnEl = null;
         
         if (sender === 'user') {
-            const userMsgDiv = document.createElement('div');
-            userMsgDiv.className = 'msg user-msg';
-            userMsgDiv.innerText = text;
-            chat.appendChild(userMsgDiv);
+            userTurnEl = createUserTurn(text);
+            chat.appendChild(userTurnEl);
         } else {
             hideAmbientGlow();
             wrapper.style.display = 'flex';
@@ -1992,6 +2487,7 @@
                 typewriterDone = true;
                 typewriter.cancel();
                 pendingTypewriters.delete(finishTypewriter);
+                if (stopActiveTypewriter === stopTypewriter) stopActiveTypewriter = null;
                 containerDiv.innerHTML = innerHTMLContent;
                 if (audioBase64 || ttsMeta) {
                     const btn = document.createElement('button');
@@ -2008,6 +2504,18 @@
                 unlockChat();
             };
             pendingTypewriters.add(finishTypewriter);
+
+            // Stop button: freeze the reply where it is instead of finishing it
+            const stopTypewriter = () => {
+                if (typewriterDone) return;
+                typewriterDone = true;
+                typewriter.cancel();
+                pendingTypewriters.delete(finishTypewriter);
+                if (stopActiveTypewriter === stopTypewriter) stopActiveTypewriter = null;
+                if (index === 0) wrapper.remove();       // nothing revealed yet: no empty bubble
+                unlockChat();
+            };
+            stopActiveTypewriter = stopTypewriter;
 
             // Frame-synced reveal (rAF): never works faster than the screen can paint, and finishes in
             // roughly 40 frames however long the reply is.
@@ -2034,10 +2542,11 @@
             rafId = requestAnimationFrame(step);
         }
         forceUIRefreshScroll();
+        return userTurnEl;
     }
 
     async function send(messageOverride = null) {
-        if (isNaviThinking) return;
+        if (isNaviThinking || editResendPending) return;
         
         if (activeAudio) clearTTSState();
         
@@ -2047,12 +2556,12 @@
         
         isNaviThinking = true;
         input.disabled = true;
-        document.getElementById('send-btn').disabled = true;
-        document.getElementById('send-btn').classList.remove('active');
+        toggleSendButtonState();          // send button turns into the Stop button
         updateStatusDisplay('thinking');
         hideWelcome();
         
-        addMessageToUI('user', msg);
+        const turnEl = addMessageToUI('user', msg);
+        if (turnEl) turnEl.dataset.pending = '1';   // cleared once the server has this message in history
         input.value = '';
 
         const typingId = 'typing-' + Date.now();
@@ -2071,8 +2580,10 @@
         document.getElementById('chat').appendChild(typingBubble);
         forceUIRefreshScroll();
         
+        currentRequest = new AbortController();
         try {
             const res = await fetch('https://camanava-bot.onrender.com/chat', {
+            signal: currentRequest.signal,
             method: 'POST',
             headers: { 
                 'Content-Type': 'application/json',
@@ -2082,15 +2593,17 @@
         });
 
         if (res.status === 401) {
-            document.getElementById('login-gate').style.display = 'flex';
+            setLoginGate(true);
             throw new Error("Unauthorized");
         }
             const data = await res.json();
+            currentRequest = null;           // reply received: nothing left to abort
             document.getElementById(typingId)?.remove();
             
             // Update AFTER the exchange completes, so this actually includes the
             // message + reply that just happened (fixes history always lagging one turn behind).
             history = data.history;
+            if (turnEl) delete turnEl.dataset.pending;
             itineraryDraft = data.itinerary_draft || null;
             updateItineraryBanner();
 
@@ -2108,10 +2621,21 @@
             }
             
         } catch (err) {
+            currentRequest = null;
             document.getElementById(typingId)?.remove();
+            if (err && err.name === 'AbortError') {
+                // The user pressed Stop while waiting for the reply
+                const note = document.createElement('div');
+                note.className = 'stopped-note';
+                note.textContent = 'Response stopped';
+                document.getElementById('chat').appendChild(note);
+                unlockChat();
+                return;
+            }
             if (isLiveModeActive) {
                 setLiveState('error', "Connection failed. Tap to retry.");
                 isNaviThinking = false;
+                toggleSendButtonState();
             } else {
                 addMessageToUI('bot', "Connection Error.");
                 unlockChat();
@@ -2176,7 +2700,7 @@
     function setLiveState(state, message) {
         const prevState = liveState;
         liveState = state;
-        statusText.innerText = message;
+        swapText(statusText, message);
 
         overlay.dataset.state = state;
         orb.className = 'live-orb';
@@ -2295,10 +2819,11 @@
         if (isLiveModeActive) return;
         if (activeAudio) clearTTSState();
         isLiveModeActive = true;
+        liveWave.start();
         liveCue('start');
         liveSilentNextListen = true;   // the start chime already covers the first "listening"
         liveMuted = false;
-        document.getElementById('live-mute-btn').classList.remove('is-on'); document.getElementById('live-mute-label').textContent = 'Mute';
+        document.getElementById('live-mute-btn').classList.remove('is-on'); swapText(document.getElementById('live-mute-label'), 'Mute');
         overlay.classList.add('is-active');
         updateTranscript("");
         setLiveState('thinking', "Connecting microphone...");
@@ -2428,7 +2953,7 @@
         const btn = document.getElementById('live-mute-btn');
         btn.classList.toggle('is-on', liveMuted);
         btn.setAttribute('aria-pressed', String(liveMuted));
-        document.getElementById('live-mute-label').textContent = liveMuted ? 'Unmute' : 'Mute';
+        swapText(document.getElementById('live-mute-label'), liveMuted ? 'Unmute' : 'Mute');
         btn.setAttribute('aria-label', liveMuted ? 'Unmute microphone' : 'Mute microphone');
         if (liveState === 'listening') setLiveState('listening', liveMuted ? "Mic is muted" : "Listening... just speak");
         liveCue(liveMuted ? 'mute' : 'unmute');
@@ -2461,6 +2986,7 @@
     function handleLiveResponse(text, audioBase64) {
         if (!isLiveModeActive) return;
         isNaviThinking = false;
+        toggleSendButtonState();
 
         const cleanText = text.replace(/\*\*(.*?)\*\*/g, '$1').replace(/\*/g, '').trim();
         updateTranscript(cleanText);
@@ -2502,6 +3028,7 @@
         liveCue('end');
         isLiveModeActive = false;
         overlay.classList.remove('is-active');
+        setTimeout(() => liveWave.stop(), 700);
 
         stopVad();
         clearTimeout(liveResumeTimer);
@@ -2528,7 +3055,7 @@
 
         liveState = 'idle';
         liveMuted = false;
-        document.getElementById('live-mute-btn').classList.remove('is-on'); document.getElementById('live-mute-label').textContent = 'Mute';
+        document.getElementById('live-mute-btn').classList.remove('is-on'); swapText(document.getElementById('live-mute-label'), 'Mute');
         overlay.dataset.state = 'idle';
         orb.className = 'live-orb';
         orb.style.setProperty('--audio-scale', 1);
@@ -2604,6 +3131,150 @@
         }
         if (audioCtx.state === 'suspended') audioCtx.resume();
     }
+
+
+    // --- LIVE WAVE RENDERER ---
+    // Layered soft gradient waves built from travelling sine waves (no outlines). Slow "swell groups" roll across the
+    // screen so energy forms and dissolves, and each ribbon slowly shifts between two hues.
+    // Amplitude follows the mic (listening) or Navi's voice (speaking) via --audio-scale.
+    const liveWave = (() => {
+        const canvas = document.getElementById('live-wave');
+        const ctx = canvas.getContext('2d');
+        const TAU = Math.PI * 2;
+        // cA/cB: the two hues a ribbon drifts between. k: wave count, k2: swell-group count, sp/sp2: speeds
+        const LAYERS = [
+            { cA: [58, 64, 220],  cB: [92, 78, 240],   k: 0.8, k2: 0.5, sp:  0.50, sp2: 0.28, ph: 0.0, a: 1.00, y:  0.00, alpha: 0.55 },
+            { cA: [38, 120, 255], cB: [70, 170, 255],  k: 1.2, k2: 0.8, sp:  0.80, sp2: 0.42, ph: 1.7, a: 0.85, y: -0.02, alpha: 0.65 },
+            { cA: [70, 210, 255], cB: [150, 235, 255], k: 1.7, k2: 1.1, sp:  1.10, sp2: 0.60, ph: 3.1, a: 0.62, y: -0.04, alpha: 0.55 },
+            { cA: [140, 112, 255],cB: [200, 120, 255], k: 1.4, k2: 0.9, sp: -0.90, sp2: 0.38, ph: 4.4, a: 0.74, y: -0.01, alpha: 0.55 },
+            { cA: [225, 105, 255],cB: [255, 140, 200], k: 2.2, k2: 1.2, sp:  1.50, sp2: 0.75, ph: 5.2, a: 0.42, y: -0.03, alpha: 0.42 }
+        ];
+        // How much of each ribbon shows in each state
+        const WEIGHTS = {
+            idle:      [0.45, 0.45, 0.25, 0.25, 0],
+            listening: [1.0, 1.0, 0.7, 0.55, 0],
+            thinking:  [1.0, 0.55, 0.2, 1.0, 0.6],
+            speaking:  [0.9, 1.0, 1.0, 0.85, 0.65],
+            error:     [0.4, 0.4, 0.2, 0.2, 0]
+        };
+        const TARGET = {
+            idle:      { amp: 0.04, speed: 0.30 },
+            listening: { amp: 0.065, speed: 0.42 },
+            thinking:  { amp: 0.08, speed: 0.80 },
+            speaking:  { amp: 0.10, speed: 0.62 },
+            error:     { amp: 0.025, speed: 0.25 }
+        };
+        const w = [0, 0, 0, 0, 0];
+        let raf = 0, W = 0, H = 0, dpr = 1, t = 0, last = 0, tick = 0;
+        let level = 0, amp = 0.035, speed = 0.5, lite = false, reduce = false;
+
+        function resize() {
+            dpr = Math.min(window.devicePixelRatio || 1, lite ? 1.5 : 2);
+            W = Math.max(1, Math.round(canvas.clientWidth * dpr));
+            H = Math.max(1, Math.round(canvas.clientHeight * dpr));
+            if (canvas.width !== W) canvas.width = W;
+            if (canvas.height !== H) canvas.height = H;
+        }
+
+        function mix(a, b, m) { return [a[0] + (b[0] - a[0]) * m, a[1] + (b[1] - a[1]) * m, a[2] + (b[2] - a[2]) * m]; }
+        function rgba(c, a) { return 'rgba(' + Math.round(c[0]) + ',' + Math.round(c[1]) + ',' + Math.round(c[2]) + ',' + a.toFixed(3) + ')'; }
+
+        function draw(ampNow) {
+            ctx.clearRect(0, 0, W, H);
+            ctx.globalCompositeOperation = 'lighter';
+            const N = lite ? 56 : Math.max(70, Math.round(W / (5 * dpr)));
+            const baseY = H * 0.64;
+            const xs = new Float32Array(N + 1), ys = new Float32Array(N + 1);
+
+            // Very faint bloom hugging the waves (stays black everywhere else)
+            const bloomA = 0.07 + level * 0.10;
+            const bg = ctx.createRadialGradient(W / 2, baseY, 0, W / 2, baseY, W * 0.75);
+            bg.addColorStop(0, 'rgba(60,120,255,' + bloomA.toFixed(3) + ')');
+            bg.addColorStop(1, 'rgba(60,120,255,0)');
+            ctx.fillStyle = bg;
+            ctx.fillRect(0, 0, W, H);
+
+            for (let li = 0; li < LAYERS.length; li++) {
+                const L = LAYERS[li], wgt = w[li];
+                if (wgt < 0.02) continue;
+                const A = ampNow * H * L.a * (0.5 + 0.5 * wgt);
+                const by = baseY + L.y * H;
+                const col = mix(L.cA, L.cB, 0.5 + 0.5 * Math.sin(t * 0.22 + L.ph));
+
+                for (let i = 0; i <= N; i++) {
+                    const x = i / N;
+                    const env = Math.pow(Math.sin(Math.PI * x), 1.1) * 0.9 + 0.1;                 // taper toward the edges
+                    const mod = 0.45 + 0.55 * Math.sin(L.k2 * x * TAU + t * L.sp2 + L.ph * 1.3);  // swell groups rolling across
+                    const main = Math.sin(L.k * x * TAU + t * L.sp + L.ph);
+                    const harm = 0.25 * Math.sin(L.k * 1.9 * x * TAU - t * L.sp * 0.7 + L.ph);    // organic second harmonic
+                    xs[i] = x * W;
+                    ys[i] = by - A * env * mod * (main + harm);
+                }
+
+                // Soft gradient body: richest just under the crest, melting into black below.
+                // A second, fainter copy sits slightly higher so the top edge feathers out (no hard line).
+                const al = L.alpha * wgt * 0.5;      // keep overlaps colorful instead of blowing out to white
+                const passes = lite ? [[0, 1]] : [[-0.08, 0.35], [-0.035, 0.6], [0, 1]];
+                for (let pi = 0; pi < passes.length; pi++) {
+                    const off = passes[pi][0] * H, pa = passes[pi][1];
+                    const g = ctx.createLinearGradient(0, by - A * 1.2 + off, 0, by + H * 0.3);
+                    g.addColorStop(0, rgba(col, al * 0.85 * pa));
+                    g.addColorStop(0.4, rgba(col, al * 0.42 * pa));
+                    g.addColorStop(1, rgba(col, 0));
+                    ctx.beginPath();
+                    ctx.moveTo(0, H);
+                    for (let i = 0; i <= N; i++) ctx.lineTo(xs[i], ys[i] + off);
+                    ctx.lineTo(W, H);
+                    ctx.closePath();
+                    ctx.fillStyle = g;
+                    ctx.fill();
+                }
+            }
+            ctx.globalCompositeOperation = 'source-over';
+        }
+
+        function frame(now) {
+            raf = requestAnimationFrame(frame);
+            if (lite && (tick++ & 1)) return;       // ~30fps on weaker phones
+            const dt = Math.min(0.05, ((now - last) / 1000) || 0.016);
+            last = now;
+
+            const st = TARGET[liveState] ? liveState : 'idle';
+            const tg = TARGET[st], wt = WEIGHTS[st];
+
+            // Voice level (set by the mic loop while listening, by the audio analyser while speaking)
+            const raw = parseFloat(orb.style.getPropertyValue('--audio-scale')) || 1;
+            const target = Math.max(0, Math.min(1, (raw - 1) / 0.25));
+            level += (target - level) * (target > level ? Math.min(1, dt * 12) : Math.min(1, dt * 3));
+
+            const k = Math.min(1, dt * 2.2);
+            amp += (tg.amp - amp) * k;
+            speed += (tg.speed - speed) * k;
+            for (let i = 0; i < w.length; i++) w[i] += (wt[i] - w[i]) * Math.min(1, dt * 1.6);
+
+            t += dt * (speed + level * 0.45) * (reduce ? 0.3 : 1);   // a little faster when louder
+            const pulse = st === 'thinking' ? 1 + 0.12 * Math.sin(now / 1000 * 1.6) : 1;
+            draw(amp * pulse + level * 0.09);
+        }
+
+        window.addEventListener('resize', () => { if (raf) resize(); });
+
+        return {
+            start() {
+                if (raf) return;
+                lite = document.documentElement.classList.contains('lite-mode');
+                reduce = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+                resize();
+                last = performance.now();
+                raf = requestAnimationFrame(frame);
+            },
+            stop() {
+                if (isLiveModeActive) return;        // reopened in the meantime
+                cancelAnimationFrame(raf); raf = 0;
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+            }
+        };
+    })();
 
     function pulseWithAudio() {
         if (liveState !== 'speaking' || !analyser) return;
