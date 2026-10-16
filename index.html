@@ -1159,7 +1159,7 @@
             transition: opacity 0.4s cubic-bezier(0.15, 0.83, 0.66, 1);
             overflow: hidden;
             --stage-h: clamp(240px, 42vh, 380px);
-            padding: 0 0 calc(var(--stage-h) + 96px + env(safe-area-inset-bottom));
+            padding: 0;
             box-sizing: border-box;
         }
 
@@ -1223,38 +1223,74 @@
         .live-status-text {
             margin-top: 0;
             font-family: var(--font-display);
-            font-size: 1rem;
+            font-size: 0.85rem;
             font-weight: 500;
-            letter-spacing: 0.01em;
-            color: rgba(255,255,255,0.62);
+            letter-spacing: 0.03em;
+            color: rgba(255,255,255,0.55);
             opacity: 0;
             transform: translateY(8px);
             transition: opacity 0.5s ease 0.18s, transform 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.18s;
         }
         #live-overlay.is-active .live-status-text { opacity: 1; transform: translateY(0); }
 
-        .live-transcript {
-            margin-top: 18px;
-            font-family: var(--font-display);
-            font-size: 1.4rem;
-            font-weight: 500;
-            line-height: 1.42;
-            letter-spacing: -0.012em;
-            color: #fff;
-            text-align: center;
-            max-width: min(88%, 520px);
-            min-height: 34px;
-            max-height: 30vh;
-            overflow-y: auto;
-            scrollbar-width: none;
-            padding: 4px 10px;
-            -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 12px, #000 calc(100% - 12px), transparent 100%);
-            mask-image: linear-gradient(to bottom, transparent 0, #000 12px, #000 calc(100% - 12px), transparent 100%);
-            transition: opacity 0.3s cubic-bezier(0.15, 0.83, 0.66, 1), transform 0.3s cubic-bezier(0.15, 0.83, 0.66, 1);
-            opacity: 1;
-            transform: translateY(0);
+        /* --- CAPTIONS: sit low on the screen, just above the buttons, on a faint glass panel --- */
+        .live-caption-wrap {
+            position: absolute;
+            left: 0; right: 0; margin: 0 auto;
+            bottom: calc(104px + env(safe-area-inset-bottom));
+            width: min(92%, 460px);
+            display: flex; flex-direction: column; align-items: center; gap: 12px;
+            z-index: 5;
+            pointer-events: none;            /* taps still reach the waves (send / interrupt) */
         }
-        .live-transcript::-webkit-scrollbar { display: none; }
+        .live-status-text { text-shadow: 0 1px 10px rgba(0,0,0,0.65); }
+
+        .live-transcript {
+            box-sizing: border-box;
+            width: fit-content; max-width: 100%;
+            padding: 12px 18px;
+            border-radius: 20px;
+            background: rgba(8,12,24,0.42);
+            border: 1px solid rgba(255,255,255,0.07);
+            -webkit-backdrop-filter: blur(14px);
+            backdrop-filter: blur(14px);
+            box-shadow: 0 8px 30px rgba(0,0,0,0.25);
+            opacity: 0;
+            transition: opacity 0.45s ease;
+        }
+        .live-transcript.is-visible { opacity: 1; }
+        /* The whole caption is laid out up front (words start invisible), so nothing re-wraps or
+           shifts while words appear. The window holds 4 lines; longer text glides up one line at a time. */
+        .cap-scroll {
+            max-height: 6.4em;                 /* exactly 4 lines at line-height 1.6 */
+            overflow: hidden;
+            font-family: var(--font-display);
+            font-size: clamp(0.95rem, 3.8vw, 1.08rem);
+            font-weight: 400;
+            line-height: 1.6;
+            letter-spacing: 0;
+            color: rgba(255,255,255,0.9);
+            text-align: center;
+        }
+        .cap-scroll.scrolled {
+            -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 0.9em, #000 100%);
+            mask-image: linear-gradient(to bottom, transparent 0, #000 0.9em, #000 100%);
+        }
+        .cap-inner {
+            position: relative;
+            transition: transform 0.75s cubic-bezier(0.45, 0.05, 0.25, 1);   /* calm ease in and out, no overshoot */
+        }
+        .live-transcript.is-user .cap-scroll { color: rgba(255,255,255,0.72); font-style: italic; }
+
+        /* Words fade in place. No movement at all. */
+        .cap-scroll .w {
+            display: inline-block;
+            opacity: 0;
+            transition: opacity 0.6s ease;
+        }
+        .cap-scroll .w.on { opacity: 1; }
+        @media (prefers-reduced-motion: reduce) { .cap-scroll .w { transition: none; } .cap-inner { transition: none; } }
+        html.lite-mode .live-transcript { -webkit-backdrop-filter: none; backdrop-filter: none; background: rgba(8,12,24,0.66); }
 
         /* --- CONTROL BAR --- */
         .live-controls {
@@ -1447,8 +1483,10 @@
     <div id="live-overlay" data-state="idle">
         <div class="live-badge"><span class="live-badge-dot"></span>Live with Navi</div>
 
-        <div id="live-status" class="live-status-text" aria-live="polite">Connecting...</div>
-        <div id="live-transcript" class="live-transcript"></div>
+        <div class="live-caption-wrap">
+            <div id="live-transcript" class="live-transcript" aria-live="off"><div id="live-caption-text" class="cap-scroll"></div></div>
+            <div id="live-status" class="live-status-text" aria-live="polite">Connecting...</div>
+        </div>
 
         <div id="live-orb" class="live-orb" onclick="handleOrbTap()" role="button" aria-label="Tap to send or interrupt">
             <canvas id="live-wave" aria-hidden="true"></canvas>
@@ -2680,21 +2718,113 @@
 
     let transcriptTimeout;
 
-    function updateTranscript(text) {
-        const transcriptEl = document.getElementById('live-transcript');
+    // Captions: words appear one at a time. Navi's words follow the voice (progress of the audio);
+    // when there is no audio they appear at a comfortable reading pace; your own words appear quickly.
+    let captionToken = 0, captionRaf = 0, captionVisible = false;
 
-        // Fade the current text out, swap it, fade the new text in
-        transcriptEl.style.opacity = '0';
-        transcriptEl.style.transform = 'translateY(5px)';
+    function cancelCaption() {
+        captionToken++;
+        if (captionRaf) { cancelAnimationFrame(captionRaf); captionRaf = 0; }
+    }
 
+    function updateTranscript(text, opts = {}) {
+        const box  = document.getElementById('live-transcript');
+        const body = document.getElementById('live-caption-text');
+        const clean = (text || '').replace(/\s+/g, ' ').trim();
+
+        cancelCaption();
         clearTimeout(transcriptTimeout);
-        transcriptTimeout = setTimeout(() => {
-            transcriptEl.innerText = text;
-            if (text.trim() !== "") {
-                transcriptEl.style.opacity = '1';
-                transcriptEl.style.transform = 'translateY(0)';
-            }
-        }, 300);
+        const token = captionToken;
+
+        const begin = () => {
+            if (token !== captionToken) return;
+            body.textContent = '';
+            if (!clean) { captionVisible = false; return; }
+
+            box.classList.toggle('is-user', !!opts.user);
+            box.classList.add('is-visible');
+            captionVisible = true;
+            if (!opts.audio && !opts.user) announce(clean);   // screen readers get the full line once (no word-by-word chatter)
+
+            const words = clean.split(' ');
+            const total = words.reduce((n, w) => n + w.length + 1, 0);
+            const startFrac = [];
+            let acc = 0;
+            words.forEach(w => { startFrac.push(acc / total); acc += w.length + 1; });
+
+            // Lay every word out right away (invisible) so the text never re-wraps or shifts while it appears
+            const inner = document.createElement('div');
+            inner.className = 'cap-inner';
+            const spans = words.map(w => {
+                const span = document.createElement('span');
+                span.className = 'w';
+                span.textContent = w;
+                inner.appendChild(span);
+                inner.appendChild(document.createTextNode(' '));
+                return span;
+            });
+            body.appendChild(inner);
+            body.classList.remove('scrolled');
+
+            let shown = 0, offset = 0;
+            const reveal = (n) => {
+                while (shown < n && shown < words.length) {
+                    spans[shown].classList.add('on');
+                    shown++;
+                }
+                // Longer than 4 lines: glide up one line at a time as the voice reaches a new line
+                const last = spans[shown - 1];
+                if (last) {
+                    const bottom = last.offsetTop + last.offsetHeight;
+                    const view = body.clientHeight;
+                    if (bottom > offset + view + 1) {
+                        offset = bottom - view;
+                        inner.style.transform = 'translateY(' + (-offset) + 'px)';
+                        body.classList.add('scrolled');
+                    }
+                }
+            };
+
+            const charMs = opts.charMs || 38;
+            const t0 = performance.now();
+            const paceTarget = (elapsed) => {
+                let n = 0;
+                while (n < words.length && startFrac[n] * total * charMs <= elapsed) n++;
+                return n;
+            };
+
+            const tick = () => {
+                if (token !== captionToken) return;
+                let target = shown;
+                const a = opts.audio;
+                if (a) {
+                    const d = a.duration;
+                    if (a.ended) target = words.length;
+                    else if (a.currentTime > 0 && d > 0 && isFinite(d)) {
+                        const frac = a.currentTime / d + 0.02;           // a hair ahead of the voice
+                        target = 0;
+                        while (target < words.length && startFrac[target] <= frac) target++;
+                    } else if (performance.now() - t0 > 1800) {
+                        target = paceTarget(performance.now() - t0 - 1800);   // audio never started: fall back to reading pace
+                    }
+                } else {
+                    target = paceTarget(performance.now() - t0);
+                }
+                reveal(target);
+                if (shown < words.length) captionRaf = requestAnimationFrame(tick);
+                else captionRaf = 0;
+            };
+            tick();
+        };
+
+        if (captionVisible) {
+            // fade the previous caption out, then start the next one
+            box.classList.remove('is-visible');
+            captionVisible = false;
+            transcriptTimeout = setTimeout(begin, 260);
+        } else {
+            begin();
+        }
     }
 
     function setLiveState(state, message) {
@@ -2757,7 +2887,8 @@
                 if (!liveSpeechDetected) liveSpeechStart = 0;
             }
 
-            // The orb breathes with the user's voice while listening
+            // The waves follow the user's voice (its frequency makeup, not just loudness) while listening
+            if (liveMicFreqBuf) analyseSpectrum(liveMicAnalyser, liveMicFreqBuf, voiced ? 1 : 0.25);
             orb.style.setProperty('--audio-scale', (1 + Math.min(level * 3, 0.3)).toFixed(3));
 
             const silentLongEnough = liveSpeechDetected && (now - liveLastVoiceAt) > LIVE_SILENCE_MS;
@@ -2851,7 +2982,9 @@
             liveMicSource = audioCtx.createMediaStreamSource(liveStream);
             liveMicAnalyser = audioCtx.createAnalyser();
             liveMicAnalyser.fftSize = 1024;
+            liveMicAnalyser.smoothingTimeConstant = 0.5;
             liveMicBuf = new Uint8Array(liveMicAnalyser.fftSize);
+            liveMicFreqBuf = new Uint8Array(liveMicAnalyser.frequencyBinCount);
             liveMicSource.connect(liveMicAnalyser);
             liveNoiseFloor = 0.01;
 
@@ -2934,7 +3067,7 @@
 
             const text = (data.text || '').trim();
             if (text) {
-                updateTranscript(`"${text}"`);
+                updateTranscript(`"${text}"`, { user: true, charMs: 22 });
                 setLiveState('thinking', "Navi is thinking...");
                 send(text);
             } else {
@@ -2989,13 +3122,13 @@
         toggleSendButtonState();
 
         const cleanText = text.replace(/\*\*(.*?)\*\*/g, '$1').replace(/\*/g, '').trim();
-        updateTranscript(cleanText);
         addMessageToUI('bot', text, audioBase64);
 
         if (audioBase64) {
             setLiveState('speaking', "Navi is speaking... tap to interrupt");
             liveAudioPlayer = new Audio("data:audio/mp3;base64," + audioBase64);
             const player = liveAudioPlayer;
+            updateTranscript(cleanText, { audio: player });   // words follow the voice
 
             // Hook the audio up to the orb visualizer
             try {
@@ -3016,6 +3149,7 @@
         } else {
             // No audio came back (TTS hiccup): give the user time to read, then resume listening
             setLiveState('speaking', "Navi says... tap to reply");
+            updateTranscript(cleanText, { charMs: 38 });      // no voice: words appear at a reading pace
             clearTimeout(liveResumeTimer);
             liveResumeTimer = setTimeout(
                 () => { if (isLiveModeActive && liveState === 'speaking') startLiveListening(); },
@@ -3119,6 +3253,7 @@
     let audioCtx = null;
     let analyser = null;
     let dataArray = null;
+    let liveMicFreqBuf = null;
     let currentAudioSource = null;
     let orbAnimationId = null;
 
@@ -3126,17 +3261,66 @@
         if (!audioCtx) {
             audioCtx = new (window.AudioContext || window.webkitAudioContext)();
             analyser = audioCtx.createAnalyser();
-            analyser.fftSize = 128; // Small chunk size for snappy visual response
+            analyser.fftSize = 512;                 // ~90Hz per bin: enough to tell low voices from high ones, still snappy
+            analyser.smoothingTimeConstant = 0.55;
             dataArray = new Uint8Array(analyser.frequencyBinCount);
         }
         if (audioCtx.state === 'suspended') audioCtx.resume();
     }
 
 
+    // --- VOICE SPECTRUM ---
+    // Splits a voice into five frequency bands (low voice / body / vowels / presence / consonants)
+    // plus a 24-step spectrum, and tracks the "brightness" (spectral centroid, i.e. pitch). The wave
+    // renderer uses them so each ribbon follows its own part of the voice.
+    const SPEC_BANDS = [80, 250, 500, 1200, 2500, 6000];   // Hz edges
+    const SPEC_GAIN  = [1.0, 1.15, 1.35, 1.8, 2.4];        // higher bands carry less energy in speech
+    const SPEC_BINS  = 24;                                  // log-spaced steps from 80Hz to 6kHz
+    const liveSpectrum = {
+        bands: new Float32Array(5), bins: new Float32Array(SPEC_BINS),
+        level: 0, centroid: 0.35, stamp: 0
+    };
+
+    function analyseSpectrum(node, buf, gate) {
+        node.getByteFrequencyData(buf);
+        const binHz = node.context.sampleRate / node.fftSize;
+        const last = buf.length - 1;
+        const avg = (f0, f1) => {
+            const lo = Math.max(1, Math.floor(f0 / binHz));
+            const hi = Math.min(last, Math.max(lo, Math.ceil(f1 / binHz)));
+            let sum = 0;
+            for (let i = lo; i <= hi; i++) sum += buf[i];
+            return sum / (hi - lo + 1) / 255;
+        };
+        const g = gate === undefined ? 1 : gate;
+
+        let total = 0;
+        for (let b = 0; b < 5; b++) {
+            const v = Math.min(1, avg(SPEC_BANDS[b], SPEC_BANDS[b + 1]) * SPEC_GAIN[b]) * g;
+            liveSpectrum.bands[b] = v;
+            total += v;
+        }
+
+        const ratio = Math.pow(SPEC_BANDS[5] / SPEC_BANDS[0], 1 / SPEC_BINS);
+        let f = SPEC_BANDS[0], wSum = 0, fSum = 0;
+        for (let j = 0; j < SPEC_BINS; j++) {
+            const f1 = f * ratio;
+            const v = Math.min(1, avg(f, f1) * 1.3 * (1 + j / SPEC_BINS)) * g;
+            liveSpectrum.bins[j] = v;
+            wSum += v;
+            fSum += v * (j / (SPEC_BINS - 1));
+            f = f1;
+        }
+        liveSpectrum.level = Math.min(1, (total / 5) * 1.6);
+        if (wSum > 0.02) liveSpectrum.centroid = fSum / wSum;   // 0 = low voice, 1 = bright / high
+        liveSpectrum.stamp = performance.now();
+    }
+
     // --- LIVE WAVE RENDERER ---
-    // Layered soft gradient waves built from travelling sine waves (no outlines). Slow "swell groups" roll across the
-    // screen so energy forms and dissolves, and each ribbon slowly shifts between two hues.
-    // Amplitude follows the mic (listening) or Navi's voice (speaking) via --audio-scale.
+    // Layered soft gradient waves built from travelling sine waves (no outlines).
+    //  - each ribbon follows one frequency band of the voice (bass at the bottom layer, consonants on top)
+    //  - the silhouette follows the voice's spectrum: low tones swell the middle, bright tones reach the edges
+    //  - higher pitch makes the waves tighter and faster; lower pitch makes them longer and slower
     const liveWave = (() => {
         const canvas = document.getElementById('live-wave');
         const ctx = canvas.getContext('2d');
@@ -3159,14 +3343,17 @@
         };
         const TARGET = {
             idle:      { amp: 0.04, speed: 0.30 },
-            listening: { amp: 0.065, speed: 0.42 },
+            listening: { amp: 0.06, speed: 0.42 },
             thinking:  { amp: 0.08, speed: 0.80 },
-            speaking:  { amp: 0.10, speed: 0.62 },
+            speaking:  { amp: 0.075, speed: 0.55 },
             error:     { amp: 0.025, speed: 0.25 }
         };
         const w = [0, 0, 0, 0, 0];
+        // Smoothed copy of the voice spectrum (quick to rise, slower to fall, so it moves like a voice)
+        const sm = { bands: new Float32Array(5), bins: new Float32Array(SPEC_BINS), level: 0, centroid: 0.35 };
         let raf = 0, W = 0, H = 0, dpr = 1, t = 0, last = 0, tick = 0;
-        let level = 0, amp = 0.035, speed = 0.5, lite = false, reduce = false;
+        let amp = 0.04, speed = 0.3, kMul = 1, lite = false, reduce = false;
+        let xs = new Float32Array(0), ys = new Float32Array(0), shape = new Float32Array(0);
 
         function resize() {
             dpr = Math.min(window.devicePixelRatio || 1, lite ? 1.5 : 2);
@@ -3179,15 +3366,22 @@
         function mix(a, b, m) { return [a[0] + (b[0] - a[0]) * m, a[1] + (b[1] - a[1]) * m, a[2] + (b[2] - a[2]) * m]; }
         function rgba(c, a) { return 'rgba(' + Math.round(c[0]) + ',' + Math.round(c[1]) + ',' + Math.round(c[2]) + ',' + a.toFixed(3) + ')'; }
 
-        function draw(ampNow) {
+        function draw(ampBase) {
             ctx.clearRect(0, 0, W, H);
             ctx.globalCompositeOperation = 'lighter';
             const N = lite ? 56 : Math.max(70, Math.round(W / (5 * dpr)));
+            if (xs.length !== N + 1) { xs = new Float32Array(N + 1); ys = new Float32Array(N + 1); shape = new Float32Array(N + 1); }
             const baseY = H * 0.64;
-            const xs = new Float32Array(N + 1), ys = new Float32Array(N + 1);
+
+            // Silhouette from the voice spectrum: low tones in the middle, bright tones toward the edges
+            for (let i = 0; i <= N; i++) {
+                const p = Math.abs(i / N - 0.5) * 2 * (SPEC_BINS - 1);
+                const i0 = Math.floor(p), i1 = Math.min(SPEC_BINS - 1, i0 + 1), fr = p - i0;
+                shape[i] = 1 + (sm.bins[i0] * (1 - fr) + sm.bins[i1] * fr) * 0.85;
+            }
 
             // Very faint bloom hugging the waves (stays black everywhere else)
-            const bloomA = 0.07 + level * 0.10;
+            const bloomA = 0.07 + sm.level * 0.10;
             const bg = ctx.createRadialGradient(W / 2, baseY, 0, W / 2, baseY, W * 0.75);
             bg.addColorStop(0, 'rgba(60,120,255,' + bloomA.toFixed(3) + ')');
             bg.addColorStop(1, 'rgba(60,120,255,0)');
@@ -3197,18 +3391,21 @@
             for (let li = 0; li < LAYERS.length; li++) {
                 const L = LAYERS[li], wgt = w[li];
                 if (wgt < 0.02) continue;
-                const A = ampNow * H * L.a * (0.5 + 0.5 * wgt);
+                if (lite && li === 4) continue;
+                // Each ribbon rises with its own slice of the voice, plus a little of the overall loudness
+                const A = (ampBase + sm.level * 0.035 + sm.bands[li] * 0.115) * H * L.a * (0.5 + 0.5 * wgt);
                 const by = baseY + L.y * H;
                 const col = mix(L.cA, L.cB, 0.5 + 0.5 * Math.sin(t * 0.22 + L.ph));
+                const kk = L.k * kMul;
 
                 for (let i = 0; i <= N; i++) {
                     const x = i / N;
                     const env = Math.pow(Math.sin(Math.PI * x), 1.1) * 0.9 + 0.1;                 // taper toward the edges
                     const mod = 0.45 + 0.55 * Math.sin(L.k2 * x * TAU + t * L.sp2 + L.ph * 1.3);  // swell groups rolling across
-                    const main = Math.sin(L.k * x * TAU + t * L.sp + L.ph);
-                    const harm = 0.25 * Math.sin(L.k * 1.9 * x * TAU - t * L.sp * 0.7 + L.ph);    // organic second harmonic
+                    const main = Math.sin(kk * x * TAU + t * L.sp + L.ph);
+                    const harm = 0.25 * Math.sin(kk * 1.9 * x * TAU - t * L.sp * 0.7 + L.ph);     // organic second harmonic
                     xs[i] = x * W;
-                    ys[i] = by - A * env * mod * (main + harm);
+                    ys[i] = by - A * env * mod * shape[i] * (main + harm);
                 }
 
                 // Soft gradient body: richest just under the crest, melting into black below.
@@ -3242,19 +3439,39 @@
             const st = TARGET[liveState] ? liveState : 'idle';
             const tg = TARGET[st], wt = WEIGHTS[st];
 
-            // Voice level (set by the mic loop while listening, by the audio analyser while speaking)
-            const raw = parseFloat(orb.style.getPropertyValue('--audio-scale')) || 1;
-            const target = Math.max(0, Math.min(1, (raw - 1) / 0.25));
-            level += (target - level) * (target > level ? Math.min(1, dt * 12) : Math.min(1, dt * 3));
+            // Voice spectrum: live data while it is fresh; otherwise fall back to the simple loudness value
+            const fresh = (now - liveSpectrum.stamp) < 180;
+            let fallback = 0;
+            if (!fresh) {
+                const raw = parseFloat(orb.style.getPropertyValue('--audio-scale')) || 1;
+                fallback = Math.max(0, Math.min(1, (raw - 1) / 0.25));
+            }
+            for (let i = 0; i < 5; i++) {
+                const tgt = fresh ? liveSpectrum.bands[i] : fallback * 0.6;
+                sm.bands[i] += (tgt - sm.bands[i]) * Math.min(1, dt * (tgt > sm.bands[i] ? 18 : 6));
+            }
+            for (let j = 0; j < SPEC_BINS; j++) {
+                const tgt = fresh ? liveSpectrum.bins[j] : 0;
+                sm.bins[j] += (tgt - sm.bins[j]) * Math.min(1, dt * (tgt > sm.bins[j] ? 16 : 6));
+            }
+            const lvTgt = fresh ? liveSpectrum.level : fallback;
+            sm.level += (lvTgt - sm.level) * Math.min(1, dt * (lvTgt > sm.level ? 14 : 4));
+            if (fresh) sm.centroid += (liveSpectrum.centroid - sm.centroid) * Math.min(1, dt * 3);
+
+            // Pitch: bright / high voices make tighter, quicker waves; low voices make longer, slower ones
+            const bright = Math.max(0, Math.min(1, (sm.centroid - 0.15) / 0.55));
+            const active = Math.min(1, sm.level * 3);
+            const kTarget = 1 + (bright - 0.5) * 0.3 * active;
+            kMul += (kTarget - kMul) * Math.min(1, dt * 1.5);
 
             const k = Math.min(1, dt * 2.2);
             amp += (tg.amp - amp) * k;
             speed += (tg.speed - speed) * k;
             for (let i = 0; i < w.length; i++) w[i] += (wt[i] - w[i]) * Math.min(1, dt * 1.6);
 
-            t += dt * (speed + level * 0.45) * (reduce ? 0.3 : 1);   // a little faster when louder
+            t += dt * (speed + sm.level * 0.4 + bright * 0.35 * active) * (reduce ? 0.3 : 1);
             const pulse = st === 'thinking' ? 1 + 0.12 * Math.sin(now / 1000 * 1.6) : 1;
-            draw(amp * pulse + level * 0.09);
+            draw(amp * pulse);
         }
 
         window.addEventListener('resize', () => { if (raf) resize(); });
@@ -3278,18 +3495,11 @@
 
     function pulseWithAudio() {
         if (liveState !== 'speaking' || !analyser) return;
-        
-        analyser.getByteFrequencyData(dataArray);
-        let sum = 0;
-        for(let i = 0; i < dataArray.length; i++) { sum += dataArray[i]; }
-        let average = sum / dataArray.length;
-        
-        // Map the volume (0-255) to a scale multiplier (1.0 to 1.35)
-        let scale = 1 + (average / 255) * 0.35; 
-        
-        // Inject the scale directly into the CSS variable!
-        document.getElementById('live-orb').style.setProperty('--audio-scale', scale);
-        
+
+        // Read the frequency makeup of Navi's voice; the wave renderer turns it into motion
+        analyseSpectrum(analyser, dataArray);
+        document.getElementById('live-orb').style.setProperty('--audio-scale', (1 + liveSpectrum.level * 0.35).toFixed(3));
+
         orbAnimationId = requestAnimationFrame(pulseWithAudio);
     }
 </script>
