@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>CamaNaviGo: Chat</title>
     <link rel="icon" type="image/png" href="https://cdn.jsdelivr.net/gh/altianalbertsebastian10-tech/camanava-bot@main/navi_avatar.png">
     
@@ -26,6 +26,7 @@
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
     
     <style>
+        @media (max-width: 640px) { #input { font-size: 16px; } }
         :root {
             /* Typography */
             --font-display: 'DM Sans', sans-serif;
@@ -599,57 +600,52 @@
             border-top-right-radius: 6px;
         }
 
+        /* Thinking indicator: a spinning starburst plus a line saying what Navi is doing right now */
         .typing-bubble {
             display: flex !important;
             align-items: center;
-            justify-content: center;
-            width: 75px; height: 50px;
-            padding: 0 !important;
+            gap: 10px;
+            width: auto; max-width: 92%;
+            padding: 6px 2px !important;
             background: transparent !important;
             border: none !important;
             box-shadow: none !important;
         }
-
         .typing-bubble::after { display: none; }
-
-        .loading-container {
-            display: flex; justify-content: center; align-items: center;
-            transform: scale(0.18);
+        .think-star {
+            flex: none; width: 22px; height: 22px;
+            color: var(--live-fg);
+            animation: thinkSpin 2.4s linear infinite, thinkPulse 1.6s ease-in-out infinite;
+            will-change: transform;
         }
-
-        .loader {
-            display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;
-            width: 80px; height: 80px;
-            transform: rotate(45deg);
-            animation: rotateLoader 2.0s cubic-bezier(0.15, 0.83, 0.66, 1) infinite;
+        .think-star svg { display: block; width: 100%; height: 100%; fill: currentColor; }
+        .think-label {
+            font-size: 0.92rem; line-height: 1.3; font-weight: 500;
+            color: var(--muted);
+            background: linear-gradient(90deg, var(--muted) 0%, var(--muted) 35%, var(--fore) 50%, var(--muted) 65%, var(--muted) 100%);
+            background-size: 250% 100%;
+            -webkit-background-clip: text; background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: thinkShimmer 2.2s linear infinite;
+            transition: opacity 0.25s ease;
         }
-
-        .cube {
-            width: 35px; height: 35px;
-            background: var(--fore);
-            opacity: 0.3;
-            border-radius: 8px;
-            transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease, opacity 0.3s ease;
-            animation: pulse 1.6s ease-in-out infinite;
+        .think-label.is-swapping { opacity: 0; }
+        @keyframes thinkSpin { to { transform: rotate(360deg); } }
+        @keyframes thinkPulse { 0%, 100% { scale: 0.86; } 50% { scale: 1.08; } }
+        @keyframes thinkShimmer { from { background-position: 125% 0; } to { background-position: -125% 0; } }
+        @media (prefers-reduced-motion: reduce) {
+            .think-star { animation: thinkPulse 2.4s ease-in-out infinite; }
+            .think-label { animation: none; -webkit-text-fill-color: currentColor; background: none; }
         }
-
-        @keyframes pulse {
-            0%, 100% { transform: scale(1); opacity: 0.3; }
-            50% { transform: scale(1.2); opacity: 1; }
-        }
-
-        @keyframes rotateLoader {
-            0% { transform: rotate(45deg); }
-            50% { transform: rotate(225deg); }
-            100% { transform: rotate(405deg); }
-        }
-        .cube:nth-child(1) { animation-delay: 0s; }
-        .cube:nth-child(2) { animation-delay: 0.2s; }
-        .cube:nth-child(3) { animation-delay: 0.4s; }
-        .cube:nth-child(4) { animation-delay: 0.6s; }
+        html.lite-mode .think-label { animation: none; -webkit-text-fill-color: currentColor; background: none; }
 
         .response-container { width: 100%; }
-        .resp-body { color: inherit; }
+        .resp-body { color: inherit; overflow-wrap: anywhere; }
+        .resp-body p { margin: 0 0 0.55em; }
+        .resp-body p:last-child, .resp-body ul:last-child, .resp-body ol:last-child { margin-bottom: 0; }
+        .resp-body ul, .resp-body ol { margin: 0 0 0.55em; padding-left: 1.3em; }
+        .resp-body li { margin: 0.15em 0; }
+        .user-msg { overflow-wrap: anywhere; }
         strong { font-family: var(--font-display); font-weight: 700; color: var(--fore); }
 
         .footer-container {
@@ -2247,18 +2243,31 @@
         });
     }
 
+    // Escapes the text first (model output is never trusted as HTML), then applies **bold** and lists.
     function formatMessageHTML(text) {
         if (!text) return '';
-        let formatted = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\*/g, '').trim();
-        let lines = formatted.split('\n').filter(l => l.trim() !== '');
-        if (lines.length <= 1) {
-            return `<div class="resp-body">${formatted}</div>`;
-        } else {
-            const inner = lines.map(l =>
-                l.trim().startsWith('- ') ? `<li>${l.trim().substring(2)}</li>` : l + '<br>'
-            ).join('');
-            return `<div class="resp-body">${inner}</div>`;
+        const esc = t => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const inline = t => esc(t).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/\*/g, '');
+        const out = [];
+        let list = null;
+        const closeList = () => { if (list) { out.push('</' + list + '>'); list = null; } };
+        for (const raw of text.trim().split('\n')) {
+            const l = raw.trim();
+            if (!l) { closeList(); continue; }
+            let m;
+            if ((m = l.match(/^[-*\u2022]\s+(.*)$/))) {
+                if (list !== 'ul') { closeList(); out.push('<ul>'); list = 'ul'; }
+                out.push('<li>' + inline(m[1]) + '</li>');
+            } else if ((m = l.match(/^\d+[.)]\s+(.*)$/))) {
+                if (list !== 'ol') { closeList(); out.push('<ol>'); list = 'ol'; }
+                out.push('<li>' + inline(m[1]) + '</li>');
+            } else {
+                closeList();
+                out.push('<p>' + inline(l) + '</p>');
+            }
         }
+        closeList();
+        return '<div class="resp-body">' + out.join('') + '</div>';
     }
 
     function updateStatusDisplay(mode) {
@@ -2885,6 +2894,53 @@
         forceUIRefreshScroll();
     }
 
+    // --- THINKING STATUS ---
+    // While waiting for a reply, show what Navi is doing. The steps mirror what the server really does
+    // (check the question, look places up, write the reply); the wording follows what the user asked.
+    const STAR_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 1.5c.7 0 1.2.5 1.3 1.2l.6 5.2 3.7-3.7c.5-.5 1.3-.5 1.8 0s.5 1.3 0 1.8l-3.7 3.7 5.2.6c.7.1 1.2.6 1.2 1.3s-.5 1.2-1.2 1.3l-5.2.6 3.7 3.7c.5.5.5 1.3 0 1.8s-1.3.5-1.8 0l-3.7-3.7-.6 5.2c-.1.7-.6 1.2-1.3 1.2s-1.2-.5-1.3-1.2l-.6-5.2-3.7 3.7c-.5.5-1.3.5-1.8 0s-.5-1.3 0-1.8l3.7-3.7-5.2-.6c-.7-.1-1.2-.6-1.2-1.3s.5-1.2 1.2-1.3l5.2-.6-3.7-3.7c-.5-.5-.5-1.3 0-1.8s1.3-.5 1.8 0l3.7 3.7.6-5.2c.1-.7.6-1.2 1.3-1.2z"/></svg>';
+
+    function thinkingSteps(msg) {
+        const m = (msg || '').toLowerCase();
+        const city = (m.match(/caloocan|kaloakan|kalookan|malabon|navotas|valenzuela/) || [])[0];
+        const cityName = city ? (/kal/.test(city) ? 'Caloocan' : city.charAt(0).toUpperCase() + city.slice(1)) : '';
+        const steps = ['Understanding your question'];
+        if (/itinerar|day\s*trip|plan (a|my|our)|trip plan|schedule/.test(m)) {
+            steps.push('Picking places for your trip', 'Arranging the stops', 'Putting your itinerary together');
+        } else if (/save|confirm|finalize/.test(m)) {
+            steps.push('Checking your itinerary', 'Saving it to your account');
+        } else if (/restaurant|food|eat|kainan|pork|dining/.test(m)) {
+            steps.push(cityName ? 'Finding places to eat in ' + cityName : 'Finding places to eat', 'Checking the details', 'Writing my recommendations');
+        } else if (/park|plaza|church|chapel|shrine|museum|fish|port|market|beach/.test(m)) {
+            steps.push(cityName ? 'Searching ' + cityName + ' spots' : 'Searching CAMANAVA spots', 'Checking the details', 'Writing my reply');
+        } else if (cityName) {
+            steps.push('Looking up places in ' + cityName, 'Checking the details', 'Writing my reply');
+        } else {
+            steps.push('Searching CAMANAVA places', 'Checking the details', 'Writing my reply');
+        }
+        return steps;
+    }
+
+    function setThinkingLabel(bubble, text, instant) {
+        const label = bubble && bubble.querySelector('.think-label');
+        if (!label || label.textContent === text) return;
+        if (instant || prefersReducedMotion()) { label.textContent = text; return; }
+        label.classList.add('is-swapping');
+        setTimeout(() => { label.textContent = text; label.classList.remove('is-swapping'); }, 220);
+    }
+
+    function startThinkingStatus(bubble, msg) {
+        const steps = thinkingSteps(msg);
+        bubble.setAttribute('role', 'status');
+        bubble.setAttribute('aria-live', 'polite');
+        bubble.innerHTML = '<span class="think-star">' + STAR_SVG + '</span><span class="think-label"></span>';
+        bubble.querySelector('.think-label').textContent = steps[0] + '...';
+        let i = 0;
+        const timer = setInterval(() => {
+            if (!bubble.isConnected) { clearInterval(timer); return; }   // reply arrived or request stopped
+            if (i < steps.length - 1) { i++; setThinkingLabel(bubble, steps[i] + '...'); }
+        }, 2200);
+    }
+
     async function send(messageOverride = null) {
         if (isNaviThinking || editResendPending) return;
         
@@ -2908,15 +2964,7 @@
         const typingBubble = document.createElement('div');
         typingBubble.className = 'msg bot-msg typing-bubble';
         typingBubble.id = typingId;
-        typingBubble.innerHTML = `
-        <div class="loading-container">
-          <div class="loader">
-            <div class="cube"></div>
-            <div class="cube"></div>
-            <div class="cube"></div>
-            <div class="cube"></div>
-          </div>
-        </div>`;
+        startThinkingStatus(typingBubble, msg);
         document.getElementById('chat').appendChild(typingBubble);
         forceUIRefreshScroll();
         
@@ -2929,11 +2977,7 @@
             if (isLiveModeActive) {
                 if (liveState === 'thinking') setLiveState('thinking', "Still working on it, one moment...");
             } else {
-                waitNote = document.createElement('div');
-                waitNote.className = 'stopped-note';
-                waitNote.textContent = 'Still working on it... the server may be waking up.';
-                document.getElementById('chat').appendChild(waitNote);
-                forceUIRefreshScroll();
+                setThinkingLabel(document.getElementById(typingId), 'Still working... the server may be waking up', true);
             }
         }, 8000);
         const dropWaitNote = () => { clearTimeout(slowChatHint); if (waitNote) { waitNote.remove(); waitNote = null; } };
