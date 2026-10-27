@@ -1,5 +1,6 @@
 import os
 import json
+import asyncio
 import base64
 import edge_tts
 import emoji
@@ -7,9 +8,10 @@ import tempfile
 import re
 import random
 from groq import Groq
-from fastapi import FastAPI, UploadFile, File, Form, Header, HTTPException, Depends
+from fastapi import FastAPI, UploadFile, File, Form, Header, HTTPException, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, StreamingResponse
+from starlette.concurrency import iterate_in_threadpool, run_in_threadpool
 from pydantic import BaseModel
 from typing import List, Dict, Optional
 import threading
@@ -746,6 +748,8 @@ async def health_check():
     mode = "FIRESTORE" if firebase_active else "JSON_FALLBACK"
     return {"status": "alive", "mode": mode}
 
+TTS_TIMEOUT_SECONDS = 8
+
 async def generate_speech_base64(text: str, mood: str, lang: str = "EN") -> str:
     """Generates natural neural TTS audio with a sassy, smart AI assistant vibe.
 
@@ -777,13 +781,21 @@ async def generate_speech_base64(text: str, mood: str, lang: str = "EN") -> str:
             pitch = "-6Hz"  # Drops the pitch for a flatter, almost deadpan tone
 
         communicate = edge_tts.Communicate(text, voice, rate=rate, pitch=pitch)
-        
-        audio_bytes = b""
-        async for chunk in communicate.stream():
-            if chunk["type"] == "audio":
-                audio_bytes += chunk["data"]
-                
+
+        async def _collect() -> bytes:
+            data = b""
+            async for chunk in communicate.stream():
+                if chunk["type"] == "audio":
+                    data += chunk["data"]
+            return data
+
+        # Never let voice generation hold the whole reply hostage: if Microsoft's endpoint is slow
+        # or blocked, give up after a few seconds and let the client show the text immediately.
+        audio_bytes = await asyncio.wait_for(_collect(), timeout=TTS_TIMEOUT_SECONDS)
         return base64.b64encode(audio_bytes).decode('utf-8')
+    except asyncio.TimeoutError:
+        print(f"Edge-TTS Timeout: no audio after {TTS_TIMEOUT_SECONDS}s, replying with text only")
+        return ""
     except Exception as e:
         print(f"Edge-TTS Error: {e}")
         return ""
@@ -799,6 +811,81 @@ async def tts(req: TTSRequest, user: dict = Depends(verify_firebase_token)):
     return {"audio": await generate_speech_base64(text, mood, lang)}
 
 
+# --- WHISPER SILENCE GUARD ---
+# Whisper "hears" stock phrases ("Thank you.", "Thanks for watching!") in silence and room noise.
+# Guessing from the text alone is unreliable, so we ask Whisper how sure it is. With
+# response_format="verbose_json" every segment comes with:
+#   no_speech_prob   - how likely the segment is NOT speech (silence / noise)
+#   avg_logprob      - how confident the words are (closer to 0 = more confident)
+#   compression_ratio - very high means a repetition loop (another classic hallucination)
+# Segments that look like non-speech are dropped before they ever reach the chat.
+_STOCK_HALLUCINATIONS = {
+    "thank you", "thanks", "thank you so much", "thanks for watching", "thank you for watching",
+    "you", "bye", "bye bye", "goodbye", "please subscribe", "like and subscribe",
+    "subtitles by the amara.org community", "salamat po", "salamat sa panonood",
+}
+MIN_AUDIO_BYTES = 2000   # a few hundred ms of audio is nothing but a click or silence
+
+
+def _seg_get(seg, key, default=0.0):
+    value = seg.get(key, default) if isinstance(seg, dict) else getattr(seg, key, default)
+    return default if value is None else value
+
+
+def _segment_is_speech(seg) -> bool:
+    no_speech = _seg_get(seg, "no_speech_prob", 0.0)
+    logprob = _seg_get(seg, "avg_logprob", 0.0)
+    compression = _seg_get(seg, "compression_ratio", 0.0)
+    if no_speech >= 0.7:                        # Whisper itself is quite sure it is silence
+        return False
+    if no_speech >= 0.5 and logprob < -0.8:     # probably silence, and it is not sure of the words
+        return False
+    if logprob < -1.5:                          # words it barely believes
+        return False
+    if compression > 2.4:                       # repetition loop
+        return False
+    return True
+
+
+def _normalize_phrase(t: str) -> str:
+    return re.sub(r"[^\w\s.]", "", t.lower()).strip(" .!?")
+
+
+def clean_transcription(transcription) -> str:
+    """Returns the real speech in a Whisper verbose_json response, or "" when it was only silence."""
+    full_text = (getattr(transcription, "text", "") or "").strip()
+    segments = getattr(transcription, "segments", None)
+    if segments is None and isinstance(transcription, dict):
+        segments = transcription.get("segments")
+
+    if not segments:
+        # No confidence data available: fall back to the phrase list alone.
+        return "" if _normalize_phrase(full_text) in _STOCK_HALLUCINATIONS else full_text
+
+    kept = []
+    for seg in segments:
+        seg_text = str(_seg_get(seg, "text", "") or "").strip()
+        if not seg_text:
+            continue
+        if _segment_is_speech(seg):
+            kept.append((seg_text, seg))
+        else:
+            print(f"[WHISPER] dropped non-speech segment: {seg_text!r} "
+                  f"(no_speech={_seg_get(seg, 'no_speech_prob'):.2f}, logprob={_seg_get(seg, 'avg_logprob'):.2f})")
+
+    text = " ".join(t for t, _ in kept).strip()
+    if not text:
+        return ""
+
+    # A stock phrase is only kept when Whisper is clearly confident someone actually said it.
+    if _normalize_phrase(text) in _STOCK_HALLUCINATIONS:
+        confident = all(_seg_get(sg, "no_speech_prob") < 0.3 and _seg_get(sg, "avg_logprob") > -0.6 for _, sg in kept)
+        if not confident:
+            print(f"[WHISPER] dropped stock phrase with low confidence: {text!r}")
+            return ""
+    return text
+
+
 @app.post("/transcribe")
 async def transcribe_audio(file: UploadFile = File(...), language: Optional[str] = Form(None)):
     temp_audio_path = None
@@ -806,9 +893,13 @@ async def transcribe_audio(file: UploadFile = File(...), language: Optional[str]
         ext = os.path.splitext(file.filename)[1]
         if not ext:
             ext = ".webm" 
-            
+
+        audio_data = await file.read()
+        if len(audio_data) < MIN_AUDIO_BYTES:
+            return {"text": ""}
+
         with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as temp_audio:
-            temp_audio.write(await file.read())
+            temp_audio.write(audio_data)
             temp_audio_path = temp_audio.name
         
         with open(temp_audio_path, "rb") as audio_file:
@@ -817,16 +908,14 @@ async def transcribe_audio(file: UploadFile = File(...), language: Optional[str]
             kwargs = {
                 "file": (temp_audio_path, audio_file.read()),
                 "model": "whisper-large-v3",
+                "response_format": "verbose_json",   # includes per-segment confidence (see the guard above)
+                "temperature": 0.0,                  # no random "creative" guesses on unclear audio
             }
             if language:
                 kwargs["language"] = language
             transcription = primary_client.audio.transcriptions.create(**kwargs)
 
-        text = (transcription.text or "").strip()
-        # Whisper tends to "hear" these phrases in near-silence; treat them as no speech.
-        if text.lower().strip(" .!") in {"thank you", "thanks for watching", "you", "bye"}:
-            text = ""
-        return {"text": text}
+        return {"text": clean_transcription(transcription)}
     except Exception as e:
         print(f"Transcription Error: {e}")
         return {"text": ""}
@@ -837,119 +926,121 @@ async def transcribe_audio(file: UploadFile = File(...), language: Optional[str]
             except:
                 pass
 
-@app.post("/chat")
-async def chat(request: ChatRequest, user: dict = Depends(verify_firebase_token)):
-    try:
-        
-        verified_uid = user.get("uid")
-        print(f"Authenticated request from UID: {verified_uid}")
+async def prepare_chat_turn(request: "ChatRequest", verified_uid: str) -> dict:
+    """Everything /chat does BEFORE it calls the language model: out-of-scope replies, itinerary
+    turns, place lookup and prompt building. Shared by /chat and /chat/stream so the two can
+    never drift apart.
 
-        # An itinerary is "in progress" either because the client is already carrying
-        # a draft from a previous turn, or because this message just triggered one.
-        # An itinerary is "in progress" for the rest of the conversation once started --
-        # not just while it already has stops. Otherwise, the very first reply ("sure,
-        # tell me the places!") has zero stops yet, and the user's NEXT message (which
-        # naturally won't contain the word "itinerary" again) would incorrectly fall back
-        # to normal chat instead of continuing to build the draft.
-        scoped = scope_reply_for(request.message, request.history)
-        if scoped:
-            reply_text, reply_lang = scoped
-            history_out = (request.history + [
-                {"role": "user", "content": request.message},
-                {"role": "assistant", "content": reply_text}
-            ])[-60:]
-            audio_b64 = await generate_speech_base64(reply_text, "NEUTRAL", reply_lang) if request.want_audio else ""
-            persist_chat_session(verified_uid, request.session_id, history_out, request.itinerary_draft)
-            return {
-                "response": reply_text,
-                "audio": audio_b64,
-                "history": history_out,
-                "itinerary_draft": request.itinerary_draft,  # keep any trip in progress untouched
-                "itinerary_saved": None,
-                "mood": "NEUTRAL",
-                "lang": reply_lang
-            }
+    Returns {"kind": "final", "payload": {...}}  -> a complete reply that needs no model call, or
+            {"kind": "llm", "system_prompt": str, "context_history": list} -> go ask the model.
+    """
 
-        itinerary_in_progress = request.itinerary_draft is not None
-        if itinerary_in_progress or ITINERARY_TRIGGER_PATTERN.search(request.message.lower()):
-            return await handle_itinerary_turn(request, verified_uid)
-        
-        user_msg = request.message.lower()
-        camanava_cities = ["caloocan", "malabon", "navotas", "valenzuela"]
-        
-        target_city = None
-        negated_cities = set()
+    # An itinerary is "in progress" either because the client is already carrying
+    # a draft from a previous turn, or because this message just triggered one.
+    # An itinerary is "in progress" for the rest of the conversation once started --
+    # not just while it already has stops. Otherwise, the very first reply ("sure,
+    # tell me the places!") has zero stops yet, and the user's NEXT message (which
+    # naturally won't contain the word "itinerary" again) would incorrectly fall back
+    # to normal chat instead of continuing to build the draft.
+    scoped = scope_reply_for(request.message, request.history)
+    if scoped:
+        reply_text, reply_lang = scoped
+        history_out = (request.history + [
+            {"role": "user", "content": request.message},
+            {"role": "assistant", "content": reply_text}
+        ])[-60:]
+        audio_b64 = await generate_speech_base64(reply_text, "NEUTRAL", reply_lang) if request.want_audio else ""
+        persist_chat_session(verified_uid, request.session_id, history_out, request.itinerary_draft)
+        return {"kind": "final", "payload": {
+            "response": reply_text,
+            "audio": audio_b64,
+            "history": history_out,
+            "itinerary_draft": request.itinerary_draft,  # keep any trip in progress untouched
+            "itinerary_saved": None,
+            "mood": "NEUTRAL",
+            "lang": reply_lang
+        }}
 
-        messages_to_check = [user_msg]
-        for entry in request.history:
-            if entry.get("role") == "user":
-                messages_to_check.append(entry['content'].lower())
+    itinerary_in_progress = request.itinerary_draft is not None
+    if itinerary_in_progress or ITINERARY_TRIGGER_PATTERN.search(request.message.lower()):
+        return {"kind": "final", "payload": await handle_itinerary_turn(request, verified_uid)}
+    
+    user_msg = request.message.lower()
+    camanava_cities = ["caloocan", "malabon", "navotas", "valenzuela"]
+    
+    target_city = None
+    negated_cities = set()
 
-        for msg in messages_to_check:
-            for city in camanava_cities:
-                city_pattern = city_regex_pattern(city)
-                if re.search(rf'\b(not|except|other than|but|outside|exclude|without|skip|no|anywhere but)\s+(in\s+|for\s+)?{city_pattern}\b', msg):
-                    negated_cities.add(city)
+    messages_to_check = [user_msg]
+    for entry in request.history:
+        if entry.get("role") == "user":
+            messages_to_check.append(entry['content'].lower())
 
+    for msg in messages_to_check:
         for city in camanava_cities:
             city_pattern = city_regex_pattern(city)
-            if re.search(city_pattern, user_msg) and city not in negated_cities:
-                target_city = city
+            if re.search(rf'\b(not|except|other than|but|outside|exclude|without|skip|no|anywhere but)\s+(in\s+|for\s+)?{city_pattern}\b', msg):
+                negated_cities.add(city)
+
+    for city in camanava_cities:
+        city_pattern = city_regex_pattern(city)
+        if re.search(city_pattern, user_msg) and city not in negated_cities:
+            target_city = city
+            break
+
+    if not target_city:
+        if any(phrase in user_msg for phrase in ["other city", "other cities", "different city", "another city", "elsewhere"]):
+            discussed_cities = set()
+            for entry in request.history:
+                content = entry.get('content', '').lower()
+                for c in camanava_cities:
+                    if c in content:
+                        discussed_cities.add(c)
+            
+            remaining_cities = [c for c in camanava_cities if c not in discussed_cities and c not in negated_cities]
+            if remaining_cities:
+                target_city = remaining_cities[0]
+            else:
+                allowed = [c for c in camanava_cities if c not in negated_cities]
+                target_city = allowed[0] if allowed else "malabon"
+
+    if not target_city and request.history:
+        for entry in reversed(request.history):
+            content = entry['content'].lower()
+            for city in camanava_cities:
+                city_pattern = city_regex_pattern(city)
+                if re.search(city_pattern, content) and city not in negated_cities:
+                    target_city = city
+                    break
+            if target_city:
                 break
 
-        if not target_city:
-            if any(phrase in user_msg for phrase in ["other city", "other cities", "different city", "another city", "elsewhere"]):
-                discussed_cities = set()
-                for entry in request.history:
-                    content = entry.get('content', '').lower()
-                    for c in camanava_cities:
-                        if c in content:
-                            discussed_cities.add(c)
-                
-                remaining_cities = [c for c in camanava_cities if c not in discussed_cities and c not in negated_cities]
-                if remaining_cities:
-                    target_city = remaining_cities[0]
-                else:
-                    allowed = [c for c in camanava_cities if c not in negated_cities]
-                    target_city = allowed[0] if allowed else "malabon"
-
-        if not target_city and request.history:
-            for entry in reversed(request.history):
-                content = entry['content'].lower()
-                for city in camanava_cities:
-                    city_pattern = city_regex_pattern(city)
-                    if re.search(city_pattern, content) and city not in negated_cities:
-                        target_city = city
-                        break
-                if target_city:
-                    break
-
-        category_filter = None
-        if re.search(r"\b(parks?|green space|plaza)\b", user_msg):
-            category_filter = "park"
-        elif re.search(r"\b(restaurants?|food|eat|dining|pork|kainan)\b", user_msg):
-            category_filter = "restaurant"
-        elif re.search(r"\b(church|chapel|shrine|parish|temple)\b", user_msg):
-            category_filter = "church"
-        elif re.search(r"\b(fish|fishing|port)\b", user_msg):
-            category_filter = "fishing"
+    category_filter = None
+    if re.search(r"\b(parks?|green space|plaza)\b", user_msg):
+        category_filter = "park"
+    elif re.search(r"\b(restaurants?|food|eat|dining|pork|kainan)\b", user_msg):
+        category_filter = "restaurant"
+    elif re.search(r"\b(church|chapel|shrine|parish|temple)\b", user_msg):
+        category_filter = "church"
+    elif re.search(r"\b(fish|fishing|port)\b", user_msg):
+        category_filter = "fishing"
 
 
-        # Look up any place the user names directly across the WHOLE database, not just the
-        # rotating 5-spot chunk. If the current message names nothing, fall back to places named
-        # in the last couple of messages so follow-ups like "how do I get there?" still resolve.
-        named_places = find_mentioned_places(request.message)
-        if not named_places and request.history:
-            recent_text = " ".join(m.get("content", "") for m in request.history[-2:])
-            named_places = find_mentioned_places(recent_text)
-        if named_places and not target_city:
-            target_city = str(named_places[0].get("city", "")).lower() or None
-        named_context = json.dumps(named_places, indent=2) if named_places else "[]"
+    # Look up any place the user names directly across the WHOLE database, not just the
+    # rotating 5-spot chunk. If the current message names nothing, fall back to places named
+    # in the last couple of messages so follow-ups like "how do I get there?" still resolve.
+    named_places = find_mentioned_places(request.message)
+    if not named_places and request.history:
+        recent_text = " ".join(m.get("content", "") for m in request.history[-2:])
+        named_places = find_mentioned_places(recent_text)
+    if named_places and not target_city:
+        target_city = str(named_places[0].get("city", "")).lower() or None
+    named_context = json.dumps(named_places, indent=2) if named_places else "[]"
 
-        relevant_data = get_city_data(target_city, request.history, category_filter, negated_cities)
-        context = json.dumps(relevant_data, indent=2)
+    relevant_data = get_city_data(target_city, request.history, category_filter, negated_cities)
+    context = json.dumps(relevant_data, indent=2)
 
-        system_prompt = f"""You are Navi -- the AI companion inside CamaNaviGo, an app for exploring the CAMANAVA
+    system_prompt = f"""You are Navi -- the AI companion inside CamaNaviGo, an app for exploring the CAMANAVA
 region (Caloocan, Malabon, Navotas, Valenzuela) in the Philippines. Think of yourself less like a search
 engine and more like a well-traveled, genuinely enthusiastic local friend who happens to know the region
 inside-out -- someone the user would actually enjoy texting, not just querying.
@@ -1050,11 +1141,27 @@ GROUND RULES (these still apply, always):
 Stay in character as Navi. Be someone worth talking to, not just a place-lookup tool.
 """
 
-        # Only send a short rolling window of history to the LLM to keep token usage
-        # (and cost/latency) in check. This is independent of how much conversation
-        # we actually store/return -- see updated_history below.
-        LLM_CONTEXT_TURNS = 12
-        context_history = request.history[-LLM_CONTEXT_TURNS:]
+    # Only send a short rolling window of history to the LLM to keep token usage
+    # (and cost/latency) in check. This is independent of how much conversation
+    # we actually store/return -- see updated_history below.
+    LLM_CONTEXT_TURNS = 12
+    context_history = request.history[-LLM_CONTEXT_TURNS:]
+
+    return {"kind": "llm", "system_prompt": system_prompt, "context_history": context_history}
+
+
+@app.post("/chat")
+async def chat(request: ChatRequest, user: dict = Depends(verify_firebase_token)):
+    try:
+        
+        verified_uid = user.get("uid")
+        print(f"Authenticated request from UID: {verified_uid}")
+
+        prep = await prepare_chat_turn(request, verified_uid)
+        if prep["kind"] == "final":
+            return prep["payload"]
+        system_prompt = prep["system_prompt"]
+        context_history = prep["context_history"]
 
         # Try Primary Groq Account with Fallback to Backup Groq Account
         try:
@@ -1140,6 +1247,261 @@ Stay in character as Navi. Be someone worth talking to, not just a place-lookup 
         print(f"CRITICAL CHAT ERROR: {e}")
         traceback.print_exc()
         return {"response": "I'm having trouble processing that right now. Try again?", "history": request.history, "itinerary_draft": request.itinerary_draft, "itinerary_saved": None}
+
+
+# --- STREAMING REPLIES (/chat/stream) ---
+# Same brain as /chat (prepare_chat_turn), but the reply is sent as Server-Sent Events while the model
+# is still writing, so the first words show up almost immediately. For Live mode (want_audio) each
+# finished sentence is also turned into speech right away, so Navi starts talking after the first
+# sentence instead of after the whole reply + whole voice clip.
+#
+# Events (one JSON object per "data:" line):
+#   {"type":"meta","mood":..,"lang":..}              the secret [MOOD][LANG] tags, already stripped
+#   {"type":"delta","text":".."}                      next piece of visible text
+#   {"type":"sentence","text":"..","audio":"b64","index":n,"word_start":n,"word_count":n}   (Live mode) one spoken sentence, in order
+#   {"type":"replace","text":".."}                    safety net: the reply was swapped (e.g. code block)
+#   {"type":"done", ...same fields /chat returns...}  final, authoritative reply + updated history
+#   {"type":"error","message":".."}                   something failed; the client falls back to /chat
+
+class _StreamHeader:
+    """Strips the secret [MOOD][LANG] tags off the start of a streamed reply, using the same rules
+    as /chat (first bracket = mood; a second bracket only counts if it is [EN] or [TL])."""
+
+    def __init__(self):
+        self.buf = ""
+        self.stage = 0
+        self.done = False
+        self.mood = "NEUTRAL"
+        self.lang = "EN"
+
+    def _finish(self, rest: str) -> str:
+        self.done = True
+        self.buf = ""
+        return rest
+
+    def feed(self, text: str) -> str:
+        if self.done:
+            return text
+        self.buf += text
+        while True:
+            s = self.buf.lstrip()
+            if not s:
+                self.buf = ""
+                return ""
+            if not s.startswith("["):
+                return self._finish(s)
+            end = s.find("]")
+            if end == -1:
+                if len(s) > 32:                 # a bracket with no end: it was not a tag
+                    return self._finish(s)
+                self.buf = s
+                return ""
+            tag = s[1:end].upper()
+            if self.stage == 0:
+                self.mood = tag
+                self.stage = 1
+                self.buf = s[end + 1:]
+                continue
+            if tag in ("EN", "TL"):
+                self.lang = tag
+                return self._finish(s[end + 1:].lstrip())
+            return self._finish(s)
+
+    def finish(self) -> str:
+        """End of stream: release anything still held back while we waited for a closing bracket."""
+        if self.done:
+            return ""
+        return self._finish(self.buf.lstrip())
+
+
+_ABBREVIATIONS = {"no", "mr", "mrs", "ms", "dr", "st", "vs", "jr", "sr", "sto", "brgy", "bgy", "ave", "blvd", "etc"}
+
+
+def pop_speakable_chunks(buf: str, first: bool, final: bool = False):
+    """Cuts finished sentences off the front of buf. The first chunk is allowed to be short so speech
+    can start early; later ones are merged up to a comfortable length. Returns (chunks, rest, first)."""
+    chunks = []
+    while True:
+        min_len = 18 if first else 40
+        cut = None
+        for m in re.finditer(r'[.!?\u2026]+["\')\]]*(?=\s)|\n', buf):
+            end = m.end()
+            if len(buf[:end].strip()) < min_len:
+                continue
+            if buf[m.start()] == ".":
+                w = re.search(r"([A-Za-z]+)$", buf[:m.start()])
+                if w and (w.group(1).lower() in _ABBREVIATIONS or (len(w.group(1)) == 1 and w.group(1).isupper())):
+                    continue                    # "Dr.", "No.", "J. Rizal" are not sentence ends
+            cut = end
+            break
+        if cut is None:
+            if len(buf) > 220:                  # a very long run without punctuation: cut at a space
+                sp = buf.rfind(" ", 0, 200)
+                cut = sp if sp > 0 else 200
+            else:
+                break
+        piece = buf[:cut].strip()
+        buf = buf[cut:].lstrip()
+        if piece:
+            chunks.append(piece)
+            first = False
+    if final and buf.strip():
+        chunks.append(buf.strip())
+        buf = ""
+    return chunks, buf, first
+
+
+def _sse(obj: dict) -> str:
+    return "data: " + json.dumps(obj, ensure_ascii=False) + "\n\n"
+
+
+async def stream_chat_events(request: "ChatRequest", verified_uid: str, is_disconnected):
+    """Async generator of SSE strings for one chat turn (see the event list above)."""
+    tts_tasks = []          # [(text, asyncio.Task)] in speaking order
+    try:
+        yield ": stream-open\n\n"
+        prep = await prepare_chat_turn(request, verified_uid)
+
+        # Out-of-scope answers and itinerary turns are not model-streamed: send them whole.
+        if prep["kind"] == "final":
+            yield _sse({"type": "done", **prep["payload"]})
+            return
+
+        messages = [
+            {"role": "system", "content": prep["system_prompt"]},
+            *prep["context_history"],
+            {"role": "user", "content": request.message},
+        ]
+        stream = None
+        for client in (primary_client, backup_client):
+            try:
+                stream = await run_in_threadpool(
+                    lambda c=client: c.chat.completions.create(
+                        model="openai/gpt-oss-120b", messages=messages,
+                        temperature=0.6, max_tokens=1024, stream=True))
+                break
+            except Exception as err:
+                print(f"[STREAM] Groq account failed, trying next one: {err}")
+        if stream is None:
+            raise RuntimeError("No language model account available")
+
+        header = _StreamHeader()
+        full_text = ""
+        speak_buf = ""
+        first_chunk = True
+        meta_sent = False
+        blocked = False
+        sentence_index = 0
+        sem = asyncio.Semaphore(3)          # a few voice clips at once, not dozens
+
+        async def speak(text: str) -> str:
+            async with sem:
+                return await generate_speech_base64(clean_for_speech(text), header.mood, header.lang)
+
+        word_cursor = 0     # how many words of the reply came before the next sentence (lets the client sync its captions)
+
+        def schedule(chunks):
+            nonlocal word_cursor
+            for c in chunks:
+                n_words = len(c.split())
+                if clean_for_speech(c):
+                    tts_tasks.append((c, asyncio.create_task(speak(c)), word_cursor, n_words))
+                word_cursor += n_words
+
+        async def ready_sentences(wait_all: bool = False):
+            nonlocal sentence_index
+            while tts_tasks and (wait_all or tts_tasks[0][1].done()):
+                text, task, w_start, w_count = tts_tasks.pop(0)
+                try:
+                    audio = await task
+                except Exception as err:
+                    print(f"[STREAM] voice for one sentence failed: {err}")
+                    audio = ""
+                if audio:
+                    yield _sse({"type": "sentence", "text": text, "audio": audio, "index": sentence_index,
+                                "word_start": w_start, "word_count": w_count})
+                    sentence_index += 1
+
+        ticks = 0
+        async for chunk in iterate_in_threadpool(iter(stream)):
+            ticks += 1
+            if ticks % 4 == 0 and await is_disconnected():
+                return                        # the user pressed Stop / closed the page: stop quietly
+            try:
+                piece = chunk.choices[0].delta.content if chunk.choices else None
+            except Exception:
+                piece = None
+            if not piece:
+                continue
+            visible = header.feed(piece)
+            if header.done and not meta_sent:
+                meta_sent = True
+                yield _sse({"type": "meta", "mood": header.mood, "lang": header.lang})
+            if not visible or blocked:
+                continue
+            full_text += visible
+            if "```" in full_text:            # same safety net as /chat: never show code
+                blocked = True
+                tts_tasks.clear()
+                yield _sse({"type": "replace", "text": SCOPE_REPLY_EN})
+                continue
+            yield _sse({"type": "delta", "text": visible})
+            if request.want_audio:
+                speak_buf += visible
+                chunks, speak_buf, first_chunk = pop_speakable_chunks(speak_buf, first_chunk)
+                schedule(chunks)
+                async for ev in ready_sentences():
+                    yield ev
+
+        tail = header.finish()
+        if tail and not blocked:
+            full_text += tail
+            yield _sse({"type": "delta", "text": tail})
+            speak_buf += tail
+        if not meta_sent:
+            yield _sse({"type": "meta", "mood": header.mood, "lang": header.lang})
+
+        if request.want_audio and not blocked:
+            chunks, speak_buf, first_chunk = pop_speakable_chunks(speak_buf, first_chunk, final=True)
+            schedule(chunks)
+            async for ev in ready_sentences(wait_all=True):
+                yield ev
+
+        response = SCOPE_REPLY_EN if blocked else full_text.replace("{{user_loc}}", "your area").replace("{user_loc}", "your area").strip()
+        mood, lang = ("NEUTRAL", "EN") if blocked else (header.mood, header.lang)
+
+        updated_history = (request.history + [
+            {"role": "user", "content": request.message},
+            {"role": "assistant", "content": response}
+        ])[-60:]
+        await run_in_threadpool(persist_chat_session, verified_uid, request.session_id, updated_history, None)
+
+        yield _sse({
+            "type": "done", "response": response, "audio": "", "history": updated_history,
+            "itinerary_draft": None, "itinerary_saved": None, "mood": mood, "lang": lang,
+            "streamed_audio": sentence_index > 0,
+        })
+    except asyncio.CancelledError:
+        raise
+    except Exception as e:
+        import traceback
+        print(f"STREAM CHAT ERROR: {e}")
+        traceback.print_exc()
+        yield _sse({"type": "error", "message": "stream failed"})
+    finally:
+        for item in tts_tasks:
+            item[1].cancel()
+
+
+@app.post("/chat/stream")
+async def chat_stream(request: ChatRequest, http_request: Request, user: dict = Depends(verify_firebase_token)):
+    verified_uid = user.get("uid")
+    return StreamingResponse(
+        stream_chat_events(request, verified_uid, http_request.is_disconnected),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache, no-transform", "X-Accel-Buffering": "no", "Connection": "keep-alive"},
+    )
+
 
 @app.get("/sessions")
 async def list_sessions(user: dict = Depends(verify_firebase_token)):

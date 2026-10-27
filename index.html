@@ -545,6 +545,40 @@
         .edit-save:hover { opacity: 0.88; }
         .edit-save:disabled { opacity: 0.4; cursor: not-allowed; }
 
+        /* Toast: short, friendly messages (replaces browser alert popups) */
+        .toast {
+            position: absolute; left: 50%;
+            bottom: calc(112px + env(safe-area-inset-bottom));
+            transform: translate(-50%, 8px);
+            max-width: min(88%, 380px); box-sizing: border-box;
+            padding: 12px 18px; border-radius: 16px;
+            background: var(--fore); color: var(--void);
+            font-family: var(--font-body); font-size: 0.88rem; font-weight: 500; line-height: 1.45; text-align: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+            opacity: 0; pointer-events: none; z-index: 7000;
+            transition: opacity 0.3s ease, transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .toast.is-visible { opacity: 1; transform: translate(-50%, 0); }
+
+        /* Failed message: plain explanation plus a Try again button */
+        .send-error {
+            align-self: flex-start;
+            display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+            max-width: 90%; box-sizing: border-box;
+            padding: 10px 14px; border-radius: 14px;
+            background: var(--panel); border: 1px solid var(--line-soft);
+            color: var(--fore); font-size: 0.88rem; line-height: 1.4;
+            animation: fadeUp 0.3s ease backwards;
+        }
+        .send-error button {
+            min-height: 32px; padding: 6px 14px; border: none; border-radius: 999px; cursor: pointer;
+            background: var(--fore); color: var(--void);
+            font-family: var(--font-body); font-size: 0.82rem; font-weight: 600;
+            transition: opacity 0.2s ease, transform 0.15s ease;
+        }
+        .send-error button:hover { opacity: 0.88; }
+        .send-error button:active { transform: scale(0.96); }
+
         .stopped-note { align-self: flex-start; padding: 0 4px; font-size: 0.8rem; color: var(--muted); }
         @media (prefers-reduced-motion: reduce) { .msg { animation: none; opacity: 1; transform: none; } .pulse-dot { animation: none !important; } }
 
@@ -918,6 +952,7 @@
 
         input {
             flex: 1;
+            min-height: 40px;            /* the whole pill height is tappable, not just the text line */
             background: transparent;
             border: none;
             color: var(--fore);
@@ -1013,29 +1048,29 @@
         .send-pill.active:active { transform: scale(0.96); }
         .send-pill svg { width: 16px; height: 16px; fill: currentColor; }
 
-        .bubble-tts-btn {
-            background-color: transparent;
-            color: var(--muted);
-            border: 1px solid var(--slate);
-            border-radius: var(--radius-inner);
-            cursor: pointer;
-            padding: 6px 14px;
-            margin-top: 14px;
-            display: inline-flex; align-items: center; gap: 8px;
-            font-family: var(--font-body);
-            font-size: 0.8rem; font-weight: 500;
-            transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
+        /* Small icon buttons under Navi's replies: listen, copy, regenerate */
+        .bot-actions {
+            display: flex; gap: 2px; margin: 2px 0 0 4px;
+            opacity: 0.8; transition: opacity 0.2s ease;
+            animation: fadeFrom 0.4s ease 0.15s backwards;
         }
-
-        .bubble-tts-btn:hover { background-color: var(--slate); color: var(--fore); }
-        .bubble-tts-btn:active { transform: scale(0.95); }
-        .bubble-tts-btn svg { fill: currentColor; width: 14px; height: 14px;}
-        
+        .bot-actions:hover, .bot-actions:focus-within { opacity: 1; }
+        .bubble-tts-btn {
+            width: 30px; height: 30px; padding: 0; margin: 0;
+            display: inline-flex; align-items: center; justify-content: center;
+            background: transparent; color: var(--muted);
+            border: none; border-radius: 8px; cursor: pointer;
+            transition: background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease, opacity 0.2s ease;
+        }
+        .bubble-tts-btn:hover { background-color: var(--hover); color: var(--fore); }
+        .bubble-tts-btn:active { transform: scale(0.92); }
+        .bubble-tts-btn svg { fill: currentColor; width: 15px; height: 15px; }
+        .bubble-tts-btn.is-loading svg { animation: iconPulse 0.9s ease-in-out infinite; }
+        @keyframes iconPulse { 50% { opacity: 0.3; } }
         .bubble-tts-btn.playing-active {
             color: var(--void);
             background-color: var(--fore);
-            border-color: var(--fore);
-            box-shadow: 0 0 15px var(--glow);
+            box-shadow: 0 0 12px var(--glow);
         }
 
         /* --- Header Voice Trigger --- */
@@ -1449,6 +1484,7 @@
     </div>
 
     <div id="sr-announce" class="sr-only" role="status" aria-live="polite"></div>
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
     <div id="chat">
         <div class="welcome-spacer" id="welcome-spacer"></div>
         <div class="welcome-container" id="welcome-container">
@@ -1480,7 +1516,7 @@
     </div>
 
     <!-- GEMINI LIVE STYLE OVERLAY -->
-    <div id="live-overlay" data-state="idle">
+    <div id="live-overlay" data-state="idle" role="dialog" aria-modal="true" aria-label="Live conversation with Navi" inert>
         <div class="live-badge"><span class="live-badge-dot"></span>Live with Navi</div>
 
         <div class="live-caption-wrap">
@@ -1488,7 +1524,7 @@
             <div id="live-status" class="live-status-text" aria-live="polite">Connecting...</div>
         </div>
 
-        <div id="live-orb" class="live-orb" onclick="handleOrbTap()" role="button" aria-label="Tap to send or interrupt">
+        <div id="live-orb" class="live-orb" onclick="handleOrbTap()" onkeydown="if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); handleOrbTap(); }" role="button" tabindex="0" aria-label="Send now, or interrupt Navi">
             <canvas id="live-wave" aria-hidden="true"></canvas>
         </div>
 
@@ -1683,7 +1719,9 @@
             closeDeleteModal();
         } else if (sidebar.classList.contains('is-active')) {
             toggleSidebar();
-        } else if (isNaviThinking && !isLiveModeActive) {
+        } else if (isLiveModeActive) {
+            closeLiveMode();
+        } else if (isNaviThinking) {
             stopResponse();
         }
     });
@@ -2142,10 +2180,19 @@
     }
 }
 
+    // The voice button is icon-only. This keeps its tooltip / screen-reader label in step with what it does.
+    function setTTSButton(btn, state) {
+        const label = state === 'playing' ? 'Stop voice' : state === 'loading' ? 'Loading voice' : 'Listen to this reply';
+        btn.title = label;
+        btn.setAttribute('aria-label', label);
+        btn.classList.toggle('is-loading', state === 'loading');
+    }
+
     function clearTTSState() {
         if (currentActiveButton) {
             currentActiveButton.classList.remove('playing-active');
             swapContent(currentActiveButton, ICON_SPEAK);
+            setTTSButton(currentActiveButton, 'idle');
             currentActiveButton = null;
         }
         updateStatusDisplay('idle');
@@ -2160,8 +2207,7 @@
         if (!base64Audio && btn._tts) {
             if (btn._loadingTTS) return;
             btn._loadingTTS = true;
-            const label = btn.innerHTML;
-            btn.innerHTML = ICON_SPEAK + " ...";
+            setTTSButton(btn, 'loading');
             try {
                 const res = await fetch('https://camanava-bot.onrender.com/tts', {
                     method: 'POST',
@@ -2173,7 +2219,7 @@
                 if (base64Audio) btn.setAttribute('data-audio', base64Audio);
             } catch (e) { console.error('TTS fetch failed:', e); }
             btn._loadingTTS = false;
-            btn.innerHTML = label;
+            setTTSButton(btn, 'idle');
         }
         if (!base64Audio) return; 
 
@@ -2186,7 +2232,8 @@
 
         currentActiveButton = btn;
         btn.classList.add('playing-active');
-        swapContent(btn, ICON_STOP + " Off");
+        swapContent(btn, ICON_STOP);
+        setTTSButton(btn, 'playing');
         updateStatusDisplay('speaking');
 
         activeAudio = new Audio("data:audio/mp3;base64," + base64Audio);
@@ -2234,6 +2281,7 @@
     }
 
     let currentRequest = null;        // AbortController for the in-flight /chat request
+    let currentRequestCtx = null;     // what that request is for (typed chat or Live)
     let stopActiveTypewriter = null;  // stops the reply that is currently being typed out
 
     function stopResponse() {
@@ -2252,7 +2300,7 @@
         const busy = isNaviThinking;
 
         sendBtn.classList.toggle('is-stop', busy);
-        document.querySelectorAll('#chat .msg-action.edit').forEach(b => { b.disabled = busy; });
+        document.querySelectorAll('#chat .msg-action.edit, #chat .msg-action.regen').forEach(b => { b.disabled = busy; });
 
         if (busy) {
             sendBtn.disabled = false;
@@ -2494,6 +2542,78 @@
         });
     }
 
+    const ICON_REGEN = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 0 1-15.5 6.2L3 16"/><path d="M3 21v-5h5"/><path d="M3 12A9 9 0 0 1 18.5 5.8L21 8"/><path d="M21 3v5h-5"/></svg>`;
+
+    function plainReplyText(raw) {
+        return (raw || '').replace(/\*\*(.*?)\*\*/g, '$1').replace(/\*/g, '').trim();
+    }
+
+    // Row of small icon buttons under one of Navi's replies
+    function addBotActions(wrapper, rawText, audioBase64, ttsMeta) {
+        wrapper.querySelectorAll('.bot-actions').forEach(n => n.remove());
+        const row = document.createElement('div');
+        row.className = 'bot-actions';
+
+        if (audioBase64 || ttsMeta) {
+            const speak = document.createElement('button');
+            speak.type = 'button';
+            speak.className = 'bubble-tts-btn';
+            speak.innerHTML = ICON_SPEAK;
+            setTTSButton(speak, 'idle');
+            if (audioBase64) speak.setAttribute('data-audio', audioBase64);
+            // No audio yet: remember what to speak; it is generated only if the user taps the button.
+            if (!audioBase64 && ttsMeta) speak._tts = { text: rawText, mood: ttsMeta.mood || 'NEUTRAL', lang: ttsMeta.lang || 'EN' };
+            speak.onclick = function () { playNaviVoice(this); };
+            row.appendChild(speak);
+        }
+
+        const copyBtn = document.createElement('button');
+        copyBtn.type = 'button';
+        copyBtn.className = 'msg-action copy';
+        copyBtn.title = 'Copy';
+        copyBtn.setAttribute('aria-label', 'Copy reply');
+        copyBtn.innerHTML = ICON_COPY;
+        copyBtn.onclick = async () => {
+            const ok = await copyText(plainReplyText(rawText));
+            if (!ok) return;
+            copyBtn.innerHTML = ICON_CHECK;
+            copyBtn.classList.add('is-done');
+            copyBtn.title = 'Copied';
+            announce('Reply copied');
+            clearTimeout(copyBtn._t);
+            copyBtn._t = setTimeout(() => {
+                copyBtn.innerHTML = ICON_COPY;
+                copyBtn.classList.remove('is-done');
+                copyBtn.title = 'Copy';
+            }, 1600);
+        };
+        row.appendChild(copyBtn);
+
+        // Regenerate only on the newest reply, and not in the middle of building an itinerary
+        // (replaying that turn would apply its changes twice).
+        document.querySelectorAll('#chat .msg-action.regen').forEach(n => n.remove());
+        if (!itineraryDraft && document.querySelector('#chat .user-turn')) {
+            const regen = document.createElement('button');
+            regen.type = 'button';
+            regen.className = 'msg-action regen';
+            regen.title = 'Regenerate';
+            regen.setAttribute('aria-label', 'Regenerate reply');
+            regen.innerHTML = ICON_REGEN;
+            regen.disabled = isNaviThinking;
+            regen.onclick = regenerateLast;
+            row.appendChild(regen);
+        }
+        wrapper.appendChild(row);
+    }
+
+    // Ask the same question again: rewinds to the last message you sent and sends it once more
+    function regenerateLast() {
+        if (isNaviThinking || editResendPending) return;
+        const turns = document.querySelectorAll('#chat .user-turn');
+        const last = turns[turns.length - 1];
+        if (last) resendFromTurn(last, last._text);
+    }
+
     function addMessageToUI(sender, text, audioBase64 = null, ttsMeta = null) {
         const chat = document.getElementById('chat');
         const wrapper = document.createElement('div');
@@ -2527,18 +2647,7 @@
                 pendingTypewriters.delete(finishTypewriter);
                 if (stopActiveTypewriter === stopTypewriter) stopActiveTypewriter = null;
                 containerDiv.innerHTML = innerHTMLContent;
-                if (audioBase64 || ttsMeta) {
-                    const btn = document.createElement('button');
-                    btn.className = 'bubble-tts-btn';
-                    btn.innerHTML = ICON_SPEAK + " Engage";
-                    if (audioBase64) btn.setAttribute('data-audio', audioBase64);
-                    // No audio yet: remember what to speak; it is generated only if the user taps Engage.
-                    if (!audioBase64 && ttsMeta) {
-                        btn._tts = { text: text, mood: ttsMeta.mood || 'NEUTRAL', lang: ttsMeta.lang || 'EN' };
-                    }
-                    btn.onclick = function() { playNaviVoice(this); };
-                    containerDiv.appendChild(btn);
-                }
+                addBotActions(wrapper, text, audioBase64, ttsMeta);
                 unlockChat();
             };
             pendingTypewriters.add(finishTypewriter);
@@ -2583,6 +2692,199 @@
         return userTurnEl;
     }
 
+
+
+    // --- STREAMING REPLIES ---
+    const API_BASE = 'https://camanava-bot.onrender.com';
+    const STREAM_REPLIES = true;        // false = always use the classic one-shot /chat request
+
+    class StreamCut extends Error {}    // the connection dropped after part of a reply had arrived
+
+    function createBotBubble() {
+        hideAmbientGlow();
+        const chat = document.getElementById('chat');
+        const wrapper = document.createElement('div');
+        wrapper.style.display = 'flex';
+        wrapper.style.flexDirection = 'column';
+        wrapper.style.alignItems = 'flex-start';
+        chat.appendChild(wrapper);
+        const botMsgDiv = document.createElement('div');
+        botMsgDiv.className = 'msg bot-msg';
+        const containerDiv = document.createElement('div');
+        containerDiv.className = 'response-container';
+        botMsgDiv.appendChild(containerDiv);
+        wrapper.appendChild(botMsgDiv);
+        return { wrapper, botMsgDiv, containerDiv };
+    }
+
+    // Draws the text received so far (at most once per frame; follows the bottom unless you scrolled up)
+    function scheduleStreamRender(ctx) {
+        if (ctx.raf) return;
+        ctx.raf = requestAnimationFrame(() => {
+            ctx.raf = 0;
+            if (!ctx.bubble) return;
+            const chat = document.getElementById('chat');
+            const nearBottom = chat.scrollHeight - chat.scrollTop - chat.clientHeight < 100;
+            ctx.bubble.containerDiv.innerHTML = formatMessageHTML(ctx.raw);
+            if (nearBottom) chat.scrollTop = chat.scrollHeight;
+        });
+    }
+
+    function onStreamDelta(ctx, text) {
+        ctx.gotAnything = true;
+        ctx.raw += text;
+        if (ctx.live) {
+            if (!isLiveModeActive) return;
+            if (!ctx.liveCapReady) { ctx.liveCapReady = true; liveCapReset(); }
+            liveCapFeed(text);
+            return;
+        }
+        if (!ctx.bubble) {
+            document.getElementById(ctx.typingId)?.remove();
+            ctx.bubble = createBotBubble();
+            updateStatusDisplay('speaking');
+        }
+        scheduleStreamRender(ctx);
+    }
+
+    function onStreamReplace(ctx, text) {
+        ctx.raw = text;
+        if (ctx.live) {
+            if (isLiveModeActive) { liveCapReset(); ctx.liveCapReady = true; liveCapFeed(text, true); }
+            return;
+        }
+        if (ctx.bubble) scheduleStreamRender(ctx);
+    }
+
+    // One spoken sentence arrived (Live mode)
+    function onStreamSentence(ctx, ev) {
+        ctx.gotAnything = true;
+        ctx.sentences++;
+        if (ctx.live && isLiveModeActive) enqueueLiveSentence(ev);
+    }
+
+    // Reads the server's event stream. Returns the final payload, or null when streaming is not available
+    // (nothing was shown yet), so the caller can use the classic request instead.
+    async function runStreamingChat(body, ctx) {
+        const res = await fetch(API_BASE + '/chat/stream', {
+            method: 'POST',
+            signal: currentRequest.signal,
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + authToken,
+                'Accept': 'text/event-stream'
+            },
+            body: JSON.stringify(body)
+        });
+        if (res.status === 401) { setLoginGate(true); throw new Error('Unauthorized'); }
+        if (res.status === 404 || res.status === 405 || res.status === 501 || !res.body || !res.body.getReader) return null;
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buf = '', final = null, failed = false;
+        const handle = (ev) => {
+            switch (ev.type) {
+                case 'meta':     ctx.meta = { mood: ev.mood, lang: ev.lang }; break;
+                case 'delta':    onStreamDelta(ctx, ev.text); break;
+                case 'replace':  onStreamReplace(ctx, ev.text); break;
+                case 'sentence': onStreamSentence(ctx, ev); break;
+                case 'done':     final = ev; break;
+                case 'error':    failed = true; break;
+            }
+        };
+        while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            buf += decoder.decode(value, { stream: true });
+            let i;
+            while ((i = buf.indexOf('\n\n')) !== -1) {
+                const block = buf.slice(0, i);
+                buf = buf.slice(i + 2);
+                const line = block.split('\n').find(l => l.startsWith('data: '));
+                if (!line) continue;                       // keep-alive comments
+                try { handle(JSON.parse(line.slice(6))); } catch (e) { console.warn('Skipped a bad stream event', e); }
+            }
+        }
+        if (final) return final;
+        if (!ctx.gotAnything) return null;                 // failed before anything showed: try the classic request
+        throw new StreamCut(failed ? 'stream error' : 'stream ended early');
+    }
+
+    // The streamed bubble becomes the final reply (authoritative text from the server, plus the icon buttons)
+    function finishStreamBubble(ctx, data) {
+        cancelAnimationFrame(ctx.raf);
+        ctx.raf = 0;
+        ctx.bubble.containerDiv.innerHTML = formatMessageHTML(data.response);
+        addBotActions(ctx.bubble.wrapper, data.response, data.audio || '', { mood: data.mood, lang: data.lang });
+        unlockChat();
+    }
+
+    // Stop pressed, Live interrupted/closed, or the connection dropped: keep what already arrived
+    function finalizePartialReply(ctx, msg, turnEl, cutOff) {
+        cancelAnimationFrame(ctx.raf);
+        ctx.raf = 0;
+        const text = (ctx.raw || '').trim();
+        if (ctx.bubble) {
+            if (text) ctx.bubble.containerDiv.innerHTML = formatMessageHTML(ctx.raw);
+            else ctx.bubble.wrapper.remove();
+        }
+        if (text && !cutOff) {
+            // make the partial answer part of the conversation so the next question has context
+            history = history.concat([{ role: 'user', content: msg }, { role: 'assistant', content: text }]);
+            if (turnEl) delete turnEl.dataset.pending;
+            if (!authToken || authToken === 'guest_mode_active') saveToLocalHistory(msg);
+            if (ctx.bubble) addBotActions(ctx.bubble.wrapper, ctx.raw, '', ctx.meta);
+            else if (ctx.live) addMessageToUI('bot', ctx.raw, '', ctx.meta);     // Live: it was spoken, so it belongs in the chat too
+        }
+        if (!ctx.live && !cutOff) {
+            const note = document.createElement('div');
+            note.className = 'stopped-note';
+            note.textContent = 'Response stopped';
+            document.getElementById('chat').appendChild(note);
+        }
+    }
+
+    // Short, friendly message that fades in and out (used instead of browser alert popups)
+    function showToast(message, ms = 5000) {
+        const el = document.getElementById('toast');
+        if (!el) return;
+        clearTimeout(el._t);
+        el.textContent = message;
+        el.classList.add('is-visible');
+        el._t = setTimeout(() => el.classList.remove('is-visible'), ms);
+    }
+
+    // A message that could not be sent: say why in plain words and offer to try again
+    function showSendError(turnEl, msg, reason) {
+        const chat = document.getElementById('chat');
+        const offline = navigator.onLine === false;
+        const note = document.createElement('div');
+        note.className = 'send-error';
+        note.setAttribute('role', 'alert');
+        const text = document.createElement('span');
+        text.textContent = offline ? "You're offline. Check your connection and try again."
+                         : reason === 'cut' ? "The reply was cut off. Please try again."
+                         : "Couldn't reach Navi. Please try again.";
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = 'Try again';
+        btn.onclick = () => {
+            if (isNaviThinking || editResendPending) return;
+            editResendPending = true;
+            const doomed = [turnEl].filter(Boolean);
+            while (doomed.length && doomed[doomed.length - 1].nextSibling) doomed.push(doomed[doomed.length - 1].nextSibling);
+            if (!doomed.includes(note)) doomed.push(note);
+            fadeOutAndRemove(doomed, () => {
+                editResendPending = false;
+                send(msg);
+            });
+        };
+        note.append(text, btn);
+        chat.appendChild(note);
+        forceUIRefreshScroll();
+    }
+
     async function send(messageOverride = null) {
         if (isNaviThinking || editResendPending) return;
         
@@ -2619,25 +2921,51 @@
         forceUIRefreshScroll();
         
         currentRequest = new AbortController();
+        const ctx = { typingId, turnEl, msg, live: isLiveModeActive, raw: '', meta: { mood: 'NEUTRAL', lang: 'EN' },
+                      bubble: null, raf: 0, gotAnything: false, sentences: 0, liveCapReady: false };
+        currentRequestCtx = ctx;
+        let waitNote = null;
+        const slowChatHint = setTimeout(() => {
+            if (isLiveModeActive) {
+                if (liveState === 'thinking') setLiveState('thinking', "Still working on it, one moment...");
+            } else {
+                waitNote = document.createElement('div');
+                waitNote.className = 'stopped-note';
+                waitNote.textContent = 'Still working on it... the server may be waking up.';
+                document.getElementById('chat').appendChild(waitNote);
+                forceUIRefreshScroll();
+            }
+        }, 8000);
+        const dropWaitNote = () => { clearTimeout(slowChatHint); if (waitNote) { waitNote.remove(); waitNote = null; } };
         try {
-            const res = await fetch('https://camanava-bot.onrender.com/chat', {
-            signal: currentRequest.signal,
-            method: 'POST',
-            headers: { 
-                'Content-Type': 'application/json',
-                'Authorization': 'Bearer ' + authToken // <-- Added this header
-            },
-            body: JSON.stringify({ message: msg, history, session_id: currentSessionId, itinerary_draft: itineraryDraft, want_audio: isLiveModeActive })
-        });
+            if (navigator.onLine === false) throw new Error('offline');
+            const body = { message: msg, history, session_id: currentSessionId, itinerary_draft: itineraryDraft, want_audio: isLiveModeActive };
 
-        if (res.status === 401) {
-            setLoginGate(true);
-            throw new Error("Unauthorized");
-        }
-            const data = await res.json();
+            // Preferred: the reply streams in word by word (and, in Live mode, sentence by sentence with voice).
+            // If the server has no streaming endpoint (older deploy), quietly use the classic request.
+            let data = null;
+            if (STREAM_REPLIES) data = await runStreamingChat(body, ctx);
+            if (!data) {
+                const res = await fetch(API_BASE + '/chat', {
+                    signal: currentRequest.signal,
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + authToken
+                    },
+                    body: JSON.stringify(body)
+                });
+                if (res.status === 401) {
+                    setLoginGate(true);
+                    throw new Error("Unauthorized");
+                }
+                if (!res.ok) throw new Error('HTTP ' + res.status);   // server errors used to slip through and break the chat history
+                data = await res.json();
+            }
+            dropWaitNote();
             currentRequest = null;           // reply received: nothing left to abort
             document.getElementById(typingId)?.remove();
-            
+
             // Update AFTER the exchange completes, so this actually includes the
             // message + reply that just happened (fixes history always lagging one turn behind).
             history = data.history;
@@ -2650,24 +2978,33 @@
             if (!authToken || authToken === 'guest_mode_active') {
                 saveToLocalHistory(msg);
             }
-            
-            // If in Live Mode, divert handling to the live loop!
-            if (isLiveModeActive) {
-                handleLiveResponse(data.response, data.audio);
+
+            if (ctx.bubble) {
+                finishStreamBubble(ctx, data);                       // typed chat: the streamed bubble becomes the final reply
+            } else if (isLiveModeActive && ctx.sentences > 0) {
+                finishLiveStream(ctx, data);                         // Live: sentences already playing, just wrap up
+            } else if (isLiveModeActive) {
+                handleLiveResponse(data.response, data.audio, data.lang);
             } else {
                 addMessageToUI('bot', data.response, data.audio, { mood: data.mood, lang: data.lang });
             }
-            
+
         } catch (err) {
+            dropWaitNote();
             currentRequest = null;
             document.getElementById(typingId)?.remove();
-            if (err && err.name === 'AbortError') {
-                // The user pressed Stop while waiting for the reply
-                const note = document.createElement('div');
-                note.className = 'stopped-note';
-                note.textContent = 'Response stopped';
-                document.getElementById('chat').appendChild(note);
-                unlockChat();
+            const stopped = err && err.name === 'AbortError';
+            const cutOff  = err instanceof StreamCut;
+            if (stopped || cutOff) {
+                // Stop pressed (or live interrupted / closed), or the connection dropped mid-reply.
+                finalizePartialReply(ctx, msg, turnEl, cutOff);
+                if (isLiveModeActive || ctx.live) {
+                    isNaviThinking = false;
+                    toggleSendButtonState();
+                } else {
+                    if (cutOff) showSendError(turnEl, msg, 'cut');
+                    unlockChat();
+                }
                 return;
             }
             if (isLiveModeActive) {
@@ -2675,7 +3012,7 @@
                 isNaviThinking = false;
                 toggleSendButtonState();
             } else {
-                addMessageToUI('bot', "Connection Error.");
+                showSendError(turnEl, msg);
                 unlockChat();
             }
         }
@@ -2706,9 +3043,13 @@
     let liveSpeechStart = 0;
     let liveLastVoiceAt = 0;
     let liveListenStart = 0;
+    let liveMaxLevel = 0;             // loudest mic level heard during this recording
+    let liveVadStart = 0, liveCalMin = Infinity;   // first moments of listening measure the room's background noise
+    let liveSpeechPeak = 0;           // how loud you are while talking (used to tell your voice from steady background noise)
 
-    const LIVE_SILENCE_MS = 1300;        // this much quiet after speech => send automatically
-    const LIVE_MIN_SPEECH_MS = 350;      // shorter blips (coughs, clicks) don't count as speech
+    const LIVE_SILENCE_MS = 1200;        // this much quiet after speech => send automatically
+    const LIVE_MIN_SPEECH_MS = 300;      // shorter blips (coughs, clicks) don't count as speech
+    const LIVE_GAP_MS = 280;             // quiet dips this short (between words / syllables) don't break up speech
     const LIVE_MAX_UTTERANCE_MS = 30000; // safety cap on one recording
 
     const overlay = document.getElementById('live-overlay');
@@ -2724,6 +3065,7 @@
 
     function cancelCaption() {
         captionToken++;
+        liveCapToken++;
         if (captionRaf) { cancelAnimationFrame(captionRaf); captionRaf = 0; }
     }
 
@@ -2868,23 +3210,49 @@
 
     function startVad() {
         stopVad();
+        liveSpeechPeak = 0;
+        liveVadStart = performance.now();
+        liveCalMin = Infinity;
         // setInterval (not requestAnimationFrame) so detection keeps running if the tab loses focus briefly
         liveVadTimer = setInterval(() => {
             if (!isLiveModeActive || liveState !== 'listening' || !liveMicAnalyser) return;
+            if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();   // some phones pause audio; without it the mic reads flat
 
             const level = micLevel();
+            if (level > liveMaxLevel) liveMaxLevel = level;
             const now = performance.now();
-            const threshold = Math.max(0.02, liveNoiseFloor * 2.5 + 0.01);
-            const voiced = level > threshold;
+
+            // Two thresholds. It takes a clear voice to START, but only a smaller level to KEEP going,
+            // so the natural dips between words don't cut you off. While you are talking, "still talking"
+            // also has to beat a fraction of your own loudness, so a steady fan or hum isn't mistaken for speech.
+            // The first ~0.7s of listening measures how noisy the room is (fan, street, hum). Nothing is
+            // treated as speech during that window unless it is already loud, so steady noise can't fool us.
+            const calibrating = (now - liveVadStart) < 700;
+            if (calibrating && level < 0.08) {
+                liveCalMin = Math.min(liveCalMin, level);
+                liveNoiseFloor = Math.min(0.06, Math.max(0.002, liveCalMin));
+            }
+            const startThr = Math.max(0.012, liveNoiseFloor * 2.5 + 0.005);
+            let keepThr = Math.max(0.008, liveNoiseFloor * 1.6 + 0.003);
+            if (liveSpeechDetected) keepThr = Math.max(keepThr, liveSpeechPeak * 0.2);
+            const voiced = (calibrating && level < 0.08) ? false : level > (liveSpeechStart ? keepThr : startThr);
 
             if (voiced) {
                 if (!liveSpeechStart) liveSpeechStart = now;
                 liveLastVoiceAt = now;
-                if (now - liveSpeechStart >= LIVE_MIN_SPEECH_MS) liveSpeechDetected = true;
+                if (!liveSpeechDetected && now - liveSpeechStart >= LIVE_MIN_SPEECH_MS) {
+                    liveSpeechDetected = true;
+                    swapText(statusText, "Hearing you...");     // tells you it is picking you up (no tap needed)
+                }
+                if (liveSpeechDetected) liveSpeechPeak = Math.max(liveSpeechPeak * 0.997, level);
             } else {
-                // Track the room's background noise level so a noisy cafe doesn't count as speech
-                liveNoiseFloor = liveNoiseFloor * 0.95 + level * 0.05;
-                if (!liveSpeechDetected) liveSpeechStart = 0;
+                // Keep following the room's background level while you are not talking (drops fast, rises slowly)
+                if (!calibrating && !liveSpeechDetected) {
+                    if (level < liveNoiseFloor) liveNoiseFloor = liveNoiseFloor * 0.7 + level * 0.3;
+                    else liveNoiseFloor = Math.min(0.06, liveNoiseFloor * 0.97 + level * 0.03);
+                }
+                // A short dip doesn't restart detection; only a real pause does
+                if (!liveSpeechDetected && liveSpeechStart && now - liveLastVoiceAt > LIVE_GAP_MS) liveSpeechStart = 0;
             }
 
             // The waves follow the user's voice (its frequency makeup, not just loudness) while listening
@@ -2896,7 +3264,9 @@
             if (silentLongEnough || tooLong) {
                 stopVad();
                 if (liveMediaRecorder && liveMediaRecorder.state === 'recording') {
-                    liveForceSend = tooLong;
+                    // The 30s safety cap only force-sends when you actually spoke. 30s of silence is just
+                    // dropped and we keep listening (sending it is what made Whisper "hear" Thank you).
+                    liveForceSend = tooLong && liveSpeechDetected;
                     liveMediaRecorder.stop();
                 }
             }
@@ -2955,7 +3325,9 @@
         liveSilentNextListen = true;   // the start chime already covers the first "listening"
         liveMuted = false;
         document.getElementById('live-mute-btn').classList.remove('is-on'); swapText(document.getElementById('live-mute-label'), 'Mute');
+        overlay.inert = false;
         overlay.classList.add('is-active');
+        setTimeout(() => { try { document.getElementById('live-orb').focus({ preventScroll: true }); } catch (e) {} }, 80);
         updateTranscript("");
         setLiveState('thinking', "Connecting microphone...");
 
@@ -2992,7 +3364,11 @@
         } catch (err) {
             console.error("Microphone error:", err);
             closeLiveMode();
-            alert("Microphone access is required for Live Mode.");
+            const denied  = err && (err.name === 'NotAllowedError' || err.name === 'SecurityError');
+            const missing = err && (err.name === 'NotFoundError' || err.name === 'OverconstrainedError');
+            showToast(denied  ? "Live mode needs your microphone. Allow mic access in your browser's site settings, then try again."
+                    : missing ? "No microphone was found on this device."
+                    :           "Couldn't start the microphone. Please try again.", 6500);
         }
     }
 
@@ -3000,6 +3376,7 @@
         if (!isLiveModeActive || !liveStream) return;
         clearTimeout(liveResumeTimer);
         stopVad();
+        resetLiveSpeech();
 
         liveAudioChunks = [];
         liveForceSend = false;
@@ -3007,6 +3384,8 @@
         liveSpeechStart = 0;
         liveLastVoiceAt = 0;
         liveListenStart = performance.now();
+        liveMaxLevel = 0;
+        try { if (window.speechSynthesis) window.speechSynthesis.cancel(); } catch (e) {}
 
         try {
             liveMediaRecorder = liveMimeType
@@ -3041,6 +3420,12 @@
 
         // Nothing but background noise: quietly go back to listening instead of sending silence
         if (!liveSpeechDetected && !forced) { startLiveListening(); return; }
+        // Tapped "send" but the mic never heard anything above a whisper: don't send an empty recording
+        if (!liveSpeechDetected && liveMaxLevel < 0.015) {
+            startLiveListening();
+            setLiveState('listening', "Didn't hear anything. Go ahead, I'm listening.");
+            return;
+        }
 
         const blob = new Blob(chunks, { type: recorder.mimeType || liveMimeType || 'audio/webm' });
         if (blob.size < 1000) {
@@ -3051,6 +3436,9 @@
 
         liveCue('sent');
         setLiveState('thinking', "Transcribing...");
+        const slowHint = setTimeout(() => {
+            if (isLiveModeActive && liveState === 'thinking') setLiveState('thinking', "Waking up the server, one moment...");
+        }, 7000);
         const ext = blob.type.includes('mp4') ? 'm4a' : (blob.type.includes('ogg') ? 'ogg' : 'webm');
         const formData = new FormData();
         formData.append("file", blob, `voice.${ext}`);
@@ -3061,6 +3449,7 @@
                 method: 'POST',
                 body: formData
             });
+            clearTimeout(slowHint);
             if (!res.ok) throw new Error('Transcribe HTTP ' + res.status);
             const data = await res.json();
             if (!isLiveModeActive) return;
@@ -3075,6 +3464,7 @@
                 setLiveState('listening', "Didn't catch that. Go ahead, I'm listening.");
             }
         } catch (err) {
+            clearTimeout(slowHint);
             console.error("Transcription error:", err);
             if (isLiveModeActive) setLiveState('error', "Transcription failed. Tap to try again.");
         }
@@ -3092,6 +3482,155 @@
         liveCue(liveMuted ? 'mute' : 'unmute');
     }
 
+
+    // --- LIVE: a streamed reply, spoken sentence by sentence ---
+    // The server sends each finished sentence with its voice clip. We play them back to back, so Navi starts
+    // talking after the first sentence instead of waiting for the whole reply. The caption has every word
+    // laid out (invisible) as soon as the text arrives; words light up as their sentence is spoken.
+    let liveQueue = [];
+    let livePlaying = false;
+    let liveStreamFinished = false;
+    let liveCapToken = 0;
+    let liveCap = { spans: [], pending: '', shown: 0, offset: 0, inner: null };
+
+    function resetLiveSpeech() {
+        liveQueue = [];
+        livePlaying = false;
+        liveStreamFinished = false;
+        liveCapToken++;
+    }
+
+    function liveCapReset() {
+        cancelCaption();
+        clearTimeout(transcriptTimeout);
+        const box = document.getElementById('live-transcript');
+        const body = document.getElementById('live-caption-text');
+        body.textContent = '';
+        const inner = document.createElement('div');
+        inner.className = 'cap-inner';
+        body.appendChild(inner);
+        body.classList.remove('scrolled');
+        liveCap = { spans: [], pending: '', shown: 0, offset: 0, inner };
+        box.classList.remove('is-user');
+        box.classList.add('is-visible');
+        captionVisible = true;
+    }
+
+    function liveCapAppendWord(word) {
+        const span = document.createElement('span');
+        span.className = 'w';
+        span.textContent = word;
+        liveCap.inner.appendChild(span);
+        liveCap.inner.appendChild(document.createTextNode(' '));
+        liveCap.spans.push(span);
+    }
+
+    // Adds newly arrived text. A word is only laid out once its end is known (or at the very end).
+    function liveCapFeed(text, final) {
+        if (!liveCap.inner) return;
+        liveCap.pending += String(text || '').replace(/\*/g, '');
+        const buf = liveCap.pending;
+        const re = /\S+\s+/g;
+        let m, last = 0;
+        while ((m = re.exec(buf)) !== null) { liveCapAppendWord(m[0].trim()); last = re.lastIndex; }
+        liveCap.pending = buf.slice(last);
+        if (final && liveCap.pending.trim()) { liveCapAppendWord(liveCap.pending.trim()); liveCap.pending = ''; }
+    }
+
+    function liveCapRevealTo(n) {
+        if (!liveCap.inner) return;
+        const body = document.getElementById('live-caption-text');
+        n = Math.min(n, liveCap.spans.length);
+        while (liveCap.shown < n) { liveCap.spans[liveCap.shown].classList.add('on'); liveCap.shown++; }
+        const last = liveCap.spans[liveCap.shown - 1];
+        if (last) {
+            const bottom = last.offsetTop + last.offsetHeight;
+            const view = body.clientHeight;
+            if (bottom > liveCap.offset + view + 1) {            // glide up one line at a time
+                liveCap.offset = bottom - view;
+                liveCap.inner.style.transform = 'translateY(' + (-liveCap.offset) + 'px)';
+                body.classList.add('scrolled');
+            }
+        }
+    }
+
+    // Lights up one sentence's words in step with its voice clip
+    function liveCapFollow(item, player) {
+        const myToken = ++liveCapToken;
+        const start = item.word_start || 0, count = item.word_count || 0;
+        const words = String(item.text || '').replace(/\*/g, '').trim().split(/\s+/).filter(Boolean);
+        const total = words.reduce((n, w) => n + w.length + 1, 0) || 1;
+        const startFrac = [];
+        let acc = 0;
+        words.forEach(w => { startFrac.push(acc / total); acc += w.length + 1; });
+        const tick = () => {
+            if (myToken !== liveCapToken || !isLiveModeActive) return;
+            let upto = start;
+            if (player.ended) upto = start + count;
+            else if (player.currentTime > 0 && player.duration > 0 && isFinite(player.duration)) {
+                const frac = player.currentTime / player.duration + 0.02;      // a hair ahead of the voice
+                let k = 0;
+                while (k < words.length && startFrac[k] <= frac) k++;
+                upto = start + k;
+            }
+            liveCapRevealTo(Math.max(liveCap.shown, upto));
+            if (!player.ended) requestAnimationFrame(tick);
+        };
+        tick();
+    }
+
+    function enqueueLiveSentence(ev) {
+        liveQueue.push(ev);
+        if (!livePlaying) playNextLiveSentence();
+    }
+
+    function playNextLiveSentence() {
+        if (!isLiveModeActive) return;
+        const item = liveQueue.shift();
+        if (!item) { livePlaying = false; maybeEndLiveReply(); return; }
+        livePlaying = true;
+        if (liveState !== 'speaking') setLiveState('speaking', "Navi is speaking... tap to interrupt");
+
+        const player = new Audio("data:audio/mp3;base64," + item.audio);
+        liveAudioPlayer = player;
+        try {
+            initAudio();
+            if (currentAudioSource) currentAudioSource.disconnect();
+            currentAudioSource = audioCtx.createMediaElementSource(player);
+            currentAudioSource.connect(analyser);
+            analyser.connect(audioCtx.destination);
+        } catch (e) { console.log("Web Audio Context skipped:", e); }
+
+        const advance = () => {
+            if (player !== liveAudioPlayer) return;                        // interrupted or replaced
+            liveCapRevealTo((item.word_start || 0) + (item.word_count || 0));
+            playNextLiveSentence();
+        };
+        player.onplay = () => pulseWithAudio();
+        player.onended = advance;
+        player.onerror = advance;
+        player.play().catch(e => { console.error("Live sentence audio error:", e); advance(); });
+        liveCapFollow(item, player);
+    }
+
+    // After the last sentence has been spoken (and the server has said it is finished): listen again
+    function maybeEndLiveReply() {
+        if (!isLiveModeActive || !liveStreamFinished || livePlaying || liveQueue.length) return;
+        liveAudioPlayer = null;
+        liveCapFeed('', true);
+        liveCapRevealTo(liveCap.spans.length);
+        if (liveState === 'speaking') startLiveListening();
+    }
+
+    function finishLiveStream(ctx, data) {
+        isNaviThinking = false;
+        toggleSendButtonState();
+        addMessageToUI('bot', data.response, '', { mood: data.mood, lang: data.lang });   // the chat behind keeps the full reply
+        if (ctx.liveCapReady) liveCapFeed('', true);
+        liveStreamFinished = true;
+        maybeEndLiveReply();
+    }
+
     function interruptNavi() {
         liveCue('interrupt');
         liveSilentNextListen = true;
@@ -3099,6 +3638,8 @@
             liveAudioPlayer.pause();
             liveAudioPlayer = null;
         }
+        resetLiveSpeech();
+        if (currentRequest && currentRequestCtx && currentRequestCtx.live) currentRequest.abort();   // stop generating the rest
         startLiveListening();
     }
 
@@ -3116,13 +3657,61 @@
         }
     }
 
-    function handleLiveResponse(text, audioBase64) {
+    // If the server voice is unavailable (TTS error or blocked playback) Navi can still talk using the
+    // browser's built-in voice. Set to false to show the words only.
+    const LIVE_BROWSER_VOICE_FALLBACK = true;
+
+    function speakWithBrowserVoice(text, lang, onDone, onNotStarted) {
+        if (!LIVE_BROWSER_VOICE_FALLBACK || !('speechSynthesis' in window) || !window.SpeechSynthesisUtterance) return false;
+        try {
+            window.speechSynthesis.cancel();
+            const u = new SpeechSynthesisUtterance(text);
+            const wanted = lang === 'TL' ? ['fil', 'tl'] : ['en'];
+            const voice = window.speechSynthesis.getVoices().find(v => wanted.some(p => (v.lang || '').toLowerCase().startsWith(p)));
+            if (voice) { u.voice = voice; u.lang = voice.lang; }
+            else u.lang = lang === 'TL' ? 'fil-PH' : 'en-US';
+            u.rate = 1.02;
+            let started = false, settled = false;
+            const done = () => { if (settled) return; settled = true; onDone(); };
+            // If the browser can't or won't speak (no voice installed, blocked), the caller shows the words
+            // at reading pace instead of moving on, so the reply is never lost.
+            const failed = () => {
+                if (settled) return; settled = true;
+                try { window.speechSynthesis.cancel(); } catch (e) {}
+                onNotStarted();
+            };
+            u.onstart = () => { started = true; };
+            u.onend = done;
+            u.onerror = () => { if (started) done(); else failed(); };
+            window.speechSynthesis.speak(u);
+            setTimeout(() => { if (!started) failed(); }, 2000);
+            return true;
+        } catch (e) { return false; }
+    }
+
+    function handleLiveResponse(text, audioBase64, lang) {
         if (!isLiveModeActive) return;
         isNaviThinking = false;
         toggleSendButtonState();
 
         const cleanText = text.replace(/\*\*(.*?)\*\*/g, '$1').replace(/\*/g, '').trim();
         addMessageToUI('bot', text, audioBase64);
+
+        // No server voice (TTS failed or the browser blocked playback): the reply is still shown right
+        // here in live mode, spoken with the browser voice when possible, and we resume listening after.
+        const showWithoutServerVoice = () => {
+            if (!isLiveModeActive) return;
+            clearTimeout(liveResumeTimer);
+            setLiveState('speaking', "Navi says... tap to reply");
+            const readingMs = Math.min(9000, 1800 + cleanText.length * 45);
+            const resume = () => { if (isLiveModeActive && liveState === 'speaking' && !liveAudioPlayer) startLiveListening(); };
+            const spoke = speakWithBrowserVoice(cleanText, lang, resume, () => {
+                clearTimeout(liveResumeTimer);
+                liveResumeTimer = setTimeout(resume, readingMs);
+            });
+            updateTranscript(cleanText, { charMs: spoke ? 65 : 38 });
+            liveResumeTimer = setTimeout(resume, spoke ? 60000 : readingMs);
+        };
 
         if (audioBase64) {
             setLiveState('speaking', "Navi is speaking... tap to interrupt");
@@ -3139,33 +3728,35 @@
                 analyser.connect(audioCtx.destination);
             } catch (e) { console.log("Web Audio Context skipped:", e); }
 
+            const voiceFailed = () => {
+                if (isLiveModeActive && player === liveAudioPlayer) { liveAudioPlayer = null; showWithoutServerVoice(); }
+            };
             player.onplay = () => pulseWithAudio();
             player.onended = () => { if (isLiveModeActive && player === liveAudioPlayer) startLiveListening(); };
-            player.onerror = () => { if (isLiveModeActive && player === liveAudioPlayer) startLiveListening(); };
+            player.onerror = voiceFailed;
             player.play().catch(e => {
                 console.error("Live Audio error:", e);
-                if (isLiveModeActive) startLiveListening();
+                voiceFailed();
             });
         } else {
-            // No audio came back (TTS hiccup): give the user time to read, then resume listening
-            setLiveState('speaking', "Navi says... tap to reply");
-            updateTranscript(cleanText, { charMs: 38 });      // no voice: words appear at a reading pace
-            clearTimeout(liveResumeTimer);
-            liveResumeTimer = setTimeout(
-                () => { if (isLiveModeActive && liveState === 'speaking') startLiveListening(); },
-                Math.min(9000, 1800 + cleanText.length * 45)
-            );
+            showWithoutServerVoice();
         }
     }
 
     function closeLiveMode() {
         liveCue('end');
         isLiveModeActive = false;
+        const hadFocus = overlay.contains(document.activeElement);
         overlay.classList.remove('is-active');
+        overlay.inert = true;
+        if (hadFocus) { try { document.querySelector('.btn-live').focus({ preventScroll: true }); } catch (e) {} }
         setTimeout(() => liveWave.stop(), 700);
 
         stopVad();
         clearTimeout(liveResumeTimer);
+        try { if (window.speechSynthesis) window.speechSynthesis.cancel(); } catch (e) {}
+        resetLiveSpeech();
+        if (currentRequest && currentRequestCtx && currentRequestCtx.live) currentRequest.abort();
 
         if (liveMediaRecorder && liveMediaRecorder.state !== 'inactive') {
             try { liveMediaRecorder.stop(); } catch (e) {}
@@ -3494,6 +4085,7 @@
     })();
 
     function pulseWithAudio() {
+        if (orbAnimationId) cancelAnimationFrame(orbAnimationId);      // a new sentence must not start a second loop
         if (liveState !== 'speaking' || !analyser) return;
 
         // Read the frequency makeup of Navi's voice; the wave renderer turns it into motion
