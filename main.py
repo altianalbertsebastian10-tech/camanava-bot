@@ -233,7 +233,7 @@ def safe_session_id(sid: str) -> str:
     return sid or "default_session"
 
 
-def get_city_data(target_city: str = None, history: list = None, category_filter=None, negated_cities: set = None, limit: int = 5) -> dict:
+def get_city_data(target_city: str = None, history: list = None, category_filter=None, negated_cities: set = None, limit: int = 5, score_fn=None) -> dict:
     """Fetches data from Firestore, filters by city, category, and handles multi-city pagination."""
     if negated_cities is None:
         negated_cities = set()
@@ -270,6 +270,8 @@ def get_city_data(target_city: str = None, history: list = None, category_filter
             if not all_matching_spots:
                 return {}
 
+            if score_fn:
+                all_matching_spots.sort(key=lambda sp: -score_fn(sp))     # stable: ties keep database order
             batch_index = 0
             if history:
                 for msg in history:
@@ -514,6 +516,8 @@ async def handle_itinerary_turn(request: "ChatRequest", verified_uid: str) -> di
                     "createdAt": firestore.SERVER_TIMESTAMP,
                 })
                 stop_count = len(stops)
+                _t3 = asyncio.create_task(run_in_threadpool(_remember_trip_sync, verified_uid, stops))
+                _BG_TASKS.add(_t3); _t3.add_done_callback(_BG_TASKS.discard)
                 saved_info = {
                     "id": itinerary_ref.id,
                     "title": title,
@@ -768,6 +772,37 @@ def scope_reply_for(message: str, history: list = None):
 async def read_profile(user: dict = Depends(verify_firebase_token)):
     uid = user.get("uid")
     return {"profile": await load_profile(uid, None) if is_real_user(uid) else _norm_profile({})}
+
+
+class ProfileRemove(BaseModel):
+    field: str
+    value: Optional[str] = None
+
+
+_LIST_FIELDS = {"likes", "dislikes", "favCities", "avoidCities", "facts", "recentPlaces"}
+_SCALAR_FIELDS = {"name", "home", "companions", "budget", "lang"}
+
+
+@app.post("/profile/remove")
+async def remove_profile_item(body: ProfileRemove, user: dict = Depends(verify_firebase_token)):
+    """Lets the user take back one thing Navi remembers instead of wiping everything."""
+    uid = user.get("uid")
+    if not is_real_user(uid):
+        return {"profile": _norm_profile({})}
+    prof = await run_in_threadpool(_load_profile_sync, uid)
+    if body.field in _LIST_FIELDS and body.value is not None:
+        _list_drop(prof[body.field], body.value)
+    elif body.field in _SCALAR_FIELDS:
+        prof[body.field] = ""
+        if body.field == "name":
+            prof["nameSource"] = ""
+    elif body.field == "counts" and body.value is not None:
+        prof["counts"].pop(body.value, None)
+    else:
+        raise HTTPException(status_code=400, detail="Unknown field")
+    prof = _norm_profile(prof)
+    await run_in_threadpool(_save_profile_sync, uid, prof)
+    return {"profile": prof}
 
 
 @app.delete("/profile")
@@ -1167,7 +1202,7 @@ def maps_directions_link(origin: dict, dest: dict) -> str:
 
 # ---- long-term memory about the user ----
 EMPTY_PROFILE = {"name": "", "nameSource": "", "home": "", "likes": [], "dislikes": [], "favCities": [], "avoidCities": [],
-                 "companions": "", "budget": "", "lang": "", "facts": []}
+                 "companions": "", "budget": "", "lang": "", "facts": [], "counts": {}, "recentPlaces": []}
 _PROFILE_CACHE = {}          # uid -> (timestamp, profile)
 _BG_TASKS = set()
 
@@ -1182,13 +1217,19 @@ def _norm_profile(p) -> dict:
         return out
     for k in ("name", "nameSource", "home", "companions", "budget", "lang"):
         out[k] = _clip_str(p.get(k), 40)
-    for k, cap, w in (("likes", 10, 30), ("dislikes", 10, 30), ("favCities", 4, 20), ("avoidCities", 4, 20), ("facts", 10, 120)):
+    for k, cap, w in (("likes", 10, 30), ("dislikes", 10, 30), ("favCities", 4, 20), ("avoidCities", 4, 20), ("facts", 10, 120), ("recentPlaces", 5, 60)):
         seen, items = set(), []
         for it in (p.get(k) if isinstance(p.get(k), list) else []):
             s = _clip_str(it, w)
             if s and s.lower() not in seen:
                 seen.add(s.lower()); items.append(s)
         out[k] = items[-cap:]
+    counts = {}
+    raw = p.get("counts") if isinstance(p.get("counts"), dict) else {}
+    for k, v in raw.items():
+        if isinstance(k, str) and re.match(r"^(city|cat):[a-z]{3,20}$", k) and isinstance(v, (int, float)) and v > 0:
+            counts[k] = int(min(v, 99))
+    out["counts"] = dict(sorted(counts.items(), key=lambda kv: -kv[1])[:16])
     return out
 
 
@@ -1274,6 +1315,8 @@ def update_profile_from_message(profile: dict, message: str, analysis: dict) -> 
     for kind, key, neg, liked in analysis.get("current_events", []):
         if kind == "city":
             c = key.title()
+            if not neg:
+                _bump(profile, "city:" + key)
             if neg:
                 _list_put(profile["avoidCities"], c, 4); _list_drop(profile["favCities"], c)
             elif liked:
@@ -1282,6 +1325,8 @@ def update_profile_from_message(profile: dict, message: str, analysis: dict) -> 
                 _list_drop(profile["avoidCities"], c)       # asking about it again means it is no longer off the table
         else:
             label = CATEGORY_LABELS.get(key, key)
+            if not neg:
+                _bump(profile, "cat:" + key)
             if neg:
                 _list_put(profile["dislikes"], label, 10); _list_drop(profile["likes"], label)
             elif liked:
@@ -1312,6 +1357,84 @@ def first_name_of(full) -> str:
     return parts[0].title()[:20] if parts else ""
 
 
+def _bump(profile: dict, key: str, by: int = 1):
+    c = profile.setdefault("counts", {})
+    c[key] = min(99, int(c.get(key, 0)) + by)
+    if len(c) > 16:
+        for k in sorted(c, key=c.get)[: len(c) - 16]:
+            del c[k]
+
+
+def _category_key_of(place: dict) -> str:
+    cat = str(place.get("category", "")).lower()
+    for key, terms in CATEGORY_FILTERS.items():
+        if any(t in cat for t in terms):
+            return key
+    return ""
+
+
+def learn_from_places(profile: dict, places: list):
+    """Places the user asked about by name say more about their taste than a passing word does."""
+    for pl in places[:2]:
+        name = str(pl.get("name", "")).strip()
+        if name:
+            _list_put(profile["recentPlaces"], name, 5)
+        city = str(pl.get("city", "")).lower()
+        if city in CITY_KEYS:
+            _bump(profile, "city:" + city)
+        ck = _category_key_of(pl)
+        if ck:
+            _bump(profile, "cat:" + ck)
+
+
+def _interest_label(key: str) -> str:
+    kind, _, val = key.partition(":")
+    return CATEGORY_LABELS.get(val, val) if kind == "cat" else val.title()
+
+
+def make_score_fn(profile: dict, wanted_cats: list):
+    """Higher = show first. Liked / often-asked kinds of places rise, disliked ones sink, and places they
+    looked at recently are pushed down a little so a returning user sees something new."""
+    label_to_key = {v: k for k, v in CATEGORY_LABELS.items()}
+    liked = {label_to_key[l] for l in profile.get("likes", []) if l in label_to_key}
+    disliked = {label_to_key[l] for l in profile.get("dislikes", []) if l in label_to_key}
+    counts = profile.get("counts", {})
+    seen = {n.lower() for n in profile.get("recentPlaces", [])}
+
+    def score(sp: dict) -> float:
+        ck = _category_key_of(sp)
+        sc = 0.0
+        if ck in liked: sc += 2
+        if ck in disliked and ck not in wanted_cats: sc -= 3
+        sc += min(counts.get("cat:" + ck, 0), 4) * 0.4
+        sc += min(counts.get("city:" + str(sp.get("city", "")).lower(), 0), 4) * 0.2
+        if str(sp.get("name", "")).lower() in seen: sc -= 1.5
+        return sc
+    return score
+
+
+def _remember_trip_sync(uid: str, stops: list):
+    """After an itinerary is saved: the places they chose are the strongest taste signal there is."""
+    try:
+        prof = _load_profile_sync(uid)
+        spots = {str(sp.get("place_id")): sp for sp in load_all_places()}
+        picked = []
+        for st in stops:
+            sp = spots.get(str(st.get("placeId"))) or next((x for x in spots.values() if x.get("name") == st.get("placeName")), None)
+            if sp:
+                picked.append(sp)
+        for sp in picked:
+            _bump(prof, "city:" + str(sp.get("city", "")).lower(), 2)
+            ck = _category_key_of(sp)
+            if ck:
+                _bump(prof, "cat:" + ck, 2)
+        for sp in picked[:3]:
+            _list_put(prof["recentPlaces"], sp.get("name", ""), 5)
+        _save_profile_sync(uid, _norm_profile(prof))
+    except Exception as e:
+        print(f"[REMEMBER TRIP ERROR] {e}")
+
+
 def format_profile_for_prompt(p: dict) -> str:
     lines = []
     if p.get("name"): lines.append(f"- Their name is {p['name']}.")
@@ -1324,6 +1447,9 @@ def format_profile_for_prompt(p: dict) -> str:
     if p.get("companions"): lines.append(f"- Last time they were travelling {p['companions']}.")
     if p.get("budget"): lines.append(f"- They said they are {p['budget']}.")
     for f in p.get("facts", []): lines.append(f"- {f}")
+    top = [_interest_label(k) for k, v in sorted(p.get("counts", {}).items(), key=lambda kv: -kv[1]) if v >= 2][:4]
+    if top: lines.append("- They keep coming back to: " + ", ".join(top) + ".")
+    if p.get("recentPlaces"): lines.append("- Places they looked at recently: " + "; ".join(p["recentPlaces"]) + ".")
     return "\n".join(lines)
 
 
@@ -1470,6 +1596,11 @@ async def prepare_chat_turn(request: "ChatRequest", verified_uid: str, status=No
     if not named_places and recent_places and not analysis["current_events"] and not smalltalk:
         named_places = recent_places[:2]       # a bare follow-up like "paano pumunta doon?"
     named_context = json.dumps(named_places, indent=2) if named_places else "[]"
+    if found_now:
+        learn_from_places(profile, [sp for sp, _ in found_now])
+        if is_real_user(verified_uid):
+            _t2 = asyncio.create_task(run_in_threadpool(_save_profile_sync, verified_uid, _norm_profile(profile)))
+            _BG_TASKS.add(_t2); _t2.add_done_callback(_BG_TASKS.discard)
 
     # ---- directions: work out which place is the start and which is the destination ----
     directions_block = ""
@@ -1532,11 +1663,12 @@ async def prepare_chat_turn(request: "ChatRequest", verified_uid: str, status=No
         await say(f"Searching {what} in {where}")
     per_city = 5 if len(cities_for_data) <= 1 else 4 if len(cities_for_data) == 2 else 3
     relevant_data, category_misses = {}, []
+    score_fn = make_score_fn(profile, wanted_cats)
     for c in ([] if route_only else cities_for_data):
-        d = await run_in_threadpool(get_city_data, c, request.history, cat_filters or None, avoided_cities, per_city)
+        d = await run_in_threadpool(get_city_data, c, request.history, cat_filters or None, avoided_cities, per_city, score_fn)
         if not d and cat_filters:
             category_misses.append(c)
-            d = await run_in_threadpool(get_city_data, c, request.history, None, avoided_cities, per_city)
+            d = await run_in_threadpool(get_city_data, c, request.history, None, avoided_cities, per_city, score_fn)
         for k, v in (d or {}).items():
             relevant_data.setdefault(k, []).extend(v)
     if avoid_terms:     # never hand the model a kind of place the user said they don't want
@@ -1624,6 +1756,9 @@ HOW TO ACTUALLY CONVERSE (this is the part that matters most):
   stay ruled out, things they asked for stay in play, and a vague follow-up ("saan pa?", "yung kanina", "ano
   pa?") continues the last topic. Answer ALL parts of a multi-part message, one by one, instead of picking one.
   Never re-ask something they already told you. Treat CONVERSATION STATE below as fact.
+- If the user greets you and you know their name, greet them by name. If they also have recent places or
+  interests listed under WHAT YOU KNOW, you may mention one lightly, once ("last time you were looking at X,
+  want to continue?"), never as a list and never in every message.
 - If the user is frustrated, swears, or vents (even at you), don't go cold and don't refuse. Take it in
   stride, briefly own it if you missed something, say so in their language, and fix it right away with a
   concrete next step. Mild swearing is not a reason to decline; only decline requests that are really

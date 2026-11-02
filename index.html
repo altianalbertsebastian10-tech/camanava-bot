@@ -666,6 +666,22 @@
         .gate-link { margin-top: 14px; background: none; border: none; color: var(--muted); font-size: 0.88rem; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
         .signout-btn { width: 100%; min-height: 40px; padding: 8px 14px; margin-top: 6px; box-sizing: border-box; border-radius: 999px; border: 1px solid var(--line-soft); background: transparent; color: var(--fore); font-family: var(--font-body); font-size: 0.85rem; font-weight: 500; cursor: pointer; }
         .signout-btn:hover { background: var(--slate); }
+        .mem-panel { background: var(--surface); padding: 22px; border-radius: 16px; border: 1px solid var(--border); width: 88%; max-width: 380px; max-height: 80vh; display: flex; flex-direction: column; font-family: 'DM Sans', sans-serif; box-sizing: border-box; }
+        .mem-title { margin: 0 0 6px; color: var(--fore); font-size: 1.2rem; }
+        .mem-sub { margin: 0 0 14px; color: var(--muted); font-size: 0.85rem; line-height: 1.45; }
+        .mem-body { overflow-y: auto; flex: 1; min-height: 40px; }
+        .mem-group { margin-bottom: 14px; }
+        .mem-group-title { font-size: 0.72rem; font-weight: 600; letter-spacing: 0.04em; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; }
+        .mem-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+        .mem-chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 8px 6px 12px; border-radius: 999px; background: var(--panel); border: 1px solid var(--line-soft); color: var(--fore); font-size: 0.85rem; }
+        .mem-chip button { border: none; background: transparent; color: var(--muted); cursor: pointer; font-size: 0.8rem; min-width: 24px; min-height: 24px; border-radius: 50%; }
+        .mem-chip button:hover { background: var(--slate); color: var(--fore); }
+        .mem-empty { color: var(--muted); font-size: 0.9rem; padding: 8px 0 14px; }
+        .mem-actions { display: flex; gap: 10px; margin-top: 8px; }
+        .mem-btn { flex: 1; min-height: 42px; border-radius: 999px; border: 1px solid var(--line-soft); background: transparent; color: var(--fore); font-family: 'DM Sans', sans-serif; font-size: 0.88rem; font-weight: 600; cursor: pointer; }
+        .mem-btn:hover { background: var(--slate); }
+        .mem-done { background: var(--fore); color: var(--void); border-color: transparent; }
+        .mem-done:hover { background: var(--fore); opacity: 0.9; }
         .forget-btn {
             width: 100%; min-height: 40px; padding: 8px 14px; margin-top: 6px; box-sizing: border-box;
             border-radius: 999px; border: 1px solid var(--line-soft); background: transparent; color: var(--fore);
@@ -1423,6 +1439,19 @@
         </div>
     </div>
 
+    <!-- WHAT NAVI REMEMBERS -->
+    <div id="memory-modal" style="display: none; position: fixed; inset: 0; background: var(--scrim); z-index: 6000; align-items: center; justify-content: center;" onclick="if(event.target===this) closeMemory()">
+        <div class="mem-panel" role="dialog" aria-modal="true" aria-labelledby="mem-title">
+            <h3 id="mem-title" class="mem-title">What Navi remembers</h3>
+            <p class="mem-sub">Only what you told Navi, or places you showed interest in. Tap &#10005; to remove anything.</p>
+            <div id="mem-body" class="mem-body"></div>
+            <div class="mem-actions">
+                <button type="button" class="mem-btn mem-danger" onclick="forgetMemory()">Forget everything</button>
+                <button type="button" class="mem-btn mem-done" onclick="closeMemory()">Done</button>
+            </div>
+        </div>
+    </div>
+
     <!-- DELETE CONFIRMATION MODAL -->
     <div id="delete-confirm-modal" style="display: none; position: fixed; inset: 0; background: var(--scrim); z-index: 6000; align-items: center; justify-content: center;">
         <div style="background: var(--surface); padding: 24px; border-radius: 12px; border: 1px solid var(--border); text-align: center; width: 85%; max-width: 320px; font-family: 'DM Sans', sans-serif;">
@@ -1470,7 +1499,7 @@
             <strong id="current-user-display" style="color: var(--fore);">Guest</strong>
             <button type="button" id="signout-btn" class="signout-btn" onclick="signOutUser()" style="display:none;">Log out</button>
             <div class="theme-label">Memory</div>
-            <button type="button" class="forget-btn" onclick="forgetMemory()" title="Navi remembers your travel preferences between chats. Tap to erase them.">Forget what Navi remembers</button>
+            <button type="button" class="forget-btn" onclick="openMemory()" title="See what Navi remembers about you, and remove anything you don't want kept.">What Navi remembers</button>
             <div class="theme-label" id="theme-label">Appearance</div>
             <div class="theme-seg" role="group" aria-labelledby="theme-label">
                 <button type="button" data-pref="system" aria-pressed="false" onclick="setThemePref('system')">Auto</button>
@@ -1678,6 +1707,11 @@
         }
     }
 
+    // Where the backend lives. Opened from localhost (testing on your own machine) it talks to the server
+    // that served the page; everywhere else it uses the deployed one.
+    const API_BASE = (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname) && location.protocol.startsWith('http'))
+        ? location.origin : 'https://camanava-bot.onrender.com';
+
     // 2. KUNIN ANG TOKEN MULA SA LOCAL STORAGE
     let authToken = localStorage.getItem('authToken') || '';
 
@@ -1853,6 +1887,7 @@
 
     document.addEventListener('keydown', (e) => {
         if (e.key !== 'Escape') return;
+        if (document.getElementById('memory-modal').style.display === 'flex') { closeMemory(); return; }
         const itineraryModal = document.getElementById('itinerary-preview-modal');
         const deleteModal = document.getElementById('delete-confirm-modal');
         const sidebar = document.getElementById('sidebar');
@@ -2082,7 +2117,7 @@
         // Logged-in users: sessions live in Firestore, fetched via the backend.
         if (isLoggedIn()) {
             try {
-                const res = await fetch('https://camanava-bot.onrender.com/sessions', {
+                const res = await fetch(API_BASE + '/sessions', {
                     headers: { 'Authorization': 'Bearer ' + authToken }
                 });
                 if (!res.ok) return [];
@@ -2170,7 +2205,7 @@
         try {
             let sessions;
             if (isLoggedIn()) {
-                const res = await fetch('https://camanava-bot.onrender.com/sessions', {
+                const res = await fetch(API_BASE + '/sessions', {
                     headers: { 'Authorization': 'Bearer ' + authToken }
                 });
                 if (!res.ok) return;
@@ -2202,7 +2237,7 @@
         if (isLoggedIn()) {
             // Logged-in: pull the full session (with messages) from Firestore via the backend.
             try {
-                const res = await fetch('https://camanava-bot.onrender.com/sessions/' + sessionId, {
+                const res = await fetch(API_BASE + '/sessions/' + sessionId, {
                     headers: { 'Authorization': 'Bearer ' + authToken }
                 });
                 if (res.ok) {
@@ -2301,7 +2336,7 @@
     if (isLoggedIn()) {
         // Logged-in: delete the Firestore-backed session via the backend.
         try {
-            await fetch('https://camanava-bot.onrender.com/sessions/' + sessionId, {
+            await fetch(API_BASE + '/sessions/' + sessionId, {
                 method: 'DELETE',
                 headers: { 'Authorization': 'Bearer ' + authToken }
             });
@@ -2352,7 +2387,7 @@
             btn._loadingTTS = true;
             setTTSButton(btn, 'loading');
             try {
-                const res = await fetch('https://camanava-bot.onrender.com/tts', {
+                const res = await fetch(API_BASE + '/tts', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
                     body: JSON.stringify(btn._tts)
@@ -2852,7 +2887,6 @@
 
 
     // --- STREAMING REPLIES ---
-    const API_BASE = 'https://camanava-bot.onrender.com';
     const STREAM_REPLIES = true;        // false = always use the classic one-shot /chat request
 
     class StreamCut extends Error {}    // the connection dropped after part of a reply had arrived
@@ -3051,6 +3085,100 @@
     function saveGuestProfile(p) {
         try { localStorage.setItem('naviProfile', JSON.stringify(p)); } catch (e) {}
     }
+    const MEM_CAT_LABELS = { park: 'parks', restaurant: 'places to eat', church: 'churches', fishing: 'fishing spots', historical: 'historical sites' };
+    let memoryProfile = {};
+
+    async function fetchMemoryProfile() {
+        if (!isLoggedIn()) return loadGuestProfile() || {};
+        try {
+            const res = await fetch(API_BASE + '/profile', { headers: { 'Authorization': 'Bearer ' + authToken } });
+            if (res.ok) return (await res.json()).profile || {};
+        } catch (e) {}
+        return null;
+    }
+
+    function memoryGroups(p) {
+        const g = [];
+        const one = (title, field, value, label) => value ? { title, field, items: [{ label: label || value, value: null }] } : null;
+        const scalars = [one('Name', 'name', p.name), one('From', 'home', p.home), one('Travelling', 'companions', p.companions),
+                         one('Budget', 'budget', p.budget), one('Language', 'lang', p.lang)].filter(Boolean);
+        scalars.forEach(x => g.push(x));
+        const list = (title, field, arr) => { if (arr && arr.length) g.push({ title, field, items: arr.map(v => ({ label: v, value: v })) }); };
+        list('Likes', 'likes', p.likes);
+        list('Not into', 'dislikes', p.dislikes);
+        list('Favourite cities', 'favCities', p.favCities);
+        list('Skips cities', 'avoidCities', p.avoidCities);
+        list('Notes', 'facts', p.facts);
+        const counts = Object.entries(p.counts || {}).sort((a, b) => b[1] - a[1]).slice(0, 6);
+        if (counts.length) g.push({ title: 'Interests', field: 'counts', items: counts.map(([k]) => {
+            const [kind, val] = k.split(':');
+            return { label: kind === 'cat' ? (MEM_CAT_LABELS[val] || val) : val.charAt(0).toUpperCase() + val.slice(1), value: k };
+        }) });
+        list('Recently looked at', 'recentPlaces', p.recentPlaces);
+        return g;
+    }
+
+    function renderMemory() {
+        const body = document.getElementById('mem-body');
+        body.textContent = '';
+        const groups = memoryGroups(memoryProfile || {});
+        if (!groups.length) {
+            const e = document.createElement('div');
+            e.className = 'mem-empty';
+            e.textContent = "Nothing yet. As you chat, Navi will remember things like your name and the kinds of places you like.";
+            body.appendChild(e);
+            return;
+        }
+        groups.forEach(gr => {
+            const wrap = document.createElement('div'); wrap.className = 'mem-group';
+            const t = document.createElement('div'); t.className = 'mem-group-title'; t.textContent = gr.title; wrap.appendChild(t);
+            const chips = document.createElement('div'); chips.className = 'mem-chips';
+            gr.items.forEach(it => {
+                const chip = document.createElement('span'); chip.className = 'mem-chip';
+                const lab = document.createElement('span'); lab.textContent = it.label; chip.appendChild(lab);
+                const x = document.createElement('button'); x.type = 'button'; x.textContent = '\u2715';
+                x.setAttribute('aria-label', 'Remove ' + it.label);
+                x.onclick = () => removeMemoryItem(gr.field, it.value);
+                chip.appendChild(x); chips.appendChild(chip);
+            });
+            wrap.appendChild(chips); body.appendChild(wrap);
+        });
+    }
+
+    async function openMemory() {
+        const modal = document.getElementById('memory-modal');
+        modal.style.display = 'flex';
+        document.getElementById('mem-body').textContent = 'Loading...';
+        const p = await fetchMemoryProfile();
+        if (p === null) { document.getElementById('mem-body').textContent = "Couldn't load this right now. Try again in a moment."; return; }
+        memoryProfile = p;
+        renderMemory();
+    }
+    function closeMemory() { document.getElementById('memory-modal').style.display = 'none'; }
+
+    async function removeMemoryItem(field, value) {
+        if (!isLoggedIn()) {
+            const p = loadGuestProfile() || {};
+            if (Array.isArray(p[field])) p[field] = p[field].filter(v => v !== value);
+            else if (field === 'counts' && p.counts) delete p.counts[value];
+            else { p[field] = ''; if (field === 'name') p.nameSource = ''; }
+            saveGuestProfile(p);
+            memoryProfile = p;
+        } else {
+            try {
+                const res = await fetch(API_BASE + '/profile/remove', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + authToken },
+                    body: JSON.stringify({ field, value })
+                });
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                memoryProfile = (await res.json()).profile || {};
+            } catch (e) { showToast("Couldn't remove that. Try again in a moment."); return; }
+        }
+        renderMemory();
+        applyPersonalGreeting();
+    }
+
     async function forgetMemory() {
         try { localStorage.removeItem('naviProfile'); } catch (e) {}
         let ok = true;
@@ -3060,7 +3188,8 @@
                 ok = res.ok;
             } catch (e) { ok = false; }
         }
-        if (typeof showToast === 'function') showToast(ok ? 'Done. Navi no longer remembers your preferences.' : "Couldn't reach the server. Try again in a moment.");
+        if (ok) { memoryProfile = {}; renderMemory(); applyPersonalGreeting(); }
+        showToast(ok ? 'Done. Navi no longer remembers your preferences.' : "Couldn't reach the server. Try again in a moment.");
     }
 
     // --- THINKING STATUS ---
@@ -3679,7 +3808,7 @@
         // No language is sent: the server auto-detects it, so any visitor can speak their own language.
 
         try {
-            const res = await fetch('https://camanava-bot.onrender.com/transcribe', {
+            const res = await fetch(API_BASE + '/transcribe', {
                 method: 'POST',
                 body: formData
             });
