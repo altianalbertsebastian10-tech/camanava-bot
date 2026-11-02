@@ -640,6 +640,41 @@
         html.lite-mode .think-label { animation: none; -webkit-text-fill-color: currentColor; background: none; }
 
         .response-container { width: 100%; }
+        .gate-step { display: flex; flex-direction: column; align-items: center; width: 100%; max-width: 340px; }
+        .gate-title { font-family: 'DM Sans', sans-serif; font-size: 1.7rem; margin: 0 0 10px; color: var(--fore); }
+        .gate-sub { color: var(--muted); font-size: 0.95rem; line-height: 1.5; margin: 0 0 22px; }
+        .gate-note { color: var(--muted); font-size: 0.82rem; margin: 18px 0 0; }
+        .gate-btn {
+            width: 100%; min-height: 46px; padding: 10px 24px; margin-top: 10px; box-sizing: border-box;
+            display: flex; align-items: center; justify-content: center; gap: 10px;
+            background: var(--panel); color: var(--fore); border: 1px solid var(--hairline); border-radius: 999px; cursor: pointer;
+            font-family: 'DM Sans', sans-serif; font-size: 0.95rem; font-weight: 600;
+            transition: background-color 0.2s ease, transform 0.15s ease;
+        }
+        .gate-btn:hover { background: var(--slate); }
+        .gate-btn:active { transform: scale(0.98); }
+        .gate-google { background: #ffffff; color: #1f2937; border-color: #d1d5db; }
+        .gate-google:hover { background: #f3f4f6; }
+        .gate-primary { background: var(--fore); color: var(--void); border-color: transparent; }
+        .gate-primary:hover { background: var(--fore); opacity: 0.9; }
+        .gate-input {
+            width: 100%; min-height: 46px; padding: 10px 18px; box-sizing: border-box; border-radius: 999px;
+            border: 1px solid var(--hairline); background: var(--panel); color: var(--fore);
+            font-family: 'DM Sans', sans-serif; font-size: 16px; text-align: center; outline: none;
+        }
+        .gate-input:focus { border-color: var(--live-border); }
+        .gate-link { margin-top: 14px; background: none; border: none; color: var(--muted); font-size: 0.88rem; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+        .signout-btn { width: 100%; min-height: 40px; padding: 8px 14px; margin-top: 6px; box-sizing: border-box; border-radius: 999px; border: 1px solid var(--line-soft); background: transparent; color: var(--fore); font-family: var(--font-body); font-size: 0.85rem; font-weight: 500; cursor: pointer; }
+        .signout-btn:hover { background: var(--slate); }
+        .forget-btn {
+            width: 100%; min-height: 40px; padding: 8px 14px; margin-top: 6px; box-sizing: border-box;
+            border-radius: 999px; border: 1px solid var(--line-soft); background: transparent; color: var(--fore);
+            font-family: var(--font-body); font-size: 0.85rem; font-weight: 500; cursor: pointer;
+            transition: background-color 0.2s ease, transform 0.15s ease;
+        }
+        .forget-btn:hover { background: var(--slate); }
+        .forget-btn:active { transform: scale(0.98); }
+        .resp-body a { color: var(--live-fg); text-decoration: underline; text-underline-offset: 2px; word-break: break-all; }
         .resp-body { color: inherit; overflow-wrap: anywhere; }
         .resp-body p { margin: 0 0 0.55em; }
         .resp-body p:last-child, .resp-body ul:last-child, .resp-body ol:last-child { margin-bottom: 0; }
@@ -1369,11 +1404,23 @@
 <body>
     <!-- LOGIN GATE OVERLAY -->
     <div id="login-gate" style="display: flex; position: absolute; inset: 0; background: var(--surface); z-index: 4000; flex-direction: column; align-items: center; justify-content: center; padding: 24px; text-align: center;">
-        <h2 style="font-family: 'DM Sans', sans-serif; font-size: 2rem; margin-bottom: 12px; color: var(--fore);">Authentication Required</h2>
-        <p style="color: var(--muted); font-size: 0.95rem; line-height: 1.5;">Please log in through the NaviGo! mobile application to access Navi.</p>
-        <button onclick="enableGuestMode()" style="margin-top: 20px; padding: 10px 24px; background: var(--panel); color: var(--fore); border: 1px solid var(--hairline); border-radius: 8px; cursor: pointer; font-family: 'DM Sans', sans-serif; transition: background 0.2s;">
-            Continue as Guest
-        </button>
+        <div id="gate-main" class="gate-step">
+            <h2 class="gate-title">Welcome to Navi</h2>
+            <p class="gate-sub">Sign in so Navi can remember you and your travel style, or just look around as a guest.</p>
+            <button type="button" id="google-btn" class="gate-btn gate-google" onclick="signInWithGoogle()" style="display:none;">
+                <svg viewBox="0 0 48 48" width="18" height="18" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.9 6.1C12.4 13.5 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.2 5.4-4.7 7.1l7.6 5.9c4.4-4.1 6.9-10.1 6.9-17.5z"/><path fill="#FBBC05" d="M10.5 28.7A14.5 14.5 0 0 1 9.5 24c0-1.6.3-3.2.8-4.7l-7.9-6.1A24 24 0 0 0 0 24c0 3.9.9 7.5 2.6 10.8l7.9-6.1z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.6-5.9c-2.1 1.4-4.8 2.3-8.3 2.3-6.3 0-11.6-4-13.5-9.8l-7.9 6.1C6.5 42.6 14.6 48 24 48z"/></svg>
+                Continue with Google
+            </button>
+            <button type="button" class="gate-btn" onclick="startGuestFlow()">Continue as Guest</button>
+            <p class="gate-note">Or log in through the NaviGo! mobile app.</p>
+        </div>
+        <div id="gate-name" class="gate-step" style="display:none;">
+            <h2 class="gate-title">What should I call you?</h2>
+            <p class="gate-sub">Navi will use it to say hi. It stays on this device.</p>
+            <input id="guest-name-input" class="gate-input" type="text" maxlength="30" placeholder="Your name" autocomplete="given-name" onkeydown="if(event.key==='Enter') submitGuestName()">
+            <button type="button" class="gate-btn gate-primary" onclick="submitGuestName()">Continue</button>
+            <button type="button" class="gate-link" onclick="skipGuestName()">Skip for now</button>
+        </div>
     </div>
 
     <!-- DELETE CONFIRMATION MODAL -->
@@ -1421,6 +1468,9 @@
         <div style="padding: 20px; border-top: 1px solid var(--border); color: var(--muted); font-family: 'DM Sans', sans-serif; font-size: 0.9rem;">
             Logged in as:<br>
             <strong id="current-user-display" style="color: var(--fore);">Guest</strong>
+            <button type="button" id="signout-btn" class="signout-btn" onclick="signOutUser()" style="display:none;">Log out</button>
+            <div class="theme-label">Memory</div>
+            <button type="button" class="forget-btn" onclick="forgetMemory()" title="Navi remembers your travel preferences between chats. Tap to erase them.">Forget what Navi remembers</button>
             <div class="theme-label" id="theme-label">Appearance</div>
             <div class="theme-seg" role="group" aria-labelledby="theme-label">
                 <button type="button" data-pref="system" aria-pressed="false" onclick="setThemePref('system')">Auto</button>
@@ -1645,20 +1695,117 @@
         }
         document.getElementById('login-gate').style.display = 'none';
         restoreLatestSession();
+        applyPersonalGreeting();
     };
 
     window.enableGuestMode = function() {
-    const guestToken = 'guest_mode_active';
-    authToken = guestToken;
-    localStorage.setItem('authToken', guestToken);
-    localStorage.setItem('uid', 'guest_user');
-    localStorage.removeItem('displayName');
-    setLoginGate(false);   // fades out
-    restoreLatestSession();
+        const guestToken = 'guest_mode_active';
+        authToken = guestToken;
+        localStorage.setItem('authToken', guestToken);
+        localStorage.setItem('uid', 'guest_user');
+        localStorage.removeItem('displayName');
+        localStorage.removeItem('authProvider');
+        setLoginGate(false);   // fades out
+        restoreLatestSession();
+        applyPersonalGreeting();
+    };
+
+    // --- GUEST: ask for a name first (once) ---
+    function showGateStep(id) {
+        document.getElementById('gate-main').style.display = id === 'gate-main' ? 'flex' : 'none';
+        document.getElementById('gate-name').style.display = id === 'gate-name' ? 'flex' : 'none';
+    }
+    window.startGuestFlow = function() {
+        const known = (loadGuestProfile() || {}).name;
+        if (known) { enableGuestMode(); return; }
+        showGateStep('gate-name');
+        setTimeout(() => { try { document.getElementById('guest-name-input').focus(); } catch (e) {} }, 50);
+    };
+    window.submitGuestName = function() {
+        const raw = document.getElementById('guest-name-input').value.replace(/\s+/g, ' ').trim().slice(0, 30);
+        if (!raw) { skipGuestName(); return; }
+        const name = raw.split(' ')[0].charAt(0).toUpperCase() + raw.split(' ')[0].slice(1);
+        const p = loadGuestProfile() || {};
+        p.name = name; p.nameSource = 'user';
+        saveGuestProfile(p);
+        enableGuestMode();
+    };
+    window.skipGuestName = function() { enableGuestMode(); };
+
+    // First name to greet the user with: Google/app account name, or the name a guest typed.
+    function currentFirstName() {
+        let n = '';
+        if (isLoggedIn()) n = (localStorage.getItem('displayName') || '').trim();
+        else n = ((loadGuestProfile() || {}).name || '').trim();
+        return n ? n.split(/\s+/)[0] : '';
+    }
+    function applyPersonalGreeting() {
+        const name = currentFirstName();
+        const sub = document.querySelector('.welcome-title-sub');
+        if (sub) sub.textContent = name ? 'Hi ' + name + ', how can I help you today?' : 'How can I be of assistance today?';
+        const out = document.getElementById('signout-btn');
+        if (out) out.style.display = localStorage.getItem('authProvider') === 'google' ? 'block' : 'none';
+    }
+
+    // --- GOOGLE SIGN-IN (Firebase Authentication) ---
+    // Fill in these four values from Firebase console > Project settings > Your apps > Web app.
+    // While they are empty the Google button stays hidden and everything else works as before.
+    const FIREBASE_WEB_CONFIG = { apiKey: "", authDomain: "", projectId: "", appId: "" };
+    let firebaseReady = false;
+
+    function loadScript(src) {
+        return new Promise((resolve, reject) => {
+            const el = document.createElement('script');
+            el.src = src; el.onload = resolve; el.onerror = reject;
+            document.head.appendChild(el);
+        });
+    }
+    async function initGoogleAuth() {
+        if (!FIREBASE_WEB_CONFIG.apiKey || firebaseReady) return;
+        try {
+            await loadScript('https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js');
+            await loadScript('https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js');
+            firebase.initializeApp(FIREBASE_WEB_CONFIG);
+            firebaseReady = true;
+            document.getElementById('google-btn').style.display = 'flex';
+            // Firebase tokens last 1 hour; this keeps ours fresh and restores the session after a reload.
+            firebase.auth().onIdTokenChanged(async (u) => {
+                if (!u) return;
+                const token = await u.getIdToken();
+                authToken = token;
+                localStorage.setItem('authToken', token);
+                localStorage.setItem('uid', u.uid);
+                if (u.displayName) localStorage.setItem('displayName', u.displayName);
+                localStorage.setItem('authProvider', 'google');
+                applyPersonalGreeting();
+            });
+        } catch (e) { console.warn('Google sign-in unavailable', e); }
+    }
+    window.signInWithGoogle = async function() {
+        if (!firebaseReady) { showToast('Google sign-in is not available right now.'); return; }
+        try {
+            const result = await firebase.auth().signInWithPopup(new firebase.auth.GoogleAuthProvider());
+            const u = result.user;
+            const token = await u.getIdToken();
+            localStorage.setItem('authProvider', 'google');
+            handleAppLogin(u.uid, token, u.displayName || '');
+            applyPersonalGreeting();
+        } catch (e) {
+            if (e && (e.code === 'auth/popup-closed-by-user' || e.code === 'auth/cancelled-popup-request')) return;
+            console.warn('Google sign-in failed', e);
+            showToast("Couldn't sign in with Google. Please try again.");
+        }
+    };
+    window.signOutUser = async function() {
+        try { if (firebaseReady) await firebase.auth().signOut(); } catch (e) {}
+        ['authToken', 'uid', 'displayName', 'authProvider'].forEach(k => localStorage.removeItem(k));
+        location.reload();
     };
 
     // 3. ITAGO ANG LOGIN GATE KUNG MAY TOKEN NA
     window.addEventListener('DOMContentLoaded', () => {
+        initGoogleAuth();
+        applyPersonalGreeting();
         if (authToken) {
             document.getElementById('login-gate').style.display = 'none';
             // URL-param auth (?token=...&uid=...) is already resolved by this point,
@@ -1801,7 +1948,7 @@
         itineraryDraft = null;
         updateItineraryBanner();
         document.getElementById('chat').innerHTML = ''; // Clear chat UI
-        addMessageToUI('bot', "Hi! I'm Navi. What new adventure are we planning today?");
+        { const n = currentFirstName(); addMessageToUI('bot', n ? "Hi " + n + "! I'm Navi. How can I help you today?" : "Hi! I'm Navi. What new adventure are we planning today?"); }
         // Now reachable from the header too: only close the sidebar if it's actually open.
         if (!document.getElementById('sidebar').classList.contains('is-active')) return;
         toggleSidebar();
@@ -1959,7 +2106,7 @@
         const currentUid = localStorage.getItem('uid') || 'guest_user';
         const displayName = localStorage.getItem('displayName');
         document.getElementById('current-user-display').innerText =
-            isLoggedIn() ? (displayName || currentUid) : 'Guest User';
+            isLoggedIn() ? (displayName || currentUid) : (currentFirstName() ? 'Guest (' + currentFirstName() + ')' : 'Guest User');
 
         const userHistories = await fetchSessionList();
 
@@ -2247,7 +2394,8 @@
     function formatMessageHTML(text) {
         if (!text) return '';
         const esc = t => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-        const inline = t => esc(t).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/\*/g, '');
+        const inline = t => esc(t).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/\*/g, '')
+            .replace(/(https:\/\/[^\s<)]+)/g, (u) => '<a href="' + u + '" target="_blank" rel="noopener noreferrer">' + (/google\.com\/maps/.test(u) ? 'Open in Google Maps' : u) + '</a>');
         const out = [];
         let list = null;
         const closeList = () => { if (list) { out.push('</' + list + '>'); list = null; } };
@@ -2794,6 +2942,7 @@
         let buf = '', final = null, failed = false;
         const handle = (ev) => {
             switch (ev.type) {
+                case 'status':   pushThinkingStatus(ctx, ev.text); break;
                 case 'meta':     ctx.meta = { mood: ev.mood, lang: ev.lang }; break;
                 case 'delta':    onStreamDelta(ctx, ev.text); break;
                 case 'replace':  onStreamReplace(ctx, ev.text); break;
@@ -2894,6 +3043,26 @@
         forceUIRefreshScroll();
     }
 
+    // --- WHAT NAVI REMEMBERS ---
+    // Signed-in users: stored on the server. Guests: kept only on this device and sent along with each message.
+    function loadGuestProfile() {
+        try { return JSON.parse(localStorage.getItem('naviProfile') || 'null'); } catch (e) { return null; }
+    }
+    function saveGuestProfile(p) {
+        try { localStorage.setItem('naviProfile', JSON.stringify(p)); } catch (e) {}
+    }
+    async function forgetMemory() {
+        try { localStorage.removeItem('naviProfile'); } catch (e) {}
+        let ok = true;
+        if (isLoggedIn()) {
+            try {
+                const res = await fetch(API_BASE + '/profile', { method: 'DELETE', headers: { 'Authorization': 'Bearer ' + authToken } });
+                ok = res.ok;
+            } catch (e) { ok = false; }
+        }
+        if (typeof showToast === 'function') showToast(ok ? 'Done. Navi no longer remembers your preferences.' : "Couldn't reach the server. Try again in a moment.");
+    }
+
     // --- THINKING STATUS ---
     // While waiting for a reply, show what Navi is doing. The steps mirror what the server really does
     // (check the question, look places up, write the reply); the wording follows what the user asked.
@@ -2928,6 +3097,26 @@
         setTimeout(() => { label.textContent = text; label.classList.remove('is-swapping'); }, 220);
     }
 
+    // Real progress notes from the server ("Searching parks in Malabon", "Found 5 places in Malabon"...).
+    // Each stays on screen at least ~0.7 s so quick steps can still be read; the newest wins when they pile up.
+    function pushThinkingStatus(ctx, text) {
+        const bubble = document.getElementById(ctx.typingId);
+        if (!bubble || !text) return;
+        ctx.gotStatus = true;
+        bubble._real = true;
+        bubble._queue = bubble._queue || [];
+        bubble._queue.push(text);
+        if (bubble._busy) return;
+        const run = () => {
+            if (!bubble.isConnected || !bubble._queue.length) { bubble._busy = false; return; }
+            bubble._busy = true;
+            if (bubble._queue.length > 2) bubble._queue.splice(0, bubble._queue.length - 2);   // skip stale steps
+            setThinkingLabel(bubble, bubble._queue.shift() + '...');
+            setTimeout(run, 700);
+        };
+        run();
+    }
+
     function startThinkingStatus(bubble, msg) {
         const steps = thinkingSteps(msg);
         bubble.setAttribute('role', 'status');
@@ -2936,7 +3125,7 @@
         bubble.querySelector('.think-label').textContent = steps[0] + '...';
         let i = 0;
         const timer = setInterval(() => {
-            if (!bubble.isConnected) { clearInterval(timer); return; }   // reply arrived or request stopped
+            if (!bubble.isConnected || bubble._real) { clearInterval(timer); return; }   // reply arrived, or real progress notes took over
             if (i < steps.length - 1) { i++; setThinkingLabel(bubble, steps[i] + '...'); }
         }, 2200);
     }
@@ -2977,13 +3166,13 @@
             if (isLiveModeActive) {
                 if (liveState === 'thinking') setLiveState('thinking', "Still working on it, one moment...");
             } else {
-                setThinkingLabel(document.getElementById(typingId), 'Still working... the server may be waking up', true);
+                if (!ctx.gotStatus) setThinkingLabel(document.getElementById(typingId), 'Still working... the server may be waking up', true);
             }
         }, 8000);
         const dropWaitNote = () => { clearTimeout(slowChatHint); if (waitNote) { waitNote.remove(); waitNote = null; } };
         try {
             if (navigator.onLine === false) throw new Error('offline');
-            const body = { message: msg, history, session_id: currentSessionId, itinerary_draft: itineraryDraft, want_audio: isLiveModeActive };
+            const body = { message: msg, history, session_id: currentSessionId, itinerary_draft: itineraryDraft, want_audio: isLiveModeActive, profile: isLoggedIn() ? null : loadGuestProfile(), display_name: isLoggedIn() ? (currentFirstName() || null) : null };
 
             // Preferred: the reply streams in word by word (and, in Live mode, sentence by sentence with voice).
             // If the server has no streaming endpoint (older deploy), quietly use the classic request.
@@ -3013,6 +3202,7 @@
             // Update AFTER the exchange completes, so this actually includes the
             // message + reply that just happened (fixes history always lagging one turn behind).
             history = data.history;
+            if (data.profile && !isLoggedIn()) saveGuestProfile(data.profile);
             if (turnEl) delete turnEl.dataset.pending;
             itineraryDraft = data.itinerary_draft || null;
             updateItineraryBanner();
