@@ -567,6 +567,11 @@ async def handle_itinerary_turn(request: "ChatRequest", verified_uid: str) -> di
             it_state += "KINDS OF PLACES THE USER DOES NOT WANT (leave them out): " + ", ".join(CATEGORY_LABELS.get(k, k) for k in sorted(_an["avoided_cats"])) + "\n"
         if _prof_text:
             it_state += "\nWHAT YOU REMEMBER ABOUT THIS USER (soft hints; this conversation overrides them):\n" + _prof_text + "\n"
+        _wx = await run_in_threadpool(build_weather_block, mentioned_cities or camanava_cities)
+        if _wx:
+            it_state += _wx + ("Use this forecast when choosing stops: indoor places (restaurants, churches, museums) on "
+                               "rainy or very hot days, parks and outdoor spots on clear days. Mention the weather "
+                               "briefly in your reply. Never invent weather beyond what is listed.\n")
         ITINERARY_LLM_CONTEXT_TURNS = 16
         itinerary_context_history = request.history[-ITINERARY_LLM_CONTEXT_TURNS:]
 
@@ -1506,6 +1511,71 @@ def shrink_history_for_llm(history: list, keep_recent: int = 4, max_old_assistan
 _CATEGORY_LABELS = {"park": "parks", "restaurant": "places to eat", "church": "churches", "fishing": "fishing spots"}
 
 
+# --- WEATHER (Open-Meteo: free, no API key) ---
+# The model cannot know the weather by itself, so the app fetches REAL data and hands it to the prompt.
+CITY_COORDS = {
+    "caloocan": (14.6500, 120.9667),
+    "malabon": (14.6625, 120.9570),
+    "navotas": (14.6667, 120.9417),
+    "valenzuela": (14.7011, 120.9830),
+}
+WEATHER_PATTERN = re.compile(
+    r"\b(weather|forecast|temperature|temp|rain|raining|rainy|ulan|umulan|init|mainit|lamig|malamig|"
+    r"umbrella|payong|humid|typhoon|bagyo|sunny|cloudy|hot|cold)\b", re.IGNORECASE)
+_WEATHER_CACHE = {}  # city -> (timestamp, data)
+_WEATHER_TTL = 900   # 15 minutes
+_WMO = {0: "clear sky", 1: "mostly clear", 2: "partly cloudy", 3: "overcast", 45: "foggy", 48: "foggy",
+        51: "light drizzle", 53: "drizzle", 55: "heavy drizzle", 61: "light rain", 63: "rain", 65: "heavy rain",
+        80: "rain showers", 81: "rain showers", 82: "violent rain showers", 95: "thunderstorm",
+        96: "thunderstorm with hail", 99: "thunderstorm with hail"}
+
+
+def fetch_weather_sync(city: str):
+    now = time.time()
+    cached = _WEATHER_CACHE.get(city)
+    if cached and now - cached[0] < _WEATHER_TTL:
+        return cached[1]
+    coords = CITY_COORDS.get(city)
+    if not coords:
+        return None
+    try:
+        r = requests.get("https://api.open-meteo.com/v1/forecast", timeout=6, params={
+            "latitude": coords[0], "longitude": coords[1], "timezone": "Asia/Manila", "forecast_days": 7,
+            "current": "temperature_2m,apparent_temperature,relative_humidity_2m,precipitation,weather_code,wind_speed_10m",
+            "daily": "weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max",
+        })
+        r.raise_for_status()
+        data = r.json()
+        _WEATHER_CACHE[city] = (now, data)
+        return data
+    except Exception as e:
+        print(f"[WEATHER ERROR] {city}: {e}")
+        return cached[1] if cached else None     # stale data beats none
+
+
+def build_weather_block(cities: list, days: int = 7) -> str:
+    lines = []
+    for c in list(dict.fromkeys(cities))[:2]:    # at most 2 cities, keeps the prompt small
+        try:
+            d = fetch_weather_sync(c)
+            if not d:
+                continue
+            cur, daily = d["current"], d["daily"]
+            lines.append(f"{c.title()} NOW: {cur['temperature_2m']}\u00b0C (feels like {cur['apparent_temperature']}\u00b0C), "
+                         f"{_WMO.get(cur['weather_code'], 'unknown')}, humidity {cur['relative_humidity_2m']}%, "
+                         f"wind {cur['wind_speed_10m']} km/h")
+            for i in range(min(days, len(daily["time"]))):
+                lines.append(f"  {c.title()} {daily['time'][i]}: {_WMO.get(daily['weather_code'][i], 'unknown')}, "
+                             f"{daily['temperature_2m_min'][i]}-{daily['temperature_2m_max'][i]}\u00b0C, "
+                             f"rain chance {daily['precipitation_probability_max'][i]}%")
+        except Exception as e:
+            print(f"[WEATHER FORMAT ERROR] {c}: {e}")
+    if not lines:
+        return ""
+    return ("\nLIVE WEATHER (real data fetched just now; use ONLY these numbers, never invent weather; "
+            "the forecast covers the next 7 days only):\n" + "\n".join(lines) + "\n")
+
+
 async def prepare_chat_turn(request: "ChatRequest", verified_uid: str, status=None) -> dict:
     """Everything /chat does BEFORE it calls the language model: out-of-scope replies, itinerary
     turns, place lookup and prompt building. Shared by /chat and /chat/stream so the two can
@@ -1646,6 +1716,10 @@ async def prepare_chat_turn(request: "ChatRequest", verified_uid: str, status=No
     remembered_avoid_cats = {_label_to_key[d] for d in profile.get("dislikes", []) if d in _label_to_key}
     default_cities = [c for c in CITY_KEYS if c not in avoided_cities and c not in remembered_avoid_cities] or [c for c in CITY_KEYS if c not in avoided_cities]
     cities_for_data = [c for c in (wanted_cities or ([named_city] if named_city in CITY_KEYS else []) or default_cities) if c in CITY_KEYS]
+    weather_block = ""
+    if WEATHER_PATTERN.search(request.message):
+        await say("Checking the weather")
+        weather_block = await run_in_threadpool(build_weather_block, cities_for_data or CITY_KEYS)
     cat_filters = [t for k in wanted_cats for t in CATEGORY_FILTERS.get(k, [k])]
     avoid_terms = [t for k in (avoided_cats | (remembered_avoid_cats - set(wanted_cats))) for t in CATEGORY_FILTERS.get(k, [k])]
     what = " and ".join(CATEGORY_LABELS.get(k, k) for k in wanted_cats) or "places"
@@ -1777,7 +1851,7 @@ VERIFIED DATABASE FACTS (places you're allowed to recommend by name):
 PLACES THE USER IS ASKING ABOUT BY NAME (matched in the database -- these ARE verified; [] means the
 user didn't name a specific place). A name here is a PLACE, never a person:
 {named_context}
-{state_block}{directions_block}{memory_block}
+{state_block}{directions_block}{memory_block}{weather_block}
 GROUND RULES (these still apply, always):
 1. When you DO name a specific place, it must come from VERIFIED DATABASE FACTS or PLACES THE USER IS
    ASKING ABOUT BY NAME above -- never invent a
@@ -1816,8 +1890,10 @@ GROUND RULES (these still apply, always):
    which text-to-speech voice reads your reply aloud, and that voice only speaks one language well --
    so within a single reply, lean into one language rather than switching back and forth line by line.
    Do not mix languages unless the user does. Example start: [HAPPY][EN]
-9. If real-time weather data is provided, weave it in naturally where it's actually relevant (e.g. "it's
-   32°C in Valenzuela right now, so..."), don't force it into unrelated replies.
+9. If real-time weather data is provided (LIVE WEATHER), weave it in naturally where it's actually relevant
+   (e.g. "it's 32°C in Valenzuela right now, so..."), don't force it into unrelated replies. If the user
+   asks about the weather and there is NO LIVE WEATHER block, say you can't check it right now. Never guess
+   temperatures, rain chances or conditions. The forecast only covers 7 days; say so for later dates.
 
 Stay in character as Navi. Be someone worth talking to, not just a place-lookup tool.
 """
