@@ -567,7 +567,8 @@ async def handle_itinerary_turn(request: "ChatRequest", verified_uid: str) -> di
             it_state += "KINDS OF PLACES THE USER DOES NOT WANT (leave them out): " + ", ".join(CATEGORY_LABELS.get(k, k) for k in sorted(_an["avoided_cats"])) + "\n"
         if _prof_text:
             it_state += "\nWHAT YOU REMEMBER ABOUT THIS USER (soft hints; this conversation overrides them):\n" + _prof_text + "\n"
-        _wx = await run_in_threadpool(build_weather_block, mentioned_cities or camanava_cities)
+        it_state += current_time_block()
+        _wx = await run_in_threadpool(build_weather_block, mentioned_cities or camanava_cities, 7, False)
         if _wx:
             it_state += _wx + ("Use this forecast when choosing stops: indoor places (restaurants, churches, museums) on "
                                "rainy or very hot days, parks and outdoor spots on clear days. Mention the weather "
@@ -1530,6 +1531,17 @@ _WMO = {0: "clear sky", 1: "mostly clear", 2: "partly cloudy", 3: "overcast", 45
         96: "thunderstorm with hail", 99: "thunderstorm with hail"}
 
 
+PH_TZ = datetime.timezone(datetime.timedelta(hours=8))
+
+
+def current_time_block() -> str:
+    """Models have no clock, so the app tells Navi the real Philippine date and time on every turn."""
+    now = datetime.datetime.now(PH_TZ)
+    return ("\nCURRENT DATE AND TIME IN THE PHILIPPINES (real, from the server clock): "
+            f"{now.strftime('%A, %B')} {now.day}, {now.year}, {now.strftime('%I:%M %p').lstrip('0')}. "
+            "Use it for 'what time is it', 'today', 'tomorrow' and trip planning. Never say you have no clock.\n")
+
+
 def fetch_weather_sync(city: str):
     now = time.time()
     cached = _WEATHER_CACHE.get(city)
@@ -1543,6 +1555,7 @@ def fetch_weather_sync(city: str):
             "latitude": coords[0], "longitude": coords[1], "timezone": "Asia/Manila", "forecast_days": 7,
             "current": "temperature_2m,apparent_temperature,relative_humidity_2m,precipitation,weather_code,wind_speed_10m",
             "daily": "weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max",
+            "hourly": "temperature_2m,precipitation_probability,weather_code",
         })
         r.raise_for_status()
         data = r.json()
@@ -1553,7 +1566,7 @@ def fetch_weather_sync(city: str):
         return cached[1] if cached else None     # stale data beats none
 
 
-def build_weather_block(cities: list, days: int = 7) -> str:
+def build_weather_block(cities: list, days: int = 7, include_hourly: bool = True) -> str:
     lines = []
     for c in list(dict.fromkeys(cities))[:2]:    # at most 2 cities, keeps the prompt small
         try:
@@ -1568,6 +1581,14 @@ def build_weather_block(cities: list, days: int = 7) -> str:
                 lines.append(f"  {c.title()} {daily['time'][i]}: {_WMO.get(daily['weather_code'][i], 'unknown')}, "
                              f"{daily['temperature_2m_min'][i]}-{daily['temperature_2m_max'][i]}\u00b0C, "
                              f"rain chance {daily['precipitation_probability_max'][i]}%")
+            h = d.get("hourly") or {}
+            if include_hourly and h.get("time"):
+                now_key = datetime.datetime.now(PH_TZ).strftime("%Y-%m-%dT%H:00")
+                start = next((i for i, t in enumerate(h["time"]) if t >= now_key), 0)
+                for i in range(start, min(start + 6, len(h["time"]))):
+                    lines.append(f"  {c.title()} HOURLY {h['time'][i].replace('T', ' ')}: "
+                                 f"{_WMO.get(h['weather_code'][i], 'unknown')}, {h['temperature_2m'][i]}\u00b0C, "
+                                 f"rain chance {h['precipitation_probability'][i]}%")
         except Exception as e:
             print(f"[WEATHER FORMAT ERROR] {c}: {e}")
     if not lines:
@@ -1716,6 +1737,7 @@ async def prepare_chat_turn(request: "ChatRequest", verified_uid: str, status=No
     remembered_avoid_cats = {_label_to_key[d] for d in profile.get("dislikes", []) if d in _label_to_key}
     default_cities = [c for c in CITY_KEYS if c not in avoided_cities and c not in remembered_avoid_cities] or [c for c in CITY_KEYS if c not in avoided_cities]
     cities_for_data = [c for c in (wanted_cities or ([named_city] if named_city in CITY_KEYS else []) or default_cities) if c in CITY_KEYS]
+    time_block = current_time_block()
     weather_block = ""
     if WEATHER_PATTERN.search(request.message):
         await say("Checking the weather")
@@ -1851,7 +1873,7 @@ VERIFIED DATABASE FACTS (places you're allowed to recommend by name):
 PLACES THE USER IS ASKING ABOUT BY NAME (matched in the database -- these ARE verified; [] means the
 user didn't name a specific place). A name here is a PLACE, never a person:
 {named_context}
-{state_block}{directions_block}{memory_block}{weather_block}
+{state_block}{directions_block}{memory_block}{time_block}{weather_block}
 GROUND RULES (these still apply, always):
 1. When you DO name a specific place, it must come from VERIFIED DATABASE FACTS or PLACES THE USER IS
    ASKING ABOUT BY NAME above -- never invent a
@@ -1894,6 +1916,8 @@ GROUND RULES (these still apply, always):
    (e.g. "it's 32°C in Valenzuela right now, so..."), don't force it into unrelated replies. If the user
    asks about the weather and there is NO LIVE WEATHER block, say you can't check it right now. Never guess
    temperatures, rain chances or conditions. The forecast only covers 7 days; say so for later dates.
+   Lines marked HOURLY are the next hours: use them for "next 3 hours" style questions.
+   CURRENT DATE AND TIME is real: answer "what time is it" / "what day is it" from it directly.
 
 Stay in character as Navi. Be someone worth talking to, not just a place-lookup tool.
 """
