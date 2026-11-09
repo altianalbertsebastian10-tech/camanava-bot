@@ -451,6 +451,64 @@ def persist_chat_session(verified_uid: str, session_id: str, updated_history: li
         print(f"[FIRESTORE SAVE ERROR] {save_err}")
 
 
+def _fmt_clock(t) -> str:
+    m = re.match(r"^\s*(\d{1,2}):(\d{2})", str(t or ""))
+    if not m:
+        return ""
+    h, mi = int(m.group(1)), int(m.group(2))
+    if h > 23 or mi > 59:
+        return ""
+    return f"{h % 12 or 12}:{mi:02d} {'AM' if h < 12 else 'PM'}"
+
+
+def format_itinerary_markdown(draft: dict) -> str:
+    """The schedule as a readable list: one bold heading per day, one line per stop (time, place, short note)."""
+    stops = [st for st in (draft.get("stops") or []) if isinstance(st, dict)]
+    if not stops:
+        return ""
+    start = None
+    try:
+        start = datetime.date.fromisoformat(str(draft.get("startDate") or "")[:10])
+    except ValueError:
+        pass
+
+    def _num(v, default=0):
+        try:
+            return int(v)
+        except (TypeError, ValueError):
+            return default
+
+    by_day = {}
+    for st in stops:
+        by_day.setdefault(_num(st.get("dayIndex")), []).append(st)
+    blocks = []
+    for d in sorted(by_day):
+        def _key(st):
+            m = re.match(r"^\s*(\d{1,2}):(\d{2})", str(st.get("time") or ""))
+            return (_num(st.get("order")), int(m.group(1)) * 60 + int(m.group(2)) if m else 9999)
+        day_stops = sorted(by_day[d], key=_key)
+        cities = list(dict.fromkeys(str(st.get("city") or "").strip() for st in day_stops if st.get("city")))
+        heading = f"Day {d + 1}"
+        if start:
+            day = start + datetime.timedelta(days=d)
+            heading += f" \u00b7 {day.strftime('%a')}, {day.strftime('%b')} {day.day}"
+        if cities:
+            heading += " \u00b7 " + ", ".join(cities)
+        lines = [f"**{heading}**"]
+        for st in day_stops:
+            when = _fmt_clock(st.get("time"))
+            name = str(st.get("placeName") or "Stop").strip()
+            note = str(st.get("notes") or "").strip()
+            if len(note) > 80:
+                note = note[:77].rstrip() + "..."
+            line = f"- **{when}** \u00b7 {name}" if when else f"- {name}"
+            if note:
+                line += f" \u2014 {note}"
+            lines.append(line)
+        blocks.append("\n".join(lines))
+    return "\n\n".join(blocks)
+
+
 async def handle_itinerary_turn(request: "ChatRequest", verified_uid: str) -> dict:
     """Handles one turn of itinerary building: collecting stops, cancelling a draft,
     or confirming/saving one to Firestore so it shows up in the app's Itineraries tab."""
@@ -473,6 +531,7 @@ async def handle_itinerary_turn(request: "ChatRequest", verified_uid: str) -> di
     # frontend shows a distinct, unmissable confirmation banner driven by this flag
     # instead of trying to parse "did it say Saved?" out of a sentence.
     saved_info = None
+    spoken_text = None      # when set, this (not the full on-screen text) is what gets read aloud
 
     # --- CANCEL --- (works even before any stop's been added -- an empty in-progress draft
     # is still a draft, and the user should be able to back out of it any time)
@@ -642,9 +701,12 @@ RULES:
    sensible estimate if the user didn't specify one), placeId, placeName, city, cityKey (lowercase city),
    and notes (short, can be empty string).
 5. Keep dayIndex/order consistent and non-conflicting as you add, remove, or reorder stops.
-6. If the draft has at least one stop and feels reasonably complete, end your reply by asking if
+6. If the draft has at least one stop and feels reasonably complete, ask in "closing" (not in "reply") if
    they'd like you to save it to their itinerary.
-7. Keep the reply short, warm, and conversational -- this is a chat message, not a report.
+7. Keep it short, warm and conversational. "reply" is at most 2 short sentences: a friendly line, plus one
+   short note about the weather if it matters. NEVER list, number or describe the stops, days, times or places
+   in "reply" or "closing": the app prints the schedule by itself, right between the two. "closing" is one
+   short question or next step (an empty string if there is nothing to add).
 8. This itinerary-building mode stays active for the rest of the conversation once started, even across
    messages that don't mention "itinerary" again -- that's expected, not a bug. If the user's latest
    message is clearly unrelated to the trip (small talk, an off-topic question), respond naturally to it
@@ -657,7 +719,8 @@ RULES:
    does. Set "lang" to "TL" only for Tagalog replies, otherwise "EN". Place names stay as in the data.
 10. Respond with ONLY a single JSON object, no other text, in exactly this shape:
 {{
-  "reply": "<your conversational message to the user>",
+  "reply": "<your short conversational message to the user>",
+  "closing": "<one short question or next step, or an empty string>",
   "lang": "EN",
   "draft": {{
     "title": "<short trip title>",
@@ -674,6 +737,7 @@ RULES:
         while len(_msgs) > 2 and _est_tokens(_msgs) > 5200:      # keep room for the reply: Groq counts prompt + max_tokens
             del _msgs[1]                                         # drop the oldest chat message first
         raw = None
+        closing = ""
         for _attempt in range(2):
             _max_out = max(900, min(2600, 7300 - _est_tokens(_msgs)))
             try:
@@ -689,6 +753,7 @@ RULES:
         try:
             parsed = json.loads(raw)
             reply_text = parsed.get("reply") or "Here's what I've got so far!"
+            closing = str(parsed.get("closing") or "").strip()
             candidate_draft = parsed.get("draft") or draft
             if not isinstance(candidate_draft.get("stops"), list):
                 candidate_draft["stops"] = draft.get("stops", [])
@@ -699,9 +764,18 @@ RULES:
             reply_text = "I'm having a little trouble organizing that -- could you tell me again which places and days you'd like?"
             candidate_draft = draft
 
+        _same = json.dumps(candidate_draft.get("stops"), sort_keys=True) == json.dumps(draft.get("stops"), sort_keys=True)
+        _asked_to_see = bool(re.search(r"\b(show|see|list|recap|summary|summarize|ipakita|ano na)\b", user_msg))
+        _schedule = format_itinerary_markdown(candidate_draft) if (not _same or _asked_to_see) else ""
+        spoken_text = " ".join(x for x in (reply_text, closing) if x)
+        if _schedule:
+            reply_text = f"{reply_text}\n\n{_schedule}" + (f"\n\n{closing}" if closing else "")
+        elif closing:
+            reply_text = f"{reply_text} {closing}"
+
         reply, mood, new_draft, updated_history = build_result(reply_text, "NEUTRAL", candidate_draft)
 
-    audio_base64 = await generate_speech_base64(clean_for_speech(reply), mood, lang) if request.want_audio else ""
+    audio_base64 = await generate_speech_base64(clean_for_speech(spoken_text or reply), mood, lang) if request.want_audio else ""
 
     persist_chat_session(verified_uid, request.session_id, updated_history, new_draft)
 
