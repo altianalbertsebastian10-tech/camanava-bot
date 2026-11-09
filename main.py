@@ -1305,6 +1305,13 @@ async def load_profile(uid, client_profile) -> dict:
 
 _NAME_EXPLICIT = re.compile(r"\b(?:ako\s+si|ako\s+nga\s+pala\s+si|ako\s+po\s+si|pangalan\s+ko\s+(?:ay\s+)?|my\s+name\s+is|call\s+me|tawagin\s+mo\s+akong?)\s+([A-Za-z][A-Za-z'-]{1,15})\b", re.IGNORECASE)
 _NAME_NOT = {"ok", "okay", "sorry", "not", "here", "just", "back", "fine", "good", "great", "hungry", "tired", "lost", "new", "visiting", "from", "planning", "looking", "ang", "ng", "sa", "po", "ba"}
+# More natural ways of giving a name. "I'm X" only counts when X is capitalised and ends the message
+# ("Hi, I'm Aki."), so "I'm hungry" / "I'm from Navotas" are never mistaken for a name.
+_NAME_NOT |= {"happy", "sad", "bored", "ready", "excited", "curious", "interested", "thinking", "trying", "wondering",
+              "still", "also", "only", "very", "really", "near", "around", "done", "free", "busy", "late", "early",
+              "student", "tourist", "bisita", "taga", "mula", "galing", "dito", "doon", "single", "married"}
+_NAME_POSSESSIVE = re.compile(r"\b(?:my\s+name'?s\s+|(?:name|pangalan)\s+ko\s+(?:ay\s+|si\s+)|name\s+ko\s+ay\s+)([A-Za-z][A-Za-z'-]{1,15})\b", re.IGNORECASE)
+_NAME_IM = re.compile(r"\b(?:i'?m|i\s+am|im)\s+((?-i:[A-Z][a-z'-]{1,15}))\s*[.!]*\s*$", re.IGNORECASE)
 _HOME = re.compile(r"\b(?:taga[- ]?|nakatira\s+(?:ako\s+)?sa\s+|i\s+live\s+in\s+|i'?m\s+from\s+)(caloocan|malabon|navotas|valenzuela|kaloakan|kalookan)\b", re.IGNORECASE)
 _COMPANIONS = [
     (re.compile(r"\b(anak|mga\s+bata|kids?|children|toddler|baby|sanggol)\b", re.IGNORECASE), "with kids"),
@@ -1341,7 +1348,7 @@ def update_profile_from_message(profile: dict, message: str, analysis: dict) -> 
                 _list_put(profile["dislikes"], label, 10); _list_drop(profile["likes"], label)
             elif liked:
                 _list_put(profile["likes"], label, 10); _list_drop(profile["dislikes"], label)
-    m = _NAME_EXPLICIT.search(message or "")
+    m = _NAME_EXPLICIT.search(message or "") or _NAME_POSSESSIVE.search(message or "") or _NAME_IM.search((message or "").strip())
     if m and m.group(1).lower() not in _NAME_NOT:
         profile["name"] = m.group(1).title()
         profile["nameSource"] = "user"       # something they told Navi beats the account name

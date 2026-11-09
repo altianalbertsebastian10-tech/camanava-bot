@@ -19,19 +19,21 @@
             document.documentElement.setAttribute('data-theme', t);
         })();
     </script>
-    <!-- Lumen Edge Typography: DM Sans -->
+    <!-- Typography: Open Sauce Sans (Fontsource build, served from cdnjs) -->
     <script>try{if((navigator.hardwareConcurrency||8)<=4||(navigator.deviceMemory||8)<=4)document.documentElement.classList.add('lite-mode');}catch(e){}</script>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/fontsource-open-sauce-sans/5.3.0/400.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/fontsource-open-sauce-sans/5.3.0/500.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/fontsource-open-sauce-sans/5.3.0/600.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/fontsource-open-sauce-sans/5.3.0/700.css" />
     
     <style>
         @media (max-width: 640px) { #input { font-size: 16px; } }
         :root {
             /* Typography */
-            --font-display: 'DM Sans', sans-serif;
-            --font-body: 'DM Sans', sans-serif;
-            --font-mono: 'DM Sans', sans-serif;
+            --font-display: 'Open Sauce Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+            --font-body: 'Open Sauce Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+            --font-mono: 'Open Sauce Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
 
             /* Shape */
             --radius-box: 18px;
@@ -456,12 +458,13 @@
 
         .welcome-title-large {
             font-family: var(--font-display);
-            font-size: 4.5rem;
+            font-size: clamp(2rem, 8vw, 3.25rem);
             font-weight: 700;
-            letter-spacing: -0.04em;
-            line-height: 0.95;
+            letter-spacing: -0.03em;
+            line-height: 1.1;
             color: var(--fore);
-            margin: 0 0 20px 0;
+            margin: 0;
+            padding-bottom: 0.08em;
             background: linear-gradient(180deg, var(--fore) 20%, var(--muted) 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
@@ -641,14 +644,14 @@
 
         .response-container { width: 100%; }
         .gate-step { display: flex; flex-direction: column; align-items: center; width: 100%; max-width: 340px; }
-        .gate-title { font-family: 'DM Sans', sans-serif; font-size: 1.7rem; margin: 0 0 10px; color: var(--fore); }
+        .gate-title { font-family: 'Open Sauce Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 1.7rem; margin: 0 0 10px; color: var(--fore); }
         .gate-sub { color: var(--muted); font-size: 0.95rem; line-height: 1.5; margin: 0 0 22px; }
         .gate-note { color: var(--muted); font-size: 0.82rem; margin: 18px 0 0; }
         .gate-btn {
             width: 100%; min-height: 46px; padding: 10px 24px; margin-top: 10px; box-sizing: border-box;
             display: flex; align-items: center; justify-content: center; gap: 10px;
             background: var(--panel); color: var(--fore); border: 1px solid var(--hairline); border-radius: 999px; cursor: pointer;
-            font-family: 'DM Sans', sans-serif; font-size: 0.95rem; font-weight: 600;
+            font-family: 'Open Sauce Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 0.95rem; font-weight: 600;
             transition: background-color 0.2s ease, transform 0.15s ease;
         }
         .gate-btn:hover { background: var(--slate); }
@@ -660,13 +663,13 @@
         .gate-input {
             width: 100%; min-height: 46px; padding: 10px 18px; box-sizing: border-box; border-radius: 999px;
             border: 1px solid var(--hairline); background: var(--panel); color: var(--fore);
-            font-family: 'DM Sans', sans-serif; font-size: 16px; text-align: center; outline: none;
+            font-family: 'Open Sauce Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 16px; text-align: center; outline: none;
         }
         .gate-input:focus { border-color: var(--live-border); }
         .gate-link { margin-top: 14px; background: none; border: none; color: var(--muted); font-size: 0.88rem; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
         .signout-btn { width: 100%; min-height: 40px; padding: 8px 14px; margin-top: 6px; box-sizing: border-box; border-radius: 999px; border: 1px solid var(--line-soft); background: transparent; color: var(--fore); font-family: var(--font-body); font-size: 0.85rem; font-weight: 500; cursor: pointer; }
         .signout-btn:hover { background: var(--slate); }
-        .mem-panel { background: var(--surface); padding: 22px; border-radius: 16px; border: 1px solid var(--border); width: 88%; max-width: 380px; max-height: 80vh; display: flex; flex-direction: column; font-family: 'DM Sans', sans-serif; box-sizing: border-box; }
+        .mem-panel { background: var(--surface); padding: 22px; border-radius: 16px; border: 1px solid var(--border); width: 88%; max-width: 380px; max-height: 80vh; display: flex; flex-direction: column; font-family: 'Open Sauce Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; box-sizing: border-box; }
         .mem-title { margin: 0 0 6px; color: var(--fore); font-size: 1.2rem; }
         .mem-sub { margin: 0 0 14px; color: var(--muted); font-size: 0.85rem; line-height: 1.45; }
         .mem-body { overflow-y: auto; flex: 1; min-height: 40px; }
@@ -678,7 +681,7 @@
         .mem-chip button:hover { background: var(--slate); color: var(--fore); }
         .mem-empty { color: var(--muted); font-size: 0.9rem; padding: 8px 0 14px; }
         .mem-actions { display: flex; gap: 10px; margin-top: 8px; }
-        .mem-btn { flex: 1; min-height: 42px; border-radius: 999px; border: 1px solid var(--line-soft); background: transparent; color: var(--fore); font-family: 'DM Sans', sans-serif; font-size: 0.88rem; font-weight: 600; cursor: pointer; }
+        .mem-btn { flex: 1; min-height: 42px; border-radius: 999px; border: 1px solid var(--line-soft); background: transparent; color: var(--fore); font-family: 'Open Sauce Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 0.88rem; font-weight: 600; cursor: pointer; }
         .mem-btn:hover { background: var(--slate); }
         .mem-done { background: var(--fore); color: var(--void); border-color: transparent; }
         .mem-done:hover { background: var(--fore); opacity: 0.9; }
@@ -1454,12 +1457,12 @@
 
     <!-- DELETE CONFIRMATION MODAL -->
     <div id="delete-confirm-modal" style="display: none; position: fixed; inset: 0; background: var(--scrim); z-index: 6000; align-items: center; justify-content: center;">
-        <div style="background: var(--surface); padding: 24px; border-radius: 12px; border: 1px solid var(--border); text-align: center; width: 85%; max-width: 320px; font-family: 'DM Sans', sans-serif;">
+        <div style="background: var(--surface); padding: 24px; border-radius: 12px; border: 1px solid var(--border); text-align: center; width: 85%; max-width: 320px; font-family: 'Open Sauce Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;">
             <h3 style="margin-top: 0; color: var(--fore); font-size: 1.25rem;">Delete Chat?</h3>
-            <p style="color: var(--muted); font-size: 0.9rem; margin-bottom: 24px; line-height: 1.5; font-family: 'DM Sans', sans-serif;">Are you sure you want to delete this chat history?</p>
+            <p style="color: var(--muted); font-size: 0.9rem; margin-bottom: 24px; line-height: 1.5; font-family: 'Open Sauce Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;">Are you sure you want to delete this chat history?</p>
             <div style="display: flex; flex-direction: column; gap: 12px;">
-                <button id="confirm-delete-btn" style="padding: 12px; background: var(--slate); color: var(--fore); border: none; border-radius: 8px; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 0.95rem; transition: background 0.2s;">Yes, I want to delete it</button>
-                <button onclick="closeDeleteModal()" style="padding: 12px; background: transparent; color: var(--muted); border: 1px solid var(--hairline); border-radius: 8px; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 0.95rem; transition: background 0.2s;">Not at all</button>
+                <button id="confirm-delete-btn" style="padding: 12px; background: var(--slate); color: var(--fore); border: none; border-radius: 8px; cursor: pointer; font-family: 'Open Sauce Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 0.95rem; transition: background 0.2s;">Yes, I want to delete it</button>
+                <button onclick="closeDeleteModal()" style="padding: 12px; background: transparent; color: var(--muted); border: 1px solid var(--hairline); border-radius: 8px; cursor: pointer; font-family: 'Open Sauce Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 0.95rem; transition: background 0.2s;">Not at all</button>
             </div>
         </div>
     </div>
@@ -1487,14 +1490,14 @@
 
     <div id="sidebar" class="sidebar-panel">
         <div style="padding: 20px; border-bottom: 1px solid var(--border);">
-            <div style="color: var(--fore); font-family: 'DM Sans', sans-serif; font-size: 1.05rem; font-weight: 700;">Chat history</div>
+            <div style="color: var(--fore); font-family: 'Open Sauce Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 1.05rem; font-weight: 700;">Chat history</div>
         </div>
         
         <div id="history-list" style="flex: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px;">
             <!-- Chat history items will load here -->
         </div>
         
-        <div style="padding: 20px; border-top: 1px solid var(--border); color: var(--muted); font-family: 'DM Sans', sans-serif; font-size: 0.9rem;">
+        <div style="padding: 20px; border-top: 1px solid var(--border); color: var(--muted); font-family: 'Open Sauce Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 0.9rem;">
             Logged in as:<br>
             <strong id="current-user-display" style="color: var(--fore);">Guest</strong>
             <button type="button" id="signout-btn" class="signout-btn" onclick="signOutUser()" style="display:none;">Log out</button>
@@ -1563,9 +1566,7 @@
     <div id="chat">
         <div class="welcome-spacer" id="welcome-spacer"></div>
         <div class="welcome-container" id="welcome-container">
-            <span class="welcome-eyebrow">HI I AM CamaNaviGo's</span>
-            <h2 class="welcome-title-large">Navi!</h2>
-            <p class="welcome-title-sub">How can I be of assistance today?</p>
+            <h2 class="welcome-title-large" id="welcome-greeting" aria-live="polite"></h2>
         </div>
         <div class="welcome-spacer" id="welcome-spacer-bottom"></div>
     </div>
@@ -1769,14 +1770,48 @@
     // First name to greet the user with: Google/app account name, or the name a guest typed.
     function currentFirstName() {
         let n = '';
-        if (isLoggedIn()) n = (localStorage.getItem('displayName') || '').trim();
-        else n = ((loadGuestProfile() || {}).name || '').trim();
+        const saved = loadGuestProfile() || {};
+        if (isLoggedIn()) {
+            n = (localStorage.getItem('displayName') || '').trim();
+            if (saved.name && saved.nameSource === 'user') n = String(saved.name).trim();   // what they told Navi wins
+            else if (!n && saved.name) n = String(saved.name).trim();
+        } else n = String(saved.name || '').trim();
         return n ? n.split(/\s+/)[0] : '';
+    }
+    // Dynamic welcome text (time-of-day + friendly variants). The variant is picked once per page view / new chat,
+    // so it doesn't flicker each time the name arrives later.
+    const WELCOME_GREETINGS = [
+        n => {
+            const h = new Date().getHours();
+            if (h < 5) return n ? `Up late, ${n}?` : 'Up late?';
+            const t = h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
+            return n ? `${t}, ${n}!` : `${t}!`;
+        },
+        n => n ? `Glad you're here, ${n}!` : `Glad you're here!`,
+        n => n ? `Good to see you, ${n}!` : `Good to see you!`,
+        n => n ? `Where to today, ${n}?` : `Where to today?`,
+        n => n ? `Ready to explore, ${n}?` : `Ready to explore?`,
+        n => n ? `Hey ${n}, let's plan something!` : `Let's plan something!`,
+    ];
+    let welcomeGreetIdx = Math.floor(Math.random() * WELCOME_GREETINGS.length);   // new variant on every page view / new chat
+    function buildWelcomeGreeting(name) {
+        return WELCOME_GREETINGS[welcomeGreetIdx % WELCOME_GREETINGS.length](name || '');
+    }
+    // Signed-in users: pull the remembered name once, so a name they told Navi shows up in new chats too.
+    let profileNamePrimed = false;
+    async function primeProfileName() {
+        if (profileNamePrimed || !isLoggedIn()) return;
+        profileNamePrimed = true;
+        try {
+            const p = await fetchMemoryProfile();
+            if (p && p.name) { memoryProfile = p; saveGuestProfile(p); applyPersonalGreeting(); }
+        } catch (e) {}
     }
     function applyPersonalGreeting() {
         const name = currentFirstName();
-        const sub = document.querySelector('.welcome-title-sub');
-        if (sub) sub.textContent = name ? 'Hi ' + name + ', how can I help you today?' : 'How can I be of assistance today?';
+        const greet = document.getElementById('welcome-greeting');
+        if (greet) greet.textContent = buildWelcomeGreeting(name);
+        primeProfileName();
         const out = document.getElementById('signout-btn');
         if (out) out.style.display = localStorage.getItem('authProvider') === 'google' ? 'block' : 'none';
     }
@@ -1832,7 +1867,7 @@
     };
     window.signOutUser = async function() {
         try { if (firebaseReady) await firebase.auth().signOut(); } catch (e) {}
-        ['authToken', 'uid', 'displayName', 'authProvider'].forEach(k => localStorage.removeItem(k));
+        ['authToken', 'uid', 'displayName', 'authProvider', 'naviProfile'].forEach(k => localStorage.removeItem(k));
         location.reload();
     };
 
@@ -1982,8 +2017,14 @@
         history = []; // Clear current active chat context
         itineraryDraft = null;
         updateItineraryBanner();
-        document.getElementById('chat').innerHTML = ''; // Clear chat UI
-        { const n = currentFirstName(); addMessageToUI('bot', n ? "Hi " + n + "! I'm Navi. How can I help you today?" : "Hi! I'm Navi. What new adventure are we planning today?"); }
+        // Clear chat UI and bring back the welcome screen with a fresh dynamic greeting
+        welcomeGreetIdx = Math.floor(Math.random() * WELCOME_GREETINGS.length);
+        document.getElementById('chat').innerHTML =
+            '<div class="welcome-spacer" id="welcome-spacer"></div>' +
+            '<div class="welcome-container" id="welcome-container"><h2 class="welcome-title-large" id="welcome-greeting" aria-live="polite"></h2></div>' +
+            '<div class="welcome-spacer" id="welcome-spacer-bottom"></div>';
+        welcomeHidden = false;
+        applyPersonalGreeting();
         // Now reachable from the header too: only close the sidebar if it's actually open.
         if (!document.getElementById('sidebar').classList.contains('is-active')) return;
         toggleSidebar();
@@ -3322,7 +3363,7 @@
         try {
             if (navigator.onLine === false) throw new Error('offline');
             const coords = WEATHER_ASK_RE.test(msg) ? await getUserCoords() : null;
-            const body = { lat: coords ? coords.lat : null, lon: coords ? coords.lon : null, message: msg, history, session_id: currentSessionId, itinerary_draft: itineraryDraft, want_audio: isLiveModeActive, profile: isLoggedIn() ? null : loadGuestProfile(), display_name: isLoggedIn() ? (currentFirstName() || null) : null };
+            const body = { lat: coords ? coords.lat : null, lon: coords ? coords.lon : null, message: msg, history, session_id: currentSessionId, itinerary_draft: itineraryDraft, want_audio: isLiveModeActive, profile: loadGuestProfile(), display_name: isLoggedIn() ? (currentFirstName() || null) : null };
 
             // Preferred: the reply streams in word by word (and, in Live mode, sentence by sentence with voice).
             // If the server has no streaming endpoint (older deploy), quietly use the classic request.
@@ -3352,7 +3393,7 @@
             // Update AFTER the exchange completes, so this actually includes the
             // message + reply that just happened (fixes history always lagging one turn behind).
             history = data.history;
-            if (data.profile && !isLoggedIn()) saveGuestProfile(data.profile);
+            if (data.profile) { saveGuestProfile(data.profile); if (isLoggedIn()) memoryProfile = data.profile; }
             if (turnEl) delete turnEl.dataset.pending;
             itineraryDraft = data.itinerary_draft || null;
             updateItineraryBanner();
