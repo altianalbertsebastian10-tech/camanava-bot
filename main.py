@@ -1577,6 +1577,7 @@ def _place_label(key: str) -> str:
     return "Your current location" if key.startswith("here:") else key.title()
 
 
+_LOCATION_ASK = re.compile(r"\b(?:my|current)\s+location\b|\bwhere\s+i\s+am\b|\bnear\s+me\b|\bnearby\b|\bdito\b|\bmalapit\b", re.IGNORECASE)
 _GEO_CACHE = {}
 _PLACE_TRAIL = {"today", "now", "tomorrow", "later", "tonight", "please", "ba", "po", "bukas", "ngayon", "mamaya", "right",
                 "this", "next", "week", "weekend", "morning", "afternoon", "evening", "like", "rn", "and", "or", "kasi", "naman"}
@@ -1584,6 +1585,43 @@ _PLACE_LEAD_SKIP = {"the", "my", "our", "a", "an", "this", "that", "here", "ther
                     "case", "order", "fact", "time", "ph", "philippines"}
 _WEATHER_PLACE_RE = re.compile(
     r"\b(?:in|at|for|around|sa|dito sa|doon sa)\s+([A-Za-z][A-Za-z.'-]*(?:\s+[A-Za-z][A-Za-z.'-]*){0,3})", re.IGNORECASE)
+
+
+def _http_get_json(url: str, params: dict, timeout: int = 8):
+    """GET -> JSON that survives flaky setups. Browsers quietly fall back between IPv6/IPv4; Python's requests
+    doesn't, so "works in the browser, times out in Python" is common. Tries: normal requests, then IPv4 only,
+    then plain urllib, and raises one error listing every failure."""
+    errors = []
+    headers = {"User-Agent": "CamaNaviGo/1.0"}
+    try:
+        r = requests.get(url, params=params, timeout=(5, timeout), headers=headers)
+        r.raise_for_status()
+        return r.json()
+    except Exception as e:
+        errors.append(f"requests: {type(e).__name__}: {e}")
+    try:
+        import socket
+        import urllib3.util.connection as _u3c
+        _orig = _u3c.allowed_gai_family
+        _u3c.allowed_gai_family = lambda: socket.AF_INET          # IPv4 only, for this retry
+        try:
+            r = requests.get(url, params=params, timeout=(5, timeout), headers=headers)
+            r.raise_for_status()
+            return r.json()
+        finally:
+            _u3c.allowed_gai_family = _orig
+    except Exception as e:
+        errors.append(f"ipv4-only: {type(e).__name__}: {e}")
+    try:
+        import json as _json
+        import urllib.parse as _up
+        import urllib.request as _ur
+        req = _ur.Request(url + "?" + _up.urlencode(params), headers=headers)
+        with _ur.urlopen(req, timeout=timeout) as resp:
+            return _json.loads(resp.read().decode("utf-8"))
+    except Exception as e:
+        errors.append(f"urllib: {type(e).__name__}: {e}")
+    raise RuntimeError(" | ".join(errors))
 
 
 def geocode_place(name: str):
@@ -1594,10 +1632,9 @@ def geocode_place(name: str):
     result = None
     for params in ({"country_code": "PH"}, {}):
         try:
-            r = requests.get("https://geocoding-api.open-meteo.com/v1/search", timeout=5,
-                             params={"name": name, "count": 1, "language": "en", "format": "json", **params})
-            r.raise_for_status()
-            hits = (r.json() or {}).get("results") or []
+            data = _http_get_json("https://geocoding-api.open-meteo.com/v1/search",
+                                  {"name": name, "count": 1, "language": "en", "format": "json", **params}, 6)
+            hits = (data or {}).get("results") or []
             if hits:
                 h = hits[0]
                 result = f"geo:{round(h['latitude'], 3)},{round(h['longitude'], 3)},{h.get('name') or name}"
@@ -1663,14 +1700,12 @@ def fetch_weather_sync(city: str):
     if len(_WEATHER_CACHE) > 200:
         _WEATHER_CACHE.clear()
     try:
-        r = requests.get("https://api.open-meteo.com/v1/forecast", timeout=10, params={
+        data = _http_get_json("https://api.open-meteo.com/v1/forecast", {
             "latitude": coords[0], "longitude": coords[1], "timezone": "Asia/Manila", "forecast_days": 7,
             "current": "temperature_2m,apparent_temperature,relative_humidity_2m,precipitation,weather_code,wind_speed_10m",
             "daily": "weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max",
             "hourly": "temperature_2m,precipitation_probability,weather_code",
-        })
-        r.raise_for_status()
-        data = r.json()
+        }, 10)
         _WEATHER_CACHE[city] = (now, data)
         _WEATHER_LAST_ERROR.pop(city, None)
         return data
@@ -1872,17 +1907,26 @@ async def prepare_chat_turn(request: "ChatRequest", verified_uid: str, status=No
     cities_for_data = [c for c in (wanted_cities or ([named_city] if named_city in CITY_KEYS else []) or default_cities) if c in CITY_KEYS]
     time_block = current_time_block()
     weather_block = ""
-    if WEATHER_PATTERN.search(request.message):
+    asks_here = bool(_LOCATION_ASK.search(request.message))
+    recent_text = " ".join(m.get("content", "") for m in request.history[-4:])
+    if WEATHER_PATTERN.search(request.message) or (asks_here and WEATHER_PATTERN.search(recent_text)):
         await say("Checking the weather")
         weather_cities, located = cities_for_data or CITY_KEYS, False
         asked_place = await run_in_threadpool(find_weather_place, request.message)
         user_place = resolve_user_place(request.lat, request.lon)
-        if asked_place:                                                         # "weather in <place>"
+        if asked_place:                                                          # "weather in <place>"
             weather_cities = [asked_place]
-        elif user_place and not (wanted_cities or named_city in CITY_KEYS):     # no place named: use where they are
+        elif user_place and (asks_here or not (wanted_cities or named_city in CITY_KEYS)):   # "my location" / no place named
             weather_cities, located = [user_place], True
-        weather_block = await run_in_threadpool(build_weather_block, weather_cities, 7, True, located)
-        print(f"[WEATHER] asked={asked_place!r} cities={weather_cities} located={located} block_chars={len(weather_block)}")
+        elif asks_here:
+            weather_cities = []
+        if weather_cities:
+            weather_block = await run_in_threadpool(build_weather_block, weather_cities, 7, True, located)
+        else:
+            weather_block = ("\nUSER LOCATION UNAVAILABLE: the user asked about the weather where they are, but their device "
+                             "location was not shared. Say you can't see their location, and ask which city they mean (or "
+                             "tell them they can allow location access in the browser). Do not assume a city.\n")
+        print(f"[WEATHER] asked={asked_place!r} here={asks_here} cities={weather_cities} located={located} block_chars={len(weather_block)}")
     cat_filters = [t for k in wanted_cats for t in CATEGORY_FILTERS.get(k, [k])]
     avoid_terms = [t for k in (avoided_cats | (remembered_avoid_cats - set(wanted_cats))) for t in CATEGORY_FILTERS.get(k, [k])]
     what = " and ".join(CATEGORY_LABELS.get(k, k) for k in wanted_cats) or "places"
