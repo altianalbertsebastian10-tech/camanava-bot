@@ -1535,6 +1535,7 @@ WEATHER_PATTERN = re.compile(
     r"\b(weather|forecast|temperature|temp|rain|raining|rainy|ulan|umulan|uulan|umuulan|maulan|init|mainit|lamig|malamig|"
     r"umbrella|payong|humid|humidity|typhoon|bagyo|sunny|cloudy|hot|cold|maaraw|panahon|klima|degrees|celsius)\b", re.IGNORECASE)
 _WEATHER_CACHE = {}  # city -> (timestamp, data)
+_WEATHER_LAST_ERROR = {}   # city -> last fetch error text (shown by /debug/weather)
 _WEATHER_TTL = 900   # 15 minutes
 _WMO = {0: "clear sky", 1: "mostly clear", 2: "partly cloudy", 3: "overcast", 45: "foggy", 48: "foggy",
         51: "light drizzle", 53: "drizzle", 55: "heavy drizzle", 61: "light rain", 63: "rain", 65: "heavy rain",
@@ -1662,7 +1663,7 @@ def fetch_weather_sync(city: str):
     if len(_WEATHER_CACHE) > 200:
         _WEATHER_CACHE.clear()
     try:
-        r = requests.get("https://api.open-meteo.com/v1/forecast", timeout=6, params={
+        r = requests.get("https://api.open-meteo.com/v1/forecast", timeout=10, params={
             "latitude": coords[0], "longitude": coords[1], "timezone": "Asia/Manila", "forecast_days": 7,
             "current": "temperature_2m,apparent_temperature,relative_humidity_2m,precipitation,weather_code,wind_speed_10m",
             "daily": "weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max",
@@ -1671,9 +1672,11 @@ def fetch_weather_sync(city: str):
         r.raise_for_status()
         data = r.json()
         _WEATHER_CACHE[city] = (now, data)
+        _WEATHER_LAST_ERROR.pop(city, None)
         return data
     except Exception as e:
-        print(f"[WEATHER ERROR] {city}: {e}")
+        _WEATHER_LAST_ERROR[city] = f"{type(e).__name__}: {e}"
+        print(f"[WEATHER ERROR] {city}: {type(e).__name__}: {e}")
         return cached[1] if cached else None     # stale data beats none
 
 
@@ -1703,10 +1706,28 @@ def build_weather_block(cities: list, days: int = 7, include_hourly: bool = True
         except Exception as e:
             print(f"[WEATHER FORMAT ERROR] {c}: {e}")
     if not lines:
+        if any(_WEATHER_LAST_ERROR.get(c) for c in cities):
+            return ("\nLIVE WEATHER LOOKUP FAILED: the weather service could not be reached just now (a technical problem, "
+                    "not missing data). Say you couldn't reach the weather service right now and suggest trying again in a "
+                    "minute. Never guess the weather.\n")
         return ""
     where = " for the place the user is in right now (from their device location)" if located else ""
     return (f"\nLIVE WEATHER{where} (real data fetched just now; use ONLY these numbers, never invent weather; "
             "the forecast covers the next 7 days only):\n" + "\n".join(lines) + "\n")
+
+
+@app.get("/debug/weather")
+async def debug_weather(request: Request, city: str = "valenzuela"):
+    """Local-only helper: open http://localhost:8000/debug/weather?city=valenzuela to see why weather fails."""
+    host = request.client.host if request.client else ""
+    if host not in ("127.0.0.1", "::1", "localhost"):
+        raise HTTPException(status_code=404)
+    key = city.strip().lower()
+    _WEATHER_CACHE.pop(key, None)
+    data = await run_in_threadpool(fetch_weather_sync, key)
+    block = await run_in_threadpool(build_weather_block, [key])
+    return {"city": key, "fetched_ok": bool(data), "last_error": _WEATHER_LAST_ERROR.get(key),
+            "known_cities": list(CITY_COORDS), "block_preview": block[:600]}
 
 
 async def prepare_chat_turn(request: "ChatRequest", verified_uid: str, status=None) -> dict:
