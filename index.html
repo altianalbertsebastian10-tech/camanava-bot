@@ -232,7 +232,7 @@
 
         /* --- AMBIENT WELCOME GLOW ---
            A single deliberate moment of color on an otherwise monochrome interface:
-           soft, blurred blobs drift and slowly cycle hue behind the welcome greeting,
+           a soft, flowing colour wash drifts across the top behind the welcome greeting,
            then dissolve for good once the person actually starts chatting, so it
            never competes with reading the conversation. */
         .ambient-glow {
@@ -253,86 +253,78 @@
         }
         /* while the AI is working the gradient glows a little stronger (JS also speeds the drift up) */
         .ambient-glow.is-thinking { opacity: 1; transition-duration: 0.6s; }
-        /* Static fade toward the bottom (replaces the old mask-image, which forced a re-composite every frame) */
+        /* the fade-out always wins over the "thinking" state, and takes its time */
+        .ambient-glow.is-hidden,
+        .ambient-glow.is-thinking.is-hidden { opacity: 0; transition: opacity 1.6s cubic-bezier(0.4, 0, 0.2, 1); }
+        /* Static fade from the top glow into the dark (no mask-image: that forced a re-composite every frame).
+           It also hides the bottom edges of the colour bands, so the glow just melts away. */
         .ambient-glow::after {
             content: '';
             position: absolute; inset: 0;
-            background: linear-gradient(to bottom, transparent 45%, var(--void) 90%);
+            background: linear-gradient(to bottom, transparent 0%, var(--void) 74%);
         }
 
-        .glow-blob {
+        /* Ambient glow: wide, soft colour washes that flow sideways across the top of the screen (not discrete
+           blobs). Two bands with different colour orders, speeds and directions overlap, so every hue (blue,
+           purple, pink, coral, amber, teal) keeps sliding past and blending into the next. Each band is twice
+           the screen width with a seamless, repeating colour sequence and only moves by transform, which the
+           GPU handles cheaply. No blur, filters, blend modes or modern-only CSS, so older webviews stay smooth. */
+        .glow-band {
             position: absolute;
-            width: min(62vw, 460px);
-            height: min(62vw, 460px);
-            border-radius: 50%;
-            /* No blur filter / blend mode: the radial gradient already fades out softly, and
-               animating transform alone stays on the GPU (cheap even on old phones). */
-            opacity: 0.55;
+            top: -14%;
+            left: 0;
+            width: 200%;
+            transform: translate3d(0, 0, 0);
+            transform-origin: 0 0;
             will-change: transform;
         }
+        .glow-band-1 {
+            height: 100%;
+            opacity: 0.5;
+            background: linear-gradient(112deg,
+                #4da3ff, #2dd4bf, #4da3ff, #a78bfa, #f472b6, #fb7185, #fbbf24,
+                #fb7185, #f472b6, #a78bfa, #4da3ff, #2dd4bf, #4da3ff, #a78bfa,
+                #f472b6, #fb7185, #fbbf24, #fb7185, #f472b6, #a78bfa, #4da3ff);
+            animation: glow-flow-a 28s linear infinite;
+        }
+        .glow-band-2 {
+            height: 106%;
+            opacity: 0.32;
+            background: linear-gradient(68deg,
+                #f472b6, #fb7185, #fbbf24, #fb7185, #f472b6, #a78bfa, #4da3ff,
+                #2dd4bf, #4da3ff, #a78bfa, #f472b6, #fb7185, #fbbf24, #fb7185,
+                #f472b6, #a78bfa, #4da3ff, #2dd4bf, #4da3ff, #a78bfa, #f472b6);
+            animation: glow-flow-b 36s linear infinite;
+        }
+        html[data-theme="light"] .glow-band-1 { opacity: 0.38; }
+        html[data-theme="light"] .glow-band-2 { opacity: 0.26; }
 
-        .glow-blob-1 {
-            background: radial-gradient(circle, #6ea8ff 0%, transparent 70%);
-            top: -18%;
-            left: -14%;
-            animation: glow-drift-1 16s ease-in-out infinite;
+        /* one full colour cycle = half the band's width, so the loop is seamless; scaleY lets the glow breathe */
+        @keyframes glow-flow-a {
+            0%   { transform: translate3d(0, 0, 0) scaleY(1); }
+            50%  { transform: translate3d(-25%, 0, 0) scaleY(1.16); }
+            100% { transform: translate3d(-50%, 0, 0) scaleY(1); }
+        }
+        @keyframes glow-flow-b {
+            0%   { transform: translate3d(-50%, 0, 0) scaleY(1.1); }
+            50%  { transform: translate3d(-25%, 0, 0) scaleY(0.9); }
+            100% { transform: translate3d(0, 0, 0) scaleY(1.1); }
         }
 
-        .glow-blob-2 {
-            background: radial-gradient(circle, #c084fc 0%, transparent 70%);
-            top: -24%;
-            right: -16%;
-            animation: glow-drift-2 19s ease-in-out infinite;
-        }
-
-        .glow-blob-3 {
-            background: radial-gradient(circle, #f472b6 0%, transparent 70%);
-            top: 6%;
-            left: 22%;
-            animation: glow-drift-3 24s ease-in-out infinite;
-        }
-
-        .glow-blob-4 {
-            background: radial-gradient(circle, #2dd4bf 0%, transparent 70%);
-            top: -6%;
-            left: 48%;
-            width: min(48vw, 360px);
-            height: min(48vw, 360px);
-            animation: glow-drift-4 20s ease-in-out infinite;
-        }
-
-        html[data-theme="light"] .glow-blob { opacity: 0.4; }
-
-        @keyframes glow-drift-1 {
-            0%, 100% { transform: translate(0, 0) scale(1); }
-            50%      { transform: translate(6%, 8%) scale(1.12); }
-        }
-
-        @keyframes glow-drift-2 {
-            0%, 100% { transform: translate(0, 0) scale(1); }
-            50%      { transform: translate(-7%, 6%) scale(0.92); }
-        }
-
-        @keyframes glow-drift-3 {
-            0%, 100% { transform: translate(0, 0) scale(1); }
-            50%      { transform: translate(4%, -9%) scale(1.08); }
-        }
-
-        @keyframes glow-drift-4 {
-            0%, 100% { transform: translate(0, 0) scale(1); }
-            50%      { transform: translate(-5%, -6%) scale(1.15); }
-        }
+        /* Webviews without the Web Animations API can't ease the speed change, so they just switch to
+           shorter durations while the AI is working. */
+        .ambient-glow.fast-fallback .glow-band-1 { animation-duration: 9s; }
+        .ambient-glow.fast-fallback .glow-band-2 { animation-duration: 12s; }
 
         @media (prefers-reduced-motion: reduce) {
             .ambient-glow,
-            .glow-blob {
+            .glow-band {
                 animation: none;
             }
         }
 
         /* LITE MODE: set by a tiny script for devices with <=4 CPU cores / <=4 GB RAM. Keeps the
            look but removes the always-running decorative animation and entrance effects. */
-        html.lite-mode .glow-blob-3, html.lite-mode .glow-blob-4 { display: none; }   /* lighter, but still there */
         html.lite-mode .msg { animation: none; opacity: 1; transform: none; }
 
         .top-nav {
@@ -1530,10 +1522,8 @@
     <div class="chat-shell">
     <div class="gradient-bg-wrapper"></div>
     <div class="ambient-glow" id="ambient-glow" aria-hidden="true">
-        <div class="glow-blob glow-blob-1"></div>
-        <div class="glow-blob glow-blob-2"></div>
-        <div class="glow-blob glow-blob-3"></div>
-        <div class="glow-blob glow-blob-4"></div>
+        <div class="glow-band glow-band-1"></div>
+        <div class="glow-band glow-band-2"></div>
     </div>
 
     <div class="top-nav">
@@ -2602,14 +2592,15 @@
         const glow = document.getElementById('ambient-glow');
         if (!glow || glowHidden) return;
         glow.classList.toggle('is-thinking', target > 1);
-        if (prefersReducedMotion() || !glow.getAnimations) return;
+        if (prefersReducedMotion()) return;
+        if (!glow.getAnimations) { glow.classList.toggle('fast-fallback', target > 1); return; }
         cancelAnimationFrame(glowRampRaf);
         const from = glowRate, t0 = performance.now(), dur = 700;   // ease the speed change so it never jumps
         const step = now => {
             const k = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - k, 3);
             glowRate = from + (target - from) * e;
             glow.getAnimations({ subtree: true }).forEach(a => {
-                if (a.animationName && a.animationName.startsWith('glow-drift')) { try { a.updatePlaybackRate(glowRate); } catch (_) {} }
+                if (a.animationName && /^glow-flow/.test(a.animationName)) { try { a.updatePlaybackRate(glowRate); } catch (_) {} }
             });
             if (k < 1) glowRampRaf = requestAnimationFrame(step);
         };
@@ -2625,8 +2616,7 @@
         el.className = 'ambient-glow';
         el.id = 'ambient-glow';
         el.setAttribute('aria-hidden', 'true');
-        el.innerHTML = '<div class="glow-blob glow-blob-1"></div><div class="glow-blob glow-blob-2"></div>' +
-                       '<div class="glow-blob glow-blob-3"></div><div class="glow-blob glow-blob-4"></div>';
+        el.innerHTML = '<div class="glow-band glow-band-1"></div><div class="glow-band glow-band-2"></div>';
         const anchor = document.querySelector('.gradient-bg-wrapper');
         if (anchor) anchor.insertAdjacentElement('afterend', el);
     }
@@ -2637,8 +2627,10 @@
         glowHidden = true;
         const glow = document.getElementById('ambient-glow');
         if (!glow) return;
+        glow.classList.remove('is-thinking');
+        void glow.offsetWidth;                 // commit the current opacity so the transition starts from it
         glow.classList.add('is-hidden');
-        setTimeout(() => { glow.remove(); }, 1400);
+        setTimeout(() => { glow.remove(); }, 1800);
     }
 
     function unlockChat() {
