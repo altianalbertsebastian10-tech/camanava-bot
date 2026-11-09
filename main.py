@@ -175,12 +175,41 @@ def find_mentioned_places(text: str, limit: int = 3) -> list:
 # Groq's client is synchronous; calling it directly inside an async endpoint froze the whole server
 # (every other user's request, /health pings, TTS) for the 1-4 s each reply took. It now runs in a
 # worker thread, with the backup key as fallback.
+_LLM_TURN = [0]
+
+
 def _llm_sync(messages, **kwargs):
-    try:
-        return primary_client.chat.completions.create(model="openai/gpt-oss-120b", messages=messages, timeout=45, **kwargs)
-    except Exception as primary_err:
-        print(f"[PRIMARY GROQ FAILED] Switching to backup Groq account... Error: {primary_err}")
-        return backup_client.chat.completions.create(model="openai/gpt-oss-120b", messages=messages, timeout=45, **kwargs)
+    # Each Groq account has its own tokens-per-minute budget, so alternate which one goes first (that doubles the
+    # budget the app can use per minute) and fall back to the other if one refuses.
+    clients = [("primary", primary_client), ("backup", backup_client)]
+    _LLM_TURN[0] += 1
+    if _LLM_TURN[0] % 2 == 0:
+        clients.reverse()
+    last_err = None
+    for name, client in clients:
+        try:
+            return client.chat.completions.create(model="openai/gpt-oss-120b", messages=messages, timeout=45, **kwargs)
+        except Exception as err:
+            last_err = err
+            print(f"[{name.upper()} GROQ FAILED] {str(err)[:260]}")
+    raise last_err
+
+
+def _est_tokens(msgs) -> int:
+    """Rough prompt size (JSON-heavy text is about 3 characters per token)."""
+    return int(sum(len(str(m.get("content", ""))) for m in msgs) / 3.0) + 8 * len(msgs)
+
+
+def _slim_places(places: dict, max_chars: int = 90) -> dict:
+    """Same places, fewer tokens: drop empty fields and links, shorten long text."""
+    slim = {}
+    for pid, info in places.items():
+        if isinstance(info, dict):
+            slim[pid] = {k: (v[:max_chars] if isinstance(v, str) else v) for k, v in info.items()
+                         if v not in (None, "", [], {}) and not (isinstance(v, str) and v.startswith("http"))}
+        else:
+            slim[pid] = info
+    return slim
 
 
 async def llm_complete(messages, **kwargs):
@@ -554,9 +583,12 @@ async def handle_itinerary_turn(request: "ChatRequest", verified_uid: str) -> di
         # the same stable first chunk of spots per city, rather than the rotating/paginated
         # chunk the normal chat flow uses -- an itinerary needs a consistent option set
         # to build against turn to turn, not a "show me different ones" rotation.
+        _place_cities = mentioned_cities or camanava_cities
+        _per_city = 10 if len(_place_cities) == 1 else 7 if len(_place_cities) == 2 else 5   # more days need more places
         verified_places = {}
-        for c in (mentioned_cities or camanava_cities):
-            verified_places.update(get_city_data(c, None, None, set()))
+        for c in _place_cities:
+            verified_places.update(get_city_data(c, None, None, set(), _per_city))
+        verified_places = _slim_places(verified_places)
 
         # This was missing entirely before -- the itinerary LLM call had no memory of
         # anything said earlier in the conversation, only the structured draft object.
@@ -572,22 +604,19 @@ async def handle_itinerary_turn(request: "ChatRequest", verified_uid: str) -> di
         if _prof_text:
             it_state += "\nWHAT YOU REMEMBER ABOUT THIS USER (soft hints; this conversation overrides them):\n" + _prof_text + "\n"
         it_state += current_time_block()
-        _wx = await run_in_threadpool(build_weather_block, mentioned_cities or camanava_cities, 7, False)
-        if _wx:
-            it_state += _wx + ("Use this forecast when choosing stops: indoor places (restaurants, churches, museums) on "
-                               "rainy or very hot days, parks and outdoor spots on clear days. Mention the weather "
-                               "briefly in your reply. Never invent weather beyond what is listed.\n")
-        ITINERARY_LLM_CONTEXT_TURNS = 16
-        itinerary_context_history = request.history[-ITINERARY_LLM_CONTEXT_TURNS:]
+        it_state += await run_in_threadpool(build_weather_brief, mentioned_cities or camanava_cities, 5)
+        ITINERARY_LLM_CONTEXT_TURNS = 8
+        itinerary_context_history = [{"role": m.get("role", "user"), "content": str(m.get("content", ""))[:350]}
+                                     for m in request.history[-ITINERARY_LLM_CONTEXT_TURNS:] if m.get("content")]
 
         system_prompt = f"""You are Navi, helping a user build a multi-stop travel itinerary in the
 CAMANAVA region (Caloocan, Malabon, Navotas, Valenzuela).
 
 CURRENT DRAFT ITINERARY (JSON):
-{json.dumps(draft, indent=2)}
+{json.dumps(draft, separators=(',', ':'))}
 
 VERIFIED AVAILABLE PLACES (JSON -- you may ONLY use place_id/name values that appear here):
-{json.dumps(verified_places, indent=2)}
+{json.dumps(verified_places, separators=(',', ':'))}
 
 USER'S LATEST MESSAGE: {request.message}
 {it_state}
@@ -641,11 +670,22 @@ RULES:
 }}
 """
 
-        completion = await llm_complete(
-            [{"role": "system", "content": system_prompt}, *itinerary_context_history, {"role": "user", "content": request.message}],
-            temperature=0.2, max_tokens=1024, response_format={"type": "json_object"})
-
-        raw = completion.choices[0].message.content
+        _msgs = [{"role": "system", "content": system_prompt}, *itinerary_context_history, {"role": "user", "content": request.message}]
+        while len(_msgs) > 2 and _est_tokens(_msgs) > 5200:      # keep room for the reply: Groq counts prompt + max_tokens
+            del _msgs[1]                                         # drop the oldest chat message first
+        raw = None
+        for _attempt in range(2):
+            _max_out = max(900, min(2600, 7300 - _est_tokens(_msgs)))
+            try:
+                completion = await llm_complete(_msgs, temperature=0.2, max_tokens=_max_out, response_format={"type": "json_object"})
+                raw = completion.choices[0].message.content
+                break
+            except Exception as llm_err:
+                print(f"[ITINERARY LLM ERROR] attempt {_attempt + 1}: {str(llm_err)[:300]}")
+                _msgs = [_msgs[0], {"role": "user", "content": request.message}]     # retry without the chat history
+        if raw is None:
+            raw = json.dumps({"reply": "I'm a bit overloaded right now -- give me a few seconds, then ask again and I'll pick up your trip right where we left off.",
+                              "lang": "EN", "draft": draft})
         try:
             parsed = json.loads(raw)
             reply_text = parsed.get("reply") or "Here's what I've got so far!"
@@ -1581,6 +1621,28 @@ _LOCATION_ASK = re.compile(r"\b(?:my|current)\s+location\b|\bwhere\s+i\s+am\b|\b
 _WEATHER_FOLLOWUP = re.compile(
     r"\b(?:what|how)\s+about\b|\bhow\s+bout\b|\bwhat'?s\s+it\s+like\b|\bhow'?s\s+it\b|\bnaman\b|\bpaano\b|\band\s+(?:in|for|sa)\b",
     re.IGNORECASE)
+_WX_WEEK = re.compile(r"\b(week|weekly|7[- ]?days?|seven\s+days?|full\s+forecast|extended|whole\s+week|next\s+few\s+days|few\s+days|coming\s+days|"
+                     r"weekend|linggo|buong\s+linggo|ilang\s+araw|susunod\s+na\s+araw)\b", re.IGNORECASE)
+_WX_NDAYS = re.compile(r"\b(\d{1,2})[- ]?days?\b", re.IGNORECASE)
+_WX_TOMORROW = re.compile(r"\b(tomorrow|tmrw|bukas|next\s+day)\b", re.IGNORECASE)
+_WX_HOURLY = re.compile(r"\b(hour|hours|hourly|later|mamaya|tonight|mamayang|this\s+(?:morning|afternoon|evening)|ngayong\s+\w+|"
+                       r"rain|raining|umulan|uulan|umbrella|payong|ulan)\b", re.IGNORECASE)
+
+
+def weather_scope(text: str):
+    """(days of daily forecast, include next-hours lines) for what was asked. Default is just today."""
+    m = _WX_NDAYS.search(text or "")
+    if _WX_WEEK.search(text or ""):
+        days = 7
+    elif m:
+        days = max(1, min(7, int(m.group(1))))
+    elif _WX_TOMORROW.search(text or ""):
+        days = 2
+    else:
+        days = 1
+    return days, bool(_WX_HOURLY.search(text or ""))
+
+
 _GEO_CACHE = {}
 _PLACE_TRAIL = {"today", "now", "tomorrow", "later", "tonight", "please", "ba", "po", "bukas", "ngayon", "mamaya", "right",
                 "this", "next", "week", "weekend", "morning", "afternoon", "evening", "like", "rn", "and", "or", "kasi", "naman"}
@@ -1710,6 +1772,24 @@ def _feels_like(temp_c, rh):
         return temp_c
 
 
+def build_weather_brief(cities: list, days: int = 5) -> str:
+    """One short line of daily weather for the itinerary prompt."""
+    for c in list(dict.fromkeys(cities))[:1]:
+        try:
+            d = fetch_weather_sync(c)
+            if not d:
+                continue
+            daily = d["daily"]
+            parts = [f"{daily['time'][i][5:]} {_WMO.get(daily['weather_code'][i], '?')} "
+                     f"{round(daily['temperature_2m_min'][i])}-{round(daily['temperature_2m_max'][i])}C"
+                     for i in range(min(days, len(daily["time"])))]
+            return (f"\nWEATHER in {_place_label(c)} (real forecast, use only this; put indoor stops on rainy or very hot "
+                    f"days, outdoor stops on clear days, and mention the weather briefly): " + "; ".join(parts) + "\n")
+        except Exception as e:
+            print(f"[WEATHER BRIEF ERROR] {c}: {e}")
+    return ""
+
+
 def _pct(v):
     return f"{v}%" if v is not None else "n/a"
 
@@ -1829,7 +1909,7 @@ def build_weather_block(cities: list, days: int = 7, include_hourly: bool = True
         return ""
     where = " for the place the user is in right now (from their device location)" if located else ""
     return (f"\nLIVE WEATHER{where} (real data fetched just now; use ONLY these numbers, never invent weather; "
-            "the forecast covers the next 7 days only):\n" + "\n".join(lines) + "\n")
+            "this is only the part the user asked for):\n" + "\n".join(lines) + "\n")
 
 
 @app.get("/debug/weather")
@@ -1991,7 +2071,7 @@ async def prepare_chat_turn(request: "ChatRequest", verified_uid: str, status=No
     asks_here = bool(_LOCATION_ASK.search(request.message))
     recent_text = " ".join(m.get("content", "") for m in request.history[-6:])
     weather_ctx = bool(WEATHER_PATTERN.search(recent_text))     # were we just talking about the weather?
-    short_place_q = len(request.message.split()) <= 6 and bool(wanted_cities or named_city in CITY_KEYS)
+    short_place_q = len(request.message.split()) <= 6 and any(c in request.message.lower() for c in CITY_KEYS)
     followup = weather_ctx and not wanted_cats and (asks_here or bool(_WEATHER_FOLLOWUP.search(request.message)) or short_place_q)   # "what about Malabon restaurants?" is not a weather question
     if WEATHER_PATTERN.search(request.message) or followup:
         await say("Checking the weather")
@@ -2005,7 +2085,11 @@ async def prepare_chat_turn(request: "ChatRequest", verified_uid: str, status=No
         elif asks_here:
             weather_cities = []
         if weather_cities:
-            weather_block = await run_in_threadpool(build_weather_block, weather_cities, 7, True, located)
+            _scope_text = request.message
+            if not WEATHER_PATTERN.search(request.message):      # a follow-up: keep the scope of the earlier question
+                _scope_text += " " + next((m.get("content", "") for m in reversed(request.history) if m.get("role") == "user"), "")
+            wx_days, wx_hourly = weather_scope(_scope_text)
+            weather_block = await run_in_threadpool(build_weather_block, weather_cities, wx_days, wx_hourly, located)
         else:
             weather_block = ("\nUSER LOCATION UNAVAILABLE: the user asked about the weather where they are, but their device "
                              "location was not shared. Say you can't see their location, and ask which city they mean (or "
@@ -2186,6 +2270,8 @@ GROUND RULES (these still apply, always):
    asks about the weather and there is NO LIVE WEATHER block, say you can't check it right now. Never guess
    temperatures, rain chances or conditions. The forecast only covers 7 days; say so for later dates.
    If LIVE WEATHER is provided for a place, share it even if that place is outside CAMANAVA (weather is general info).
+   Keep weather answers short: right now plus today's range and rain chance, in 2-3 sentences. Only give a multi-day
+   or hour-by-hour list when LIVE WEATHER contains those lines (the user asked for them), and never add days that aren't listed.
    Lines marked HOURLY are the next hours: use them for "next 3 hours" style questions.
    CURRENT DATE AND TIME is real: answer "what time is it" / "what day is it" from it directly.
 
