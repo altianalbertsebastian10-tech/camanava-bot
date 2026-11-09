@@ -1578,6 +1578,9 @@ def _place_label(key: str) -> str:
 
 
 _LOCATION_ASK = re.compile(r"\b(?:my|current)\s+location\b|\bwhere\s+i\s+am\b|\bnear\s+me\b|\bnearby\b|\bdito\b|\bmalapit\b", re.IGNORECASE)
+_WEATHER_FOLLOWUP = re.compile(
+    r"\b(?:what|how)\s+about\b|\bhow\s+bout\b|\bwhat'?s\s+it\s+like\b|\bhow'?s\s+it\b|\bnaman\b|\bpaano\b|\band\s+(?:in|for|sa)\b",
+    re.IGNORECASE)
 _GEO_CACHE = {}
 _PLACE_TRAIL = {"today", "now", "tomorrow", "later", "tonight", "please", "ba", "po", "bukas", "ngayon", "mamaya", "right",
                 "this", "next", "week", "weekend", "morning", "afternoon", "evening", "like", "rn", "and", "or", "kasi", "naman"}
@@ -1694,6 +1697,19 @@ def _metno_code(symbol):
     return 3
 
 
+def _feels_like(temp_c, rh):
+    """Heat index (Rothfusz regression) for warm, humid weather; otherwise just the air temperature."""
+    try:
+        t = temp_c * 9 / 5 + 32
+        if t < 80 or rh is None or rh < 40:
+            return temp_c
+        hi = (-42.379 + 2.04901523 * t + 10.14333127 * rh - 0.22475541 * t * rh - 0.00683783 * t * t
+              - 0.05481717 * rh * rh + 0.00122874 * t * t * rh + 0.00085282 * t * rh * rh - 0.00000199 * t * t * rh * rh)
+        return round((hi - 32) * 5 / 9, 1)
+    except Exception:
+        return temp_c
+
+
 def _pct(v):
     return f"{v}%" if v is not None else "n/a"
 
@@ -1722,7 +1738,7 @@ def fetch_metno(coords):
         return min(rs, key=lambda r: abs(r["dt"].hour - 13))["code"]
     return {
         "_source": "met.no",
-        "current": {"temperature_2m": cur["temp"], "apparent_temperature": cur["temp"], "relative_humidity_2m": round(cur["rh"] or 0),
+        "current": {"temperature_2m": cur["temp"], "apparent_temperature": _feels_like(cur["temp"], cur["rh"]), "relative_humidity_2m": round(cur["rh"] or 0),
                     "precipitation": 0, "weather_code": cur["code"], "wind_speed_10m": cur["wind"]},
         "daily": {"time": day_keys, "weather_code": [noon_code(days[k]) for k in day_keys],
                   "temperature_2m_max": [max(r["temp"] for r in days[k]) for k in day_keys],
@@ -1973,8 +1989,11 @@ async def prepare_chat_turn(request: "ChatRequest", verified_uid: str, status=No
     time_block = current_time_block()
     weather_block = ""
     asks_here = bool(_LOCATION_ASK.search(request.message))
-    recent_text = " ".join(m.get("content", "") for m in request.history[-4:])
-    if WEATHER_PATTERN.search(request.message) or (asks_here and WEATHER_PATTERN.search(recent_text)):
+    recent_text = " ".join(m.get("content", "") for m in request.history[-6:])
+    weather_ctx = bool(WEATHER_PATTERN.search(recent_text))     # were we just talking about the weather?
+    short_place_q = len(request.message.split()) <= 6 and bool(wanted_cities or named_city in CITY_KEYS)
+    followup = weather_ctx and not wanted_cats and (asks_here or bool(_WEATHER_FOLLOWUP.search(request.message)) or short_place_q)   # "what about Malabon restaurants?" is not a weather question
+    if WEATHER_PATTERN.search(request.message) or followup:
         await say("Checking the weather")
         weather_cities, located = cities_for_data or CITY_KEYS, False
         asked_place = await run_in_threadpool(find_weather_place, request.message)
