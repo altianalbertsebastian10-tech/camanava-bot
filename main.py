@@ -1536,7 +1536,7 @@ WEATHER_PATTERN = re.compile(
     r"umbrella|payong|humid|humidity|typhoon|bagyo|sunny|cloudy|hot|cold|maaraw|panahon|klima|degrees|celsius)\b", re.IGNORECASE)
 _WEATHER_CACHE = {}  # city -> (timestamp, data)
 _WEATHER_LAST_ERROR = {}   # city -> last fetch error text (shown by /debug/weather)
-_WEATHER_TTL = 900   # 15 minutes
+_WEATHER_TTL = 1800  # 30 minutes (fewer calls = fewer 429s on a shared hosting IP)
 _WMO = {0: "clear sky", 1: "mostly clear", 2: "partly cloudy", 3: "overcast", 45: "foggy", 48: "foggy",
         51: "light drizzle", 53: "drizzle", 55: "heavy drizzle", 61: "light rain", 63: "rain", 65: "heavy rain",
         80: "rain showers", 81: "rain showers", 82: "violent rain showers", 95: "thunderstorm",
@@ -1587,17 +1587,20 @@ _WEATHER_PLACE_RE = re.compile(
     r"\b(?:in|at|for|around|sa|dito sa|doon sa)\s+([A-Za-z][A-Za-z.'-]*(?:\s+[A-Za-z][A-Za-z.'-]*){0,3})", re.IGNORECASE)
 
 
-def _http_get_json(url: str, params: dict, timeout: int = 8):
+def _http_get_json(url: str, params: dict, timeout: int = 8, headers: dict = None):
     """GET -> JSON that survives flaky setups. Browsers quietly fall back between IPv6/IPv4; Python's requests
     doesn't, so "works in the browser, times out in Python" is common. Tries: normal requests, then IPv4 only,
     then plain urllib, and raises one error listing every failure."""
     errors = []
-    headers = {"User-Agent": "CamaNaviGo/1.0"}
+    headers = headers or {"User-Agent": "CamaNaviGo/1.0"}
     try:
         r = requests.get(url, params=params, timeout=(5, timeout), headers=headers)
         r.raise_for_status()
         return r.json()
     except Exception as e:
+        resp = getattr(e, "response", None)
+        if resp is not None:        # the server answered (429, 5xx...): other routes would get the same answer
+            raise RuntimeError(f"HTTP {resp.status_code} from {url.split('?')[0]}")
         errors.append(f"requests: {type(e).__name__}: {e}")
     try:
         import socket
@@ -1677,6 +1680,59 @@ def current_time_block() -> str:
             "Use it for 'what time is it', 'today', 'tomorrow' and trip planning. Never say you have no clock.\n")
 
 
+WEATHER_CONTACT = os.environ.get("WEATHER_CONTACT", "camanavigo-app")   # MET Norway asks apps to identify themselves
+WEATHER_USER_AGENT = f"CamaNaviGo/1.0 (+contact: {WEATHER_CONTACT})"
+_METNO_CODES = [("thunder", 95), ("heavyrain", 65), ("showers", 80), ("lightrain", 61), ("rain", 63), ("sleet", 61),
+                ("snow", 71), ("fog", 45), ("partlycloudy", 2), ("cloudy", 3), ("fair", 1), ("clearsky", 0)]
+
+
+def _metno_code(symbol):
+    sym = (symbol or "").split("_")[0]
+    for key, code in _METNO_CODES:
+        if key in sym:
+            return code
+    return 3
+
+
+def _pct(v):
+    return f"{v}%" if v is not None else "n/a"
+
+
+def fetch_metno(coords):
+    """Backup when Open-Meteo refuses us (e.g. 429 on a shared hosting IP). Returns Open-Meteo-shaped data."""
+    raw = _http_get_json("https://api.met.no/weatherapi/locationforecast/2.0/compact",
+                         {"lat": round(coords[0], 4), "lon": round(coords[1], 4)}, 10,
+                         headers={"User-Agent": WEATHER_USER_AGENT})
+    rows = []
+    for t in raw["properties"]["timeseries"]:
+        dt = datetime.datetime.fromisoformat(t["time"].replace("Z", "+00:00")).astimezone(PH_TZ)
+        det = t["data"]["instant"]["details"]
+        n1, n6 = t["data"].get("next_1_hours") or {}, t["data"].get("next_6_hours") or {}
+        sym = ((n1 or n6).get("summary") or {}).get("symbol_code")
+        rows.append({"dt": dt, "hourly": bool(n1), "temp": det.get("air_temperature"), "rh": det.get("relative_humidity"),
+                     "wind": round((det.get("wind_speed") or 0) * 3.6, 1), "code": _metno_code(sym)})
+    now = datetime.datetime.now(PH_TZ)
+    cur = min(rows, key=lambda r: abs((r["dt"] - now).total_seconds()))
+    hours = [r for r in rows if r["hourly"] and r["dt"] >= now.replace(minute=0, second=0, microsecond=0)][:24]
+    days = {}
+    for r in rows:
+        days.setdefault(r["dt"].strftime("%Y-%m-%d"), []).append(r)
+    day_keys = sorted(days)[:7]
+    def noon_code(rs):
+        return min(rs, key=lambda r: abs(r["dt"].hour - 13))["code"]
+    return {
+        "_source": "met.no",
+        "current": {"temperature_2m": cur["temp"], "apparent_temperature": cur["temp"], "relative_humidity_2m": round(cur["rh"] or 0),
+                    "precipitation": 0, "weather_code": cur["code"], "wind_speed_10m": cur["wind"]},
+        "daily": {"time": day_keys, "weather_code": [noon_code(days[k]) for k in day_keys],
+                  "temperature_2m_max": [max(r["temp"] for r in days[k]) for k in day_keys],
+                  "temperature_2m_min": [min(r["temp"] for r in days[k]) for k in day_keys],
+                  "precipitation_probability_max": [None for _ in day_keys]},
+        "hourly": {"time": [r["dt"].strftime("%Y-%m-%dT%H:00") for r in hours], "temperature_2m": [r["temp"] for r in hours],
+                   "precipitation_probability": [None for _ in hours], "weather_code": [r["code"] for r in hours]},
+    }
+
+
 def fetch_weather_sync(city: str):
     now = time.time()
     cached = _WEATHER_CACHE.get(city)
@@ -1710,8 +1766,17 @@ def fetch_weather_sync(city: str):
         _WEATHER_LAST_ERROR.pop(city, None)
         return data
     except Exception as e:
-        _WEATHER_LAST_ERROR[city] = f"{type(e).__name__}: {e}"
-        print(f"[WEATHER ERROR] {city}: {type(e).__name__}: {e}")
+        first = f"{type(e).__name__}: {e}"
+        print(f"[WEATHER ERROR] {city}: open-meteo failed -> {first[:200]}")
+        try:
+            data = fetch_metno(coords)
+            _WEATHER_CACHE[city] = (now, data)
+            _WEATHER_LAST_ERROR.pop(city, None)
+            print(f"[WEATHER] {city}: served by MET Norway backup")
+            return data
+        except Exception as e2:
+            _WEATHER_LAST_ERROR[city] = f"open-meteo: {first[:160]} | met.no: {type(e2).__name__}: {e2}"[:400]
+            print(f"[WEATHER ERROR] {city}: backup failed too -> {type(e2).__name__}: {e2}")
         return cached[1] if cached else None     # stale data beats none
 
 
@@ -1729,7 +1794,7 @@ def build_weather_block(cities: list, days: int = 7, include_hourly: bool = True
             for i in range(min(days, len(daily["time"]))):
                 lines.append(f"  {_place_label(c)} {daily['time'][i]}: {_WMO.get(daily['weather_code'][i], 'unknown')}, "
                              f"{daily['temperature_2m_min'][i]}-{daily['temperature_2m_max'][i]}\u00b0C, "
-                             f"rain chance {daily['precipitation_probability_max'][i]}%")
+                             f"rain chance {_pct(daily['precipitation_probability_max'][i])}")
             h = d.get("hourly") or {}
             if include_hourly and h.get("time"):
                 now_key = datetime.datetime.now(PH_TZ).strftime("%Y-%m-%dT%H:00")
@@ -1737,7 +1802,7 @@ def build_weather_block(cities: list, days: int = 7, include_hourly: bool = True
                 for i in range(start, min(start + 6, len(h["time"]))):
                     lines.append(f"  {_place_label(c)} HOURLY {h['time'][i].replace('T', ' ')}: "
                                  f"{_WMO.get(h['weather_code'][i], 'unknown')}, {h['temperature_2m'][i]}\u00b0C, "
-                                 f"rain chance {h['precipitation_probability'][i]}%")
+                                 f"rain chance {_pct(h['precipitation_probability'][i])}")
         except Exception as e:
             print(f"[WEATHER FORMAT ERROR] {c}: {e}")
     if not lines:
