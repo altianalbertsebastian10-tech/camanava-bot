@@ -338,6 +338,10 @@ class ChatRequest(BaseModel):
     want_audio: bool = True
     # First name of the signed-in account (from the token, else what the app shows).
     display_name: Optional[str] = None
+    # Approximate device location (rounded by the browser, never stored). Only used to pick the user's city
+    # for weather when they did not name one.
+    lat: Optional[float] = None
+    lon: Optional[float] = None
     # Guests only: what Navi remembers about them, kept on their own device and sent back each turn.
     profile: Optional[Dict] = None
 
@@ -1531,6 +1535,38 @@ _WMO = {0: "clear sky", 1: "mostly clear", 2: "partly cloudy", 3: "overcast", 45
         96: "thunderstorm with hail", 99: "thunderstorm with hail"}
 
 
+from math import radians, sin, cos, asin, sqrt
+
+
+def _km_between(lat1, lon1, lat2, lon2) -> float:
+    la1, lo1, la2, lo2 = map(radians, (lat1, lon1, lat2, lon2))
+    a = sin((la2 - la1) / 2) ** 2 + cos(la1) * cos(la2) * sin((lo2 - lo1) / 2) ** 2
+    return 6371 * 2 * asin(sqrt(a))
+
+
+def resolve_user_place(lat, lon):
+    """City key of the nearest CAMANAVA city if the user is within 10 km of it; otherwise a 'here:lat,lon'
+    key so the weather is still for where they actually are. None if the coordinates are missing/invalid."""
+    try:
+        lat, lon = float(lat), float(lon)
+    except (TypeError, ValueError):
+        return None
+    if not (-90 <= lat <= 90 and -180 <= lon <= 180):
+        return None
+    best, best_km = None, 1e9
+    for key, (clat, clon) in CITY_COORDS.items():
+        km = _km_between(lat, lon, clat, clon)
+        if km < best_km:
+            best, best_km = key, km
+    if best_km <= 10:
+        return best
+    return f"here:{round(lat, 2)},{round(lon, 2)}"
+
+
+def _place_label(key: str) -> str:
+    return "Your current location" if key.startswith("here:") else key.title()
+
+
 PH_TZ = datetime.timezone(datetime.timedelta(hours=8))
 
 
@@ -1548,8 +1584,16 @@ def fetch_weather_sync(city: str):
     if cached and now - cached[0] < _WEATHER_TTL:
         return cached[1]
     coords = CITY_COORDS.get(city)
+    if not coords and city.startswith("here:"):
+        try:
+            a, b = city[5:].split(",")
+            coords = (float(a), float(b))
+        except ValueError:
+            return None
     if not coords:
         return None
+    if len(_WEATHER_CACHE) > 200:
+        _WEATHER_CACHE.clear()
     try:
         r = requests.get("https://api.open-meteo.com/v1/forecast", timeout=6, params={
             "latitude": coords[0], "longitude": coords[1], "timezone": "Asia/Manila", "forecast_days": 7,
@@ -1566,7 +1610,7 @@ def fetch_weather_sync(city: str):
         return cached[1] if cached else None     # stale data beats none
 
 
-def build_weather_block(cities: list, days: int = 7, include_hourly: bool = True) -> str:
+def build_weather_block(cities: list, days: int = 7, include_hourly: bool = True, located: bool = False) -> str:
     lines = []
     for c in list(dict.fromkeys(cities))[:2]:    # at most 2 cities, keeps the prompt small
         try:
@@ -1574,11 +1618,11 @@ def build_weather_block(cities: list, days: int = 7, include_hourly: bool = True
             if not d:
                 continue
             cur, daily = d["current"], d["daily"]
-            lines.append(f"{c.title()} NOW: {cur['temperature_2m']}\u00b0C (feels like {cur['apparent_temperature']}\u00b0C), "
+            lines.append(f"{_place_label(c)} NOW: {cur['temperature_2m']}\u00b0C (feels like {cur['apparent_temperature']}\u00b0C), "
                          f"{_WMO.get(cur['weather_code'], 'unknown')}, humidity {cur['relative_humidity_2m']}%, "
                          f"wind {cur['wind_speed_10m']} km/h")
             for i in range(min(days, len(daily["time"]))):
-                lines.append(f"  {c.title()} {daily['time'][i]}: {_WMO.get(daily['weather_code'][i], 'unknown')}, "
+                lines.append(f"  {_place_label(c)} {daily['time'][i]}: {_WMO.get(daily['weather_code'][i], 'unknown')}, "
                              f"{daily['temperature_2m_min'][i]}-{daily['temperature_2m_max'][i]}\u00b0C, "
                              f"rain chance {daily['precipitation_probability_max'][i]}%")
             h = d.get("hourly") or {}
@@ -1586,14 +1630,15 @@ def build_weather_block(cities: list, days: int = 7, include_hourly: bool = True
                 now_key = datetime.datetime.now(PH_TZ).strftime("%Y-%m-%dT%H:00")
                 start = next((i for i, t in enumerate(h["time"]) if t >= now_key), 0)
                 for i in range(start, min(start + 6, len(h["time"]))):
-                    lines.append(f"  {c.title()} HOURLY {h['time'][i].replace('T', ' ')}: "
+                    lines.append(f"  {_place_label(c)} HOURLY {h['time'][i].replace('T', ' ')}: "
                                  f"{_WMO.get(h['weather_code'][i], 'unknown')}, {h['temperature_2m'][i]}\u00b0C, "
                                  f"rain chance {h['precipitation_probability'][i]}%")
         except Exception as e:
             print(f"[WEATHER FORMAT ERROR] {c}: {e}")
     if not lines:
         return ""
-    return ("\nLIVE WEATHER (real data fetched just now; use ONLY these numbers, never invent weather; "
+    where = " for the place the user is in right now (from their device location)" if located else ""
+    return (f"\nLIVE WEATHER{where} (real data fetched just now; use ONLY these numbers, never invent weather; "
             "the forecast covers the next 7 days only):\n" + "\n".join(lines) + "\n")
 
 
@@ -1741,7 +1786,11 @@ async def prepare_chat_turn(request: "ChatRequest", verified_uid: str, status=No
     weather_block = ""
     if WEATHER_PATTERN.search(request.message):
         await say("Checking the weather")
-        weather_block = await run_in_threadpool(build_weather_block, cities_for_data or CITY_KEYS)
+        weather_cities, located = cities_for_data or CITY_KEYS, False
+        user_place = resolve_user_place(request.lat, request.lon)
+        if user_place and not (wanted_cities or named_city in CITY_KEYS):   # user did not name a city
+            weather_cities, located = [user_place], True
+        weather_block = await run_in_threadpool(build_weather_block, weather_cities, 7, True, located)
     cat_filters = [t for k in wanted_cats for t in CATEGORY_FILTERS.get(k, [k])]
     avoid_terms = [t for k in (avoided_cats | (remembered_avoid_cats - set(wanted_cats))) for t in CATEGORY_FILTERS.get(k, [k])]
     what = " and ".join(CATEGORY_LABELS.get(k, k) for k in wanted_cats) or "places"

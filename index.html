@@ -2954,6 +2954,26 @@
         if (ctx.live && isLiveModeActive) enqueueLiveSentence(ev);
     }
 
+    // --- Approximate location, only to answer weather questions for the city the user is in ---
+    // Asked lazily (the browser shows its own permission prompt), rounded to ~1 km, never saved.
+    const WEATHER_ASK_RE = /\b(weather|forecast|temperature|temp|rain|raining|rainy|ulan|umulan|init|mainit|lamig|malamig|umbrella|payong|humid|typhoon|bagyo|sunny|cloudy|hot|cold)\b/i;
+    let userCoords = null, userCoordsAt = 0, locationDenied = false;
+    function getUserCoords() {
+        return new Promise(resolve => {
+            if (locationDenied || !navigator.geolocation || !window.isSecureContext) return resolve(null);
+            if (userCoords && Date.now() - userCoordsAt < 600000) return resolve(userCoords);
+            navigator.geolocation.getCurrentPosition(
+                pos => {
+                    userCoords = { lat: +pos.coords.latitude.toFixed(2), lon: +pos.coords.longitude.toFixed(2) };
+                    userCoordsAt = Date.now();
+                    resolve(userCoords);
+                },
+                err => { if (err && err.code === 1) locationDenied = true; resolve(userCoords); },
+                { enableHighAccuracy: false, timeout: 8000, maximumAge: 600000 }
+            );
+        });
+    }
+
     // Reads the server's event stream. Returns the final payload, or null when streaming is not available
     // (nothing was shown yet), so the caller can use the classic request instead.
     async function runStreamingChat(body, ctx) {
@@ -3301,7 +3321,8 @@
         const dropWaitNote = () => { clearTimeout(slowChatHint); if (waitNote) { waitNote.remove(); waitNote = null; } };
         try {
             if (navigator.onLine === false) throw new Error('offline');
-            const body = { message: msg, history, session_id: currentSessionId, itinerary_draft: itineraryDraft, want_audio: isLiveModeActive, profile: isLoggedIn() ? null : loadGuestProfile(), display_name: isLoggedIn() ? (currentFirstName() || null) : null };
+            const coords = WEATHER_ASK_RE.test(msg) ? await getUserCoords() : null;
+            const body = { lat: coords ? coords.lat : null, lon: coords ? coords.lon : null, message: msg, history, session_id: currentSessionId, itinerary_draft: itineraryDraft, want_audio: isLiveModeActive, profile: isLoggedIn() ? null : loadGuestProfile(), display_name: isLoggedIn() ? (currentFirstName() || null) : null };
 
             // Preferred: the reply streams in word by word (and, in Live mode, sentence by sentence with voice).
             // If the server has no streaming endpoint (older deploy), quietly use the classic request.
