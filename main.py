@@ -1532,8 +1532,8 @@ CITY_COORDS = {
     "valenzuela": (14.7011, 120.9830),
 }
 WEATHER_PATTERN = re.compile(
-    r"\b(weather|forecast|temperature|temp|rain|raining|rainy|ulan|umulan|init|mainit|lamig|malamig|"
-    r"umbrella|payong|humid|typhoon|bagyo|sunny|cloudy|hot|cold)\b", re.IGNORECASE)
+    r"\b(weather|forecast|temperature|temp|rain|raining|rainy|ulan|umulan|uulan|umuulan|maulan|init|mainit|lamig|malamig|"
+    r"umbrella|payong|humid|humidity|typhoon|bagyo|sunny|cloudy|hot|cold|maaraw|panahon|klima|degrees|celsius)\b", re.IGNORECASE)
 _WEATHER_CACHE = {}  # city -> (timestamp, data)
 _WEATHER_TTL = 900   # 15 minutes
 _WMO = {0: "clear sky", 1: "mostly clear", 2: "partly cloudy", 3: "overcast", 45: "foggy", 48: "foggy",
@@ -1571,7 +1571,61 @@ def resolve_user_place(lat, lon):
 
 
 def _place_label(key: str) -> str:
+    if key.startswith("geo:"):
+        return key[4:].split(",", 2)[2] if key.count(",") >= 2 else "That place"
     return "Your current location" if key.startswith("here:") else key.title()
+
+
+_GEO_CACHE = {}
+_PLACE_TRAIL = {"today", "now", "tomorrow", "later", "tonight", "please", "ba", "po", "bukas", "ngayon", "mamaya", "right",
+                "this", "next", "week", "weekend", "morning", "afternoon", "evening", "like", "rn", "and", "or", "kasi", "naman"}
+_PLACE_LEAD_SKIP = {"the", "my", "our", "a", "an", "this", "that", "here", "there", "your", "his", "her", "their", "general",
+                    "case", "order", "fact", "time", "ph", "philippines"}
+_WEATHER_PLACE_RE = re.compile(
+    r"\b(?:in|at|for|around|sa|dito sa|doon sa)\s+([A-Za-z][A-Za-z.'-]*(?:\s+[A-Za-z][A-Za-z.'-]*){0,3})", re.IGNORECASE)
+
+
+def geocode_place(name: str):
+    """'Manila' -> 'geo:14.6,121.0,Manila' using Open-Meteo's free geocoder (Philippines first, then anywhere)."""
+    key = name.lower().strip()
+    if key in _GEO_CACHE:
+        return _GEO_CACHE[key]
+    result = None
+    for params in ({"country_code": "PH"}, {}):
+        try:
+            r = requests.get("https://geocoding-api.open-meteo.com/v1/search", timeout=5,
+                             params={"name": name, "count": 1, "language": "en", "format": "json", **params})
+            r.raise_for_status()
+            hits = (r.json() or {}).get("results") or []
+            if hits:
+                h = hits[0]
+                result = f"geo:{round(h['latitude'], 3)},{round(h['longitude'], 3)},{h.get('name') or name}"
+                break
+        except Exception as e:
+            print(f"[GEOCODE ERROR] {name}: {e}")
+    if len(_GEO_CACHE) > 300:
+        _GEO_CACHE.clear()
+    _GEO_CACHE[key] = result
+    return result
+
+
+def find_weather_place(message: str):
+    """The place a weather question is about ('weather in Quezon City today' -> that city), or None.
+    One of the four CAMANAVA cities comes back as its plain key; anything else is geocoded."""
+    for m in _WEATHER_PLACE_RE.finditer(message or ""):
+        words = m.group(1).strip(" .,!?'-").split()
+        while words and words[-1].lower() in _PLACE_TRAIL:
+            words.pop()
+        if not words or words[0].lower() in _PLACE_LEAD_SKIP or words[0].lower() in _PLACE_TRAIL:
+            continue
+        name = " ".join(words)[:40]
+        low = re.sub(r"\s+city$", "", name.lower())
+        if low in CITY_KEYS:
+            return low
+        found = geocode_place(name)
+        if found:
+            return found
+    return None
 
 
 PH_TZ = datetime.timezone(datetime.timedelta(hours=8))
@@ -1591,6 +1645,12 @@ def fetch_weather_sync(city: str):
     if cached and now - cached[0] < _WEATHER_TTL:
         return cached[1]
     coords = CITY_COORDS.get(city)
+    if not coords and city.startswith("geo:"):
+        try:
+            a, b, _name = city[4:].split(",", 2)
+            coords = (float(a), float(b))
+        except ValueError:
+            return None
     if not coords and city.startswith("here:"):
         try:
             a, b = city[5:].split(",")
@@ -1794,10 +1854,14 @@ async def prepare_chat_turn(request: "ChatRequest", verified_uid: str, status=No
     if WEATHER_PATTERN.search(request.message):
         await say("Checking the weather")
         weather_cities, located = cities_for_data or CITY_KEYS, False
+        asked_place = await run_in_threadpool(find_weather_place, request.message)
         user_place = resolve_user_place(request.lat, request.lon)
-        if user_place and not (wanted_cities or named_city in CITY_KEYS):   # user did not name a city
+        if asked_place:                                                         # "weather in <place>"
+            weather_cities = [asked_place]
+        elif user_place and not (wanted_cities or named_city in CITY_KEYS):     # no place named: use where they are
             weather_cities, located = [user_place], True
         weather_block = await run_in_threadpool(build_weather_block, weather_cities, 7, True, located)
+        print(f"[WEATHER] asked={asked_place!r} cities={weather_cities} located={located} block_chars={len(weather_block)}")
     cat_filters = [t for k in wanted_cats for t in CATEGORY_FILTERS.get(k, [k])]
     avoid_terms = [t for k in (avoided_cats | (remembered_avoid_cats - set(wanted_cats))) for t in CATEGORY_FILTERS.get(k, [k])]
     what = " and ".join(CATEGORY_LABELS.get(k, k) for k in wanted_cats) or "places"
@@ -1972,6 +2036,7 @@ GROUND RULES (these still apply, always):
    (e.g. "it's 32°C in Valenzuela right now, so..."), don't force it into unrelated replies. If the user
    asks about the weather and there is NO LIVE WEATHER block, say you can't check it right now. Never guess
    temperatures, rain chances or conditions. The forecast only covers 7 days; say so for later dates.
+   If LIVE WEATHER is provided for a place, share it even if that place is outside CAMANAVA (weather is general info).
    Lines marked HOURLY are the next hours: use them for "next 3 hours" style questions.
    CURRENT DATE AND TIME is real: answer "what time is it" / "what day is it" from it directly.
 

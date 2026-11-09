@@ -3039,7 +3039,7 @@
 
     // --- Approximate location, only to answer weather questions for the city the user is in ---
     // Asked lazily (the browser shows its own permission prompt), rounded to ~1 km, never saved.
-    const WEATHER_ASK_RE = /\b(weather|forecast|temperature|temp|rain|raining|rainy|ulan|umulan|init|mainit|lamig|malamig|umbrella|payong|humid|typhoon|bagyo|sunny|cloudy|hot|cold)\b/i;
+    const WEATHER_ASK_RE = /\b(weather|forecast|temperature|temp|rain|raining|rainy|ulan|umulan|uulan|umuulan|maulan|init|mainit|lamig|malamig|umbrella|payong|humid|humidity|typhoon|bagyo|sunny|cloudy|hot|cold|maaraw|panahon|klima|degrees|celsius)\b/i;
     let userCoords = null, userCoordsAt = 0, locationDenied = false;
     function getUserCoords() {
         return new Promise(resolve => {
