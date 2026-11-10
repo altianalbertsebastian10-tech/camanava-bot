@@ -675,6 +675,11 @@
         .gate-link { margin-top: 14px; background: none; border: none; color: var(--muted); font-size: 0.88rem; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
         .signout-btn { width: 100%; min-height: 40px; padding: 8px 14px; margin-top: 6px; box-sizing: border-box; border-radius: 999px; border: 1px solid var(--line-soft); background: transparent; color: var(--fore); font-family: var(--font-body); font-size: 0.85rem; font-weight: 500; cursor: pointer; }
         .signout-btn:hover { background: var(--slate); }
+        .help-steps { margin: 0 0 12px; padding-left: 20px; color: var(--fore); font-size: 0.9rem; line-height: 1.5; }
+        .help-steps li { margin-bottom: 6px; }
+        .help-note { margin: 0 0 14px; color: var(--muted); font-size: 0.8rem; line-height: 1.45; }
+        .login-chip { display: inline-flex; align-items: center; margin-top: 8px; min-height: 36px; padding: 6px 16px; border-radius: 999px; border: 1px solid var(--line-soft); background: transparent; color: var(--fore); font-family: 'Open Sauce Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 0.82rem; font-weight: 600; cursor: pointer; }
+        .login-chip:hover { background: var(--slate); }
         .mem-panel { background: var(--surface); padding: 22px; border-radius: 16px; border: 1px solid var(--border); width: 88%; max-width: 380px; max-height: 80vh; display: flex; flex-direction: column; font-family: 'Open Sauce Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; box-sizing: border-box; }
         .mem-title { margin: 0 0 6px; color: var(--fore); font-size: 1.2rem; }
         .mem-sub { margin: 0 0 14px; color: var(--muted); font-size: 0.85rem; line-height: 1.45; }
@@ -1437,7 +1442,8 @@
                 Continue with Google
             </button>
             <button type="button" class="gate-btn" onclick="startGuestFlow()">Continue as Guest</button>
-            <p class="gate-note">Or log in through the NaviGo! mobile app.</p>
+            <p class="gate-note">Want to save your trips? Log in through the NaviGo! mobile app: sign in there, then open Navi from inside the app.
+                <button type="button" class="gate-link" onclick="openLoginHelp()" style="display:inline; margin:0; padding:0; min-height:0; width:auto;">See the steps</button></p>
         </div>
         <div id="gate-name" class="gate-step" style="display:none;">
             <h2 class="gate-title">What should I call you?</h2>
@@ -1445,6 +1451,25 @@
             <input id="guest-name-input" class="gate-input" type="text" maxlength="30" placeholder="Your name" autocomplete="given-name" onkeydown="if(event.key==='Enter') submitGuestName()">
             <button type="button" class="gate-btn gate-primary" onclick="submitGuestName()">Continue</button>
             <button type="button" class="gate-link" onclick="skipGuestName()">Skip for now</button>
+        </div>
+    </div>
+
+    <!-- HOW TO LOG IN -->
+    <div id="login-help-modal" style="display: none; position: fixed; inset: 0; background: var(--scrim); z-index: 6000; align-items: center; justify-content: center;" onclick="if(event.target===this) closeLoginHelp()">
+        <div class="mem-panel" role="dialog" aria-modal="true" aria-labelledby="login-help-title">
+            <h3 id="login-help-title" class="mem-title">Log in to save your trips</h3>
+            <p class="mem-sub">You can chat and plan with Navi as a guest. Saving a trip needs a NaviGo! account.</p>
+            <ol class="help-steps">
+                <li>Open the <strong>NaviGo!</strong> mobile app.</li>
+                <li>Sign in to your NaviGo! account there, or create one.</li>
+                <li>Open <strong>Navi</strong> from inside the app. You'll be logged in automatically.</li>
+                <li>Ask Navi to <strong>save your trip</strong>. Saved trips show up in the app's Itineraries tab.</li>
+            </ol>
+            <p class="help-note">Plans made here as a guest stay in this browser, so after logging in you may need to ask Navi for the plan again.</p>
+            <div class="mem-actions">
+                <a id="login-help-app" class="mem-btn" href="#" target="_blank" rel="noopener noreferrer" style="display:none; align-items:center; justify-content:center; text-decoration:none;">Open NaviGo! app</a>
+                <button type="button" class="mem-btn mem-done" onclick="closeLoginHelp()">Got it</button>
+            </div>
         </div>
     </div>
 
@@ -1507,6 +1532,7 @@
             Logged in as:<br>
             <strong id="current-user-display" style="color: var(--fore);">Guest</strong>
             <button type="button" id="signout-btn" class="signout-btn" onclick="signOutUser()" style="display:none;">Log out</button>
+            <button type="button" id="login-help-btn" class="signout-btn" onclick="openLoginHelp()" style="display:none;">How to log in</button>
             <div class="theme-label">Memory</div>
             <button type="button" class="forget-btn" onclick="openMemory()" title="See what Navi remembers about you, and remove anything you don't want kept.">What Navi remembers</button>
             <div class="theme-label" id="theme-label">Appearance</div>
@@ -1818,6 +1844,8 @@
         primeProfileName();
         const out = document.getElementById('signout-btn');
         if (out) out.style.display = localStorage.getItem('authProvider') === 'google' ? 'block' : 'none';
+        const help = document.getElementById('login-help-btn');
+        if (help) help.style.display = isLoggedIn() ? 'none' : 'block';
     }
 
     // --- GOOGLE SIGN-IN (Firebase Authentication) ---
@@ -1825,6 +1853,8 @@
     // While they are empty the Google button stays hidden and everything else works as before.
     const FIREBASE_WEB_CONFIG = { apiKey: "", authDomain: "", projectId: "", appId: "" };
     let firebaseReady = false;
+    // Where people can get / open the NaviGo! app (Play Store, App Store or a deep link). Leave '' to hide the button.
+    const NAVIGO_APP_LINK = '';
 
     function loadScript(src) {
         return new Promise((resolve, reject) => {
@@ -3040,6 +3070,7 @@
     // --- Approximate location, only to answer weather questions for the city the user is in ---
     // Asked lazily (the browser shows its own permission prompt), rounded to ~1 km, never saved.
     const WEATHER_ASK_RE = /\b(weather|forecast|temperature|temp|rain|raining|rainy|ulan|umulan|uulan|umuulan|maulan|init|mainit|lamig|malamig|umbrella|payong|humid|humidity|typhoon|bagyo|sunny|cloudy|hot|cold|maaraw|panahon|klima|degrees|celsius)\b/i;
+    const LOCATION_ASK_RE = /\b(?:my|current)\s+location\b|\bwhere\s+i\s+am\b|\bnear\s+me\b|\bnearby\b|\bdito\b|\bmalapit\b/i;
     let userCoords = null, userCoordsAt = 0, locationDenied = false;
     function getUserCoords() {
         return new Promise(resolve => {
@@ -3248,6 +3279,24 @@
         });
     }
 
+    // --- How to log in (guests can't save trips; real accounts come from the NaviGo! app) ---
+    function openLoginHelp() {
+        const link = document.getElementById('login-help-app');
+        if (link) { link.href = NAVIGO_APP_LINK || '#'; link.style.display = NAVIGO_APP_LINK ? 'flex' : 'none'; }
+        document.getElementById('login-help-modal').style.display = 'flex';
+    }
+    function closeLoginHelp() { document.getElementById('login-help-modal').style.display = 'none'; }
+    // A "How to log in" button under Navi's reply when a guest tries to save a trip
+    function attachLoginHelpChip() {
+        const rows = document.querySelectorAll('#chat .bot-actions');
+        const host = rows.length ? rows[rows.length - 1].parentElement : document.getElementById('chat');
+        if (!host || host.querySelector('.login-chip')) return;
+        const b = document.createElement('button');
+        b.type = 'button'; b.className = 'login-chip'; b.textContent = 'How to log in';
+        b.onclick = openLoginHelp;
+        host.appendChild(b);
+    }
+
     async function openMemory() {
         const modal = document.getElementById('memory-modal');
         modal.style.display = 'flex';
@@ -3405,7 +3454,7 @@
         const dropWaitNote = () => { clearTimeout(slowChatHint); if (waitNote) { waitNote.remove(); waitNote = null; } };
         try {
             if (navigator.onLine === false) throw new Error('offline');
-            const coords = WEATHER_ASK_RE.test(msg) ? await getUserCoords() : null;
+            const coords = (WEATHER_ASK_RE.test(msg) || LOCATION_ASK_RE.test(msg)) ? await getUserCoords() : null;
             const body = { lat: coords ? coords.lat : null, lon: coords ? coords.lon : null, message: msg, history, session_id: currentSessionId, itinerary_draft: itineraryDraft, want_audio: isLiveModeActive, profile: loadGuestProfile(), display_name: isLoggedIn() ? (currentFirstName() || null) : null };
 
             // Preferred: the reply streams in word by word (and, in Live mode, sentence by sentence with voice).
@@ -3439,6 +3488,7 @@
             if (data.profile) { saveGuestProfile(data.profile); if (isLoggedIn()) memoryProfile = data.profile; }
             if (turnEl) delete turnEl.dataset.pending;
             itineraryDraft = data.itinerary_draft || null;
+            if (data.login_required) attachLoginHelpChip();
             updateItineraryBanner();
 
             // Logged-in users are persisted server-side in Firestore (done inside /chat).

@@ -531,6 +531,7 @@ async def handle_itinerary_turn(request: "ChatRequest", verified_uid: str) -> di
     # frontend shows a distinct, unmissable confirmation banner driven by this flag
     # instead of trying to parse "did it say Saved?" out of a sentence.
     saved_info = None
+    login_required = False  # set when a guest tries to save: the page shows a "how to log in" button
     spoken_text = None      # when set, this (not the full on-screen text) is what gets read aloud
 
     # --- CANCEL --- (works even before any stop's been added -- an empty in-progress draft
@@ -550,9 +551,14 @@ async def handle_itinerary_turn(request: "ChatRequest", verified_uid: str) -> di
 
     elif has_stops and (ITINERARY_CONFIRM_PATTERN.search(user_msg) or ITINERARY_SHORT_YES.match(user_msg)):
         if not verified_uid or verified_uid in GUEST_LIKE_UIDS:
+            login_required = True
             reply, mood, new_draft, updated_history = build_result(
-                "I'd love to save that for you, but you'll need to log in first so it's tied to your "
-                "account. Once you're logged in, just ask me to save it again and it'll be right there.",
+                "I'd love to save this, but saving needs a NaviGo! account and you're browsing as a guest. Here's how to log in:\n\n"
+                "1. Open the NaviGo! mobile app and sign in to your account (or create one).\n"
+                "2. Open Navi from inside the app. You'll be logged in automatically.\n"
+                "3. Ask me to save your trip again. Saved trips show up in the app's Itineraries tab.\n\n"
+                "Your plan stays in this chat for now, so feel free to screenshot it. Trips planned here as a guest may "
+                "not carry over to the app, so you might need to ask me for the plan again after logging in.",
                 "NEUTRAL", draft
             )
         elif not (firebase_active and db is not None):
@@ -785,6 +791,7 @@ RULES:
         "history": updated_history,
         "itinerary_draft": new_draft,
         "itinerary_saved": saved_info,
+        "login_required": login_required,
         "mood": mood,
         "lang": lang
     }
