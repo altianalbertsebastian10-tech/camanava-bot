@@ -1395,6 +1395,13 @@ _NAV_DEST_STOP = {"please", "pls", "po", "now", "from", "but", "na", "lang", "as
                   "tomorrow", "bukas", "ngayon", "there", "it", "here", "somewhere", "anywhere", "a", "an", "the", "my", "eat", "go"}
 
 
+# words that end the place name ("manila SINCE im lost", "caloocan BECAUSE ...", "sm valenzuela PLEASE")
+_NAV_CLAUSE_STOP = {"since", "because", "cuz", "coz", "cause", "so", "but", "and", "or", "then", "if", "when", "while", "as", "im", "i'm", "i",
+                    "my", "me", "we", "you", "kasi", "dahil", "pero", "tapos", "para", "please", "pls", "po", "now", "asap", "today", "tonight",
+                    "tomorrow", "bukas", "ngayon", "from", "at", "in", "on", "near", "with", "lost", "dont", "don't", "cant", "can't", "need", "help"}
+_NAV_HOME = re.compile(r"\b(?:home|bahay|umuwi|uwi|pauwi|makauwi|makakauwi|back\s+home)\b", re.IGNORECASE)
+
+
 def navigation_help_reply(message: str):
     """Navi has no reliable route data, so it never explains routes. It points people to tools that do
     (phone navigation, NaviGo!'s navigation, ride-hailing). Returns (text, lang)."""
@@ -1403,12 +1410,17 @@ def navigation_help_reply(message: str):
     lang = "TL" if len(_TAGALOG_HINTS.findall(text)) >= 2 else "EN"
     dest = ""
     for m in _NAV_DEST.finditer(text):
-        words = m.group(1).strip(" .,!?'-").split()
+        words = []
+        for w in m.group(1).strip(" .,!?'-").split():
+            if w.lower().strip(".,!?'") in _NAV_CLAUSE_STOP:     # the place name ends here
+                break
+            words.append(w)
         while words and words[-1].lower() in _NAV_DEST_STOP:
             words.pop()
         if words and words[0].lower() not in _NAV_DEST_STOP:
             dest = " ".join(words)[:40]
     lost = bool(_NAV_LOST.search(text))
+    going_home = bool(_NAV_HOME.search(text))
     link = ("https://www.google.com/maps/dir/?api=1&destination=" + quote(f"{dest.title()}, Philippines")) if dest else ""
     shown = dest.title() if dest else ""
     if lang == "TL":
@@ -1423,6 +1435,8 @@ def navigation_help_reply(message: str):
         lines.append("- **Ride-hailing:** mag-book ng Angkas (motor), Joyride o Grab, at susundan ng driver ang tamang ruta.")
         if link:
             lines.append(f"\nI-tap para buksan sa Google Maps: {link}")
+        if going_home:
+            lines.append("\nKung pauwi ka na, i-type ang address ng bahay mo sa Google Maps, Waze o ride-hailing app.")
         lines.append("\nKapag okay ka na, sabihin mo kung ano ang gusto mong gawin sa Caloocan, Malabon, Navotas o Valenzuela "
                      "at magmumungkahi ako ng mga lugar.")
     else:
@@ -1437,6 +1451,8 @@ def navigation_help_reply(message: str):
         lines.append("- **Ride-hailing:** book Angkas (motorcycle), Joyride or Grab, and the driver's app handles the route.")
         if link:
             lines.append(f"\nTap to open it in Google Maps: {link}")
+        if going_home:
+            lines.append("\nIf you're trying to get home, type your home address into Google Maps, Waze or the ride-hailing app.")
         lines.append("\nOnce you're settled, tell me what you feel like doing around Caloocan, Malabon, Navotas or Valenzuela "
                      "and I'll suggest places.")
     return "\n".join(lines), lang
