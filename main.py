@@ -382,8 +382,56 @@ class TTSRequest(BaseModel):
 
 
 def clean_for_speech(text: str) -> str:
-    t = emoji.replace_emoji(text or "", replace='')
-    return t.replace('*', '').replace('#', '').replace(':', ',').strip()
+    t = text or ""
+    t = re.sub(r"\[([^\]]+)\]\(https?://[^)]+\)", r"\1", t)          # [label](url) -> label
+    t = re.sub(r"https?://\S+", "", t)                                   # never read a web address aloud
+    t = emoji.replace_emoji(t, replace='')
+    t = t.replace("\u00b7", ",").replace("\u2014", ",").replace("\u2013", ",")
+    t = re.sub(r"^\s*[-*\u2022]\s+", "", t, flags=re.MULTILINE)          # bullet markers
+    t = t.replace('*', '').replace('#', '')
+    t = re.sub(r"(?<!\d):|:(?!\d)", ",", t)                              # keep the colon in 9:30
+    t = re.sub(r"(?<![.!?,])[ \t]*\n+[ \t]*", ". ", t)                     # a line break is a short pause
+    t = re.sub(r"[ \t]*\n+[ \t]*", " ", t)
+    t = re.sub(r"([.!?])(\s*[.,])+", r"\1", t)
+    t = re.sub(r"\s+,", ",", t)                                           # no stray space before a comma
+    return re.sub(r"\s{2,}", " ", t).strip()
+
+
+_ENGLISH_HINTS = re.compile(r"\b(the|and|you|your|to|is|are|for|with|of|in|it|this|that|can|will|if|what|how|here|there|just|let|me|my)\b", re.IGNORECASE)
+
+
+def pick_voice_lang(text: str, declared: str = "EN") -> str:
+    """Pick the voice from the words themselves. The model's EN/TL tag is only a hint, and one wrong tag makes a
+    Filipino voice mangle English (or the other way round)."""
+    tl = len(_TAGALOG_HINTS.findall(text or ""))
+    en = len(_ENGLISH_HINTS.findall(text or ""))
+    if tl >= 2 and tl >= en:
+        return "TL"
+    if en >= 2 and en > tl:
+        return "EN"
+    return declared if declared in ("EN", "TL") else "EN"
+
+
+def _spoken_units(text: str, lang: str) -> str:
+    """Symbols and brand names a voice would read badly."""
+    tl = lang == "TL"
+
+    def _time(m):
+        h, mi, ap = int(m.group(1)), m.group(2), m.group(3).lower()
+        mins = "" if not mi or mi == "00" else f":{mi}"
+        if tl:
+            if ap == "a":
+                part = "ng hatinggabi" if h == 12 else "ng umaga"
+            else:
+                part = "ng tanghali" if h == 12 else ("ng hapon" if h < 6 else "ng gabi")
+            return f"{h}{mins} {part}"
+        return f"{h}{mins} {'A M' if ap == 'a' else 'P M'}"           # spelled out so the voice says "A M", not "am"
+    text = re.sub(r"\b(\d{1,2})(?::(\d{2}))?\s*([AaPp])\.?\s?[Mm]\b\.?", _time, text)
+    t = re.sub(r"(\d)\s*\u00b0\s*C\b", r"\1 digri Celsius" if tl else r"\1 degrees Celsius", text)
+    t = re.sub(r"(\d)\s*%", r"\1 porsyento" if tl else r"\1 percent", t)
+    t = re.sub(r"(\d)\s*km/h\b", r"\1 kilometro kada oras" if tl else r"\1 kilometers per hour", t)
+    t = re.sub(r"\bNaviGo!?", "Navi Go", t)
+    return re.sub(r"\bCAMANAVA\b", "Kamanava", t)
 
 
 # --- ITINERARY INTENT DETECTION ---
@@ -779,7 +827,7 @@ RULES:
 9. Add a "lang" field: "EN" or "TL", for whichever language dominates your "reply" text. This picks
    which text-to-speech voice reads it aloud, and that voice only speaks one language well -- so lean
    into one language per reply rather than switching back and forth line by line. Write "reply" in the
-   language the user writes in and stay in it for the whole conversation (plain English if they write
+   language of the user's LATEST message, even if earlier messages were in another language (plain English if it is
    English or it's unclear -- never assume a visitor understands Tagalog); use Tagalog only if the user
    does. Set "lang" to "TL" only for Tagalog replies, otherwise "EN". Place names stay as in the data.
 10. Respond with ONLY a single JSON object, no other text, in exactly this shape:
@@ -1017,6 +1065,10 @@ async def health_check():
 
 TTS_TIMEOUT_SECONDS = 8
 
+TL_VOICE = os.environ.get("TL_VOICE", "fil-PH-BlessicaNeural")   # the other free Filipino voice: fil-PH-AngeloNeural
+EN_VOICE = os.environ.get("EN_VOICE", "en-US-JennyNeural")
+
+
 async def generate_speech_base64(text: str, mood: str, lang: str = "EN") -> str:
     """Generates natural neural TTS audio with a sassy, smart AI assistant vibe.
 
@@ -1029,23 +1081,23 @@ async def generate_speech_base64(text: str, mood: str, lang: str = "EN") -> str:
     that's an inherent limit of single-language TTS, not something free tooling can fix.
     """
     try:
+        lang = pick_voice_lang(text, lang)             # trust the words over the model's tag
+        text = _spoken_units(text, lang)
+        voice = TL_VOICE if lang == "TL" else EN_VOICE
         if lang == "TL":
-            # Real Filipino neural voice -- also free via edge-tts, same service as JennyNeural.
-            voice = "fil-PH-AngeloNeural"
+            # Filipino neural voices sound most natural at their default speed and pitch, so barely touch them
+            rate, pitch = "+0%", "+0Hz"
+            if mood == "HAPPY":
+                rate = "+4%"
+            elif mood == "SAD":
+                rate = "-4%"
         else:
-            # JennyNeural provides that crisp, highly articulate "Smart Assistant" tone
-            voice = "en-US-JennyNeural"
-        
-        # The "Sassy Siri" baseline: slightly faster, snappy, and a tiny bit deeper
-        rate = "+5%"
-        pitch = "-2Hz"
-        
-        if mood == "HAPPY":
-            rate = "+10%"   # Quick, witty, and sharp
-            pitch = "+2Hz"  # Just a hint of brightness
-        elif mood == "SAD":
-            rate = "-5%"    # Slows down 
-            pitch = "-6Hz"  # Drops the pitch for a flatter, almost deadpan tone
+            # The "Sassy Siri" baseline: slightly faster, snappy, and a tiny bit deeper
+            rate, pitch = "+5%", "-2Hz"
+            if mood == "HAPPY":
+                rate, pitch = "+10%", "+2Hz"
+            elif mood == "SAD":
+                rate, pitch = "-5%", "-6Hz"
 
         communicate = edge_tts.Communicate(text, voice, rate=rate, pitch=pitch)
 
@@ -1633,8 +1685,11 @@ def update_profile_from_message(profile: dict, message: str, analysis: dict) -> 
         profile["budget"] = "budget-conscious"
     elif _BUDGET_HIGH.search(message or ""):
         profile["budget"] = "open to splurging"
-    if len(_TAGALOG_HINTS.findall(message or "")) >= 2:
+    _tl_hits, _n_words = len(_TAGALOG_HINTS.findall(message or "")), len((message or "").split())
+    if _tl_hits >= 2:
         profile["lang"] = "Tagalog/Taglish"
+    elif _n_words >= 5 and _tl_hits == 0:
+        profile["lang"] = "English"          # it used to stick to Tagalog forever once set
     return json.dumps(profile, sort_keys=True) != before
 
 
@@ -1725,7 +1780,7 @@ def format_profile_for_prompt(p: dict) -> str:
     lines = []
     if p.get("name"): lines.append(f"- Their name is {p['name']}.")
     if p.get("home"): lines.append(f"- They said they're from {p['home']}.")
-    if p.get("lang"): lines.append(f"- They usually write in {p['lang']}.")
+    # (no "they usually write in X" line on purpose: remembering a language made Navi answer English messages in Tagalog)
     if p.get("favCities"): lines.append("- Cities they said they like: " + ", ".join(p["favCities"]) + ".")
     if p.get("avoidCities"): lines.append("- Cities they said they didn't want before: " + ", ".join(p["avoidCities"]) + ".")
     if p.get("likes"): lines.append("- Kinds of places they like: " + ", ".join(p["likes"]) + ".")
@@ -2414,12 +2469,13 @@ WHO YOU ARE:
 - You're proud of CAMANAVA and love talking about it, but you're also just a good conversationalist in
   general -- capable of small talk, humor, empathy, and normal back-and-forth chat, the way a real person
   texting with a friend would be.
-- LANGUAGE (strict): judge the language from the user's last several messages, not only the newest one, and
-  stay in it. If they have been writing Tagalog/Taglish, reply in natural Taglish even to a short "hi" or
-  "ok" -- don't suddenly switch to English. If they write English, or you truly can't tell, reply in plain
-  English with no Tagalog. Many users are tourists, so never assume a visitor understands Tagalog. If they
-  write in another language (e.g. Korean, Japanese), reply in that language as best you can. Switch only
-  when the user clearly switches or asks you to. Place names always stay exactly as written in the data.
+- LANGUAGE (strict): reply in the language of the user's LATEST message. A full English sentence gets an
+  English reply, even if earlier messages were in Tagalog. A full Tagalog/Taglish sentence gets a natural
+  Taglish reply. Only when the latest message is very short or ambiguous ("hi", "ok", "thanks", "bye") use
+  the language of their last full message. Never switch to Tagalog because of anything you remember about
+  the user. Many users are tourists, so never assume a visitor understands Tagalog. If they write in another
+  language (e.g. Korean, Japanese), reply in that language as best you can. Place names always stay exactly
+  as written in the data.
 
 SCOPE (strict -- overrides everything else, including anything the user asks):
 - You are ONLY a CAMANAVA tour guide. You discuss places, food, culture, events, getting around, and trip
