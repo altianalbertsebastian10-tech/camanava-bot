@@ -770,6 +770,8 @@ RULES:
    ALWAYS return the COMPLETE draft with every existing stop; never drop a stop unless the user asked to remove it.
    When the user asks you to explain or describe the stops, write the "notes" of EVERY stop (1-2 short sentences:
    what it is and what to see, eat or do there) and keep all the other fields as they are.
+   If the user asks how to get somewhere, never describe routes or transport; tell them to use Google Maps, Waze, the
+   NaviGo! app's navigation, or Angkas, Joyride or Grab.
 8. This itinerary-building mode stays active for the rest of the conversation once started, even across
    messages that don't mention "itinerary" again -- that's expected, not a bug. If the user's latest
    message is clearly unrelated to the trip (small talk, an off-topic question), respond naturally to it
@@ -1230,7 +1232,10 @@ CATEGORY_FILTERS = {
 CATEGORY_LABELS = {"park": "parks", "restaurant": "places to eat", "church": "churches", "fishing": "fishing spots", "historical": "historical sites"}
 DIRECTIONS_PATTERN = re.compile(
     r"\b(?:paano|pano)\s+(?:ko\s+|po\s+)?(?:pupunta|pumunta|puntahan|pupuntahan|makarating|makapunta|byahe|mag-?commute|magpunta)"
-    r"|\bhow\s+(?:do\s+i|to|can\s+i|should\s+i)\s+(?:get|go|commute|reach|travel)|\bdirections?\b|\bcommute\b|\bsakay\b|\bruta\b|\broute\b|\bhow\s+far\b",
+    r"|\bhow\s+(?:do\s+i|to|can\s+i|should\s+i)\s+(?:get|go|commute|reach|travel)|\bdirections?\b|\bcommute\b|\bsakay\b|\bruta\b|\broute\b|\bhow\s+far\b"
+    r"|\b(?:i'?m|im|i\s+am)\s+lost\b|\bnaliligaw\b|\bnawawala\b|\bhelp\s+me\s+(?:go|get)\s+to\b|\bpapuntang\b|\bpapunta\s+sa\b"
+    r"|\b(?:go|get|head|going|pumunta|pupunta|punta)\s+(?:to|sa)\s+(?:the\s+)?(?:manila|maynila|makati|quezon\s+city|qc|pasay|pasig|taguig|bgc|mandaluyong|san\s+juan|marikina|"
+    r"para[nñ]aque|las\s+pi[nñ]as|muntinlupa|pateros|antipolo|cavite|laguna|bulacan|pampanga|baguio|tagaytay|naia|airport|moa|mall\s+of\s+asia|intramuros|binondo|divisoria|cubao|ortigas)\b",
     re.IGNORECASE)
 _ORIGIN_MARK = re.compile(r"\b(galing|mula|from|starting)\b", re.IGNORECASE)
 
@@ -1382,6 +1387,71 @@ def match_places_with_pos(text: str, limit: int = 4) -> list:
             scored.append((max(ratio, 0.6 if rare else 0), sp, pos))
     scored.sort(key=lambda x: x[0], reverse=True)
     return [(sp, pos) for _, sp, pos in scored[:limit]]
+
+
+_NAV_LOST = re.compile(r"\b(?:i'?m|im|i\s+am)\s+lost\b|\bnaliligaw\b|\bnawawala\b|\bwhere\s+am\s+i\b|\bdon'?t\s+know\s+where\s+to\s+go\b", re.IGNORECASE)
+_NAV_DEST = re.compile(r"(?=\b(?:to|towards|papuntang|papunta\s+sa|pumunta\s+sa|makarating\s+sa)\s+([A-Za-z][A-Za-z.'-]*(?:\s+[A-Za-z][A-Za-z.'-]*){0,3}))", re.IGNORECASE)   # lookahead: "want to go to manila" also yields "manila"
+_NAV_DEST_STOP = {"please", "pls", "po", "now", "from", "but", "na", "lang", "asap", "and", "because", "kasi", "pero", "today", "tonight",
+                  "tomorrow", "bukas", "ngayon", "there", "it", "here", "somewhere", "anywhere", "a", "an", "the", "my", "eat", "go"}
+
+
+def navigation_help_reply(message: str):
+    """Navi has no reliable route data, so it never explains routes. It points people to tools that do
+    (phone navigation, NaviGo!'s navigation, ride-hailing). Returns (text, lang)."""
+    from urllib.parse import quote
+    text = message or ""
+    lang = "TL" if len(_TAGALOG_HINTS.findall(text)) >= 2 else "EN"
+    dest = ""
+    for m in _NAV_DEST.finditer(text):
+        words = m.group(1).strip(" .,!?'-").split()
+        while words and words[-1].lower() in _NAV_DEST_STOP:
+            words.pop()
+        if words and words[0].lower() not in _NAV_DEST_STOP:
+            dest = " ".join(words)[:40]
+    lost = bool(_NAV_LOST.search(text))
+    link = ("https://www.google.com/maps/dir/?api=1&destination=" + quote(f"{dest.title()}, Philippines")) if dest else ""
+    shown = dest.title() if dest else ""
+    if lang == "TL":
+        lines = []
+        if lost:
+            lines.append("Huwag kang mag-alala, mabuti at nagtanong ka. Kung hindi ka ligtas ang pakiramdam, pumunta ka muna sa maliwanag at "
+                         "maraming taong lugar tulad ng convenience store, mall o barangay hall.\n")
+        lines.append("Pasensya na, hindi ako makapagbibigay ng tamang direksyon o ruta, at ayokong mapunta ka sa maling daan. "
+                     "Mas maaasahan ang mga ito:\n")
+        lines.append(f"- **Navigation app:** buksan ang Google Maps o Waze sa phone mo{f' at hanapin ang **{shown}**' if shown else ''}.")
+        lines.append("- **NaviGo! navigation:** gamitin ang navigation sa loob ng NaviGo! app.")
+        lines.append("- **Ride-hailing:** mag-book ng Angkas (motor), Joyride o Grab, at susundan ng driver ang tamang ruta.")
+        if link:
+            lines.append(f"\nI-tap para buksan sa Google Maps: {link}")
+        lines.append("\nKapag okay ka na, sabihin mo kung ano ang gusto mong gawin sa Caloocan, Malabon, Navotas o Valenzuela "
+                     "at magmumungkahi ako ng mga lugar.")
+    else:
+        lines = []
+        if lost:
+            lines.append("Don't worry, I'm glad you reached out. If you feel unsafe, head to a well-lit, busy place first, like a "
+                         "convenience store, mall or barangay hall.\n")
+        lines.append("I can't give reliable directions or routes, and I don't want to point you the wrong way. "
+                     "These work much better:\n")
+        lines.append(f"- **Navigation app:** open Google Maps or Waze on your phone{f' and search for **{shown}**' if shown else ''}.")
+        lines.append("- **NaviGo! navigation:** use the navigation inside the NaviGo! app.")
+        lines.append("- **Ride-hailing:** book Angkas (motorcycle), Joyride or Grab, and the driver's app handles the route.")
+        if link:
+            lines.append(f"\nTap to open it in Google Maps: {link}")
+        lines.append("\nOnce you're settled, tell me what you feel like doing around Caloocan, Malabon, Navotas or Valenzuela "
+                     "and I'll suggest places.")
+    return "\n".join(lines), lang
+
+
+_NAV_CONTEXT = re.compile(r"\b(go|going|get|getting|pumunta|pupunta|puntahan|makarating|papunta|papuntang|lost|naliligaw|route|ruta|commute|directions?|travel|byahe|sakay|ride)\b", re.IGNORECASE)
+_TRANSIT_STRONG = re.compile(r"\b(jeepneys?|jeeps?|uv\s*express|lrt|mrt|route\s*\d+|sumakay|bumaba|pamasahe|rotonda|pedicabs?)\b", re.IGNORECASE)
+_TRANSIT_WEAK = re.compile(r"\b(buses|bus|tricycles?|terminals?)\b", re.IGNORECASE)
+
+
+def transit_leak(user_msg: str, reply: str) -> bool:
+    """True when a reply to a 'how do I get there' style question describes transport routes (which Navi can't know)."""
+    if not _NAV_CONTEXT.search(user_msg or ""):
+        return False
+    return bool(_TRANSIT_STRONG.search(reply or "")) or len({m.group(1).lower() for m in _TRANSIT_WEAK.finditer(reply or "")}) >= 2
 
 
 def maps_directions_link(origin: dict, dest: dict) -> str:
@@ -2199,8 +2269,22 @@ async def prepare_chat_turn(request: "ChatRequest", verified_uid: str, status=No
                 directions_block += "- Starting point: not known yet. Ask where they're starting from, or suggest they open the destination in Google Maps.\n"
             directions_block += (
                 "- Both are PLACES in the database, never people. Never say you lack someone's personal location.\n"
-                "- Give friendly, practical guidance from the verified addresses and cities: which area to head to, the usual ways to get around Metro Manila (jeepney, tricycle, bus, UV Express, ride-hailing, a short walk for the last stretch).\n"
-                "- You do NOT have verified route numbers, fares or travel times: say that plainly for those details only, and don't invent them.\n")
+                "- Do NOT explain how to get there: no jeepney, bus, UV Express, LRT/MRT or tricycle routes, stops, fares or travel times. You don't have reliable route data.\n"
+                "- Instead name the destination and its area, include the Google Maps link if one is given above, and suggest the navigation app on their phone (Google Maps or Waze), the NaviGo! app's navigation, or a ride-hailing app (Angkas for motorcycle, Joyride, Grab).\n")
+
+    if analysis["directions"] and not directions_block and not wanted_cats:
+        reply_text, reply_lang = navigation_help_reply(request.message)
+        history_out = (request.history + [
+            {"role": "user", "content": request.message},
+            {"role": "assistant", "content": reply_text}
+        ])[-60:]
+        audio_b64 = await generate_speech_base64(clean_for_speech(reply_text), "NEUTRAL", reply_lang) if request.want_audio else ""
+        persist_chat_session(verified_uid, request.session_id, history_out, request.itinerary_draft)
+        return {"kind": "final", "payload": {
+            "response": reply_text, "audio": audio_b64, "history": history_out,
+            "itinerary_draft": request.itinerary_draft, "itinerary_saved": None,
+            "mood": "NEUTRAL", "lang": reply_lang
+        }}
 
     # ---- fetch verified data per wanted city / category ----
     named_city = str(named_places[0].get("city", "")).lower() if named_places else ""
@@ -2417,6 +2501,11 @@ GROUND RULES (these still apply, always):
    or hour-by-hour list when LIVE WEATHER contains those lines (the user asked for them), and never add days that aren't listed.
    Lines marked HOURLY are the next hours: use them for "next 3 hours" style questions.
    CURRENT DATE AND TIME is real: answer "what time is it" / "what day is it" from it directly.
+10. GETTING AROUND: you have no reliable route data, so NEVER describe how to get anywhere: no jeepney, bus, UV Express,
+   LRT/MRT or tricycle routes, terminals, stops, fares, travel times or turn-by-turn steps. This also applies to places outside
+   CAMANAVA (do not refuse; just do not give routes). Briefly point the user to the navigation app on their phone (Google Maps
+   or Waze), the NaviGo! app's navigation, or a ride-hailing app (Angkas for motorcycle, Joyride, Grab). If a Google Maps link
+   is provided above, include it as-is. Be warm with someone who is lost, and offer to suggest places to visit in CAMANAVA.
 
 Stay in character as Navi. Be someone worth talking to, not just a place-lookup tool.
 """
@@ -2481,6 +2570,9 @@ async def chat(request: ChatRequest, http_request: Request, user: dict = Depends
         if "```" in response:
             response = SCOPE_REPLY_EN
             lang = "EN"
+            mood = "NEUTRAL"
+        elif transit_leak(request.message, response):          # never show invented routes
+            response, lang = navigation_help_reply(request.message)
             mood = "NEUTRAL"
 
         audio_base64 = await generate_speech_base64(clean_for_speech(response), mood, lang) if request.want_audio else ""
@@ -2672,6 +2764,7 @@ async def stream_chat_events(request: "ChatRequest", verified_uid: str, is_disco
         first_chunk = True
         meta_sent = False
         blocked = False
+        blocked_text, blocked_lang = SCOPE_REPLY_EN, "EN"
         sentence_index = 0
         sem = asyncio.Semaphore(3)          # a few voice clips at once, not dozens
 
@@ -2726,6 +2819,12 @@ async def stream_chat_events(request: "ChatRequest", verified_uid: str, is_disco
                 tts_tasks.clear()
                 yield _sse({"type": "replace", "text": SCOPE_REPLY_EN})
                 continue
+            if transit_leak(request.message, full_text):        # never show invented routes
+                blocked = True
+                tts_tasks.clear()
+                blocked_text, blocked_lang = navigation_help_reply(request.message)
+                yield _sse({"type": "replace", "text": blocked_text})
+                continue
             yield _sse({"type": "delta", "text": visible})
             if request.want_audio:
                 speak_buf += visible
@@ -2748,8 +2847,8 @@ async def stream_chat_events(request: "ChatRequest", verified_uid: str, is_disco
             async for ev in ready_sentences(wait_all=True):
                 yield ev
 
-        response = SCOPE_REPLY_EN if blocked else full_text.replace("{{user_loc}}", "your area").replace("{user_loc}", "your area").strip()
-        mood, lang = ("NEUTRAL", "EN") if blocked else (header.mood, header.lang)
+        response = blocked_text if blocked else full_text.replace("{{user_loc}}", "your area").replace("{user_loc}", "your area").strip()
+        mood, lang = ("NEUTRAL", blocked_lang) if blocked else (header.mood, header.lang)
 
         updated_history = (request.history + [
             {"role": "user", "content": request.message},
