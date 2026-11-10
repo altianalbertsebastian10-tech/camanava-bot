@@ -451,6 +451,58 @@ def persist_chat_session(verified_uid: str, session_id: str, updated_history: li
         print(f"[FIRESTORE SAVE ERROR] {save_err}")
 
 
+_STOP_REMOVAL_WORDS = re.compile(
+    r"\b(remove|delete|drop|replace|swap|instead|cancel|skip|without|shorter|fewer|less|only|start over|restart|redo|clear|"
+    r"alisin|tanggalin|palitan|wag|huwag|ayaw)\b", re.IGNORECASE)
+
+
+def _stop_key(st: dict) -> str:
+    return str(st.get("placeId") or st.get("place_id") or re.sub(r"[^a-z0-9]", "", str(st.get("placeName") or "").lower())[:24])
+
+
+def keep_existing_stops(old_draft, new_draft, user_msg: str):
+    """The model re-sends the whole draft every turn and sometimes forgets stops. Unless the user asked to remove or
+    change something, any stop that went missing is put back."""
+    old = [st for st in ((old_draft or {}).get("stops") or []) if isinstance(st, dict)]
+    new = [st for st in ((new_draft or {}).get("stops") or []) if isinstance(st, dict)]
+    if not old or len(new) >= len(old) or _STOP_REMOVAL_WORDS.search(user_msg or ""):
+        return new_draft
+    have = {_stop_key(st) for st in new}
+    missing = [st for st in old if _stop_key(st) not in have]
+    if not missing:
+        return new_draft
+
+    def _n(v):
+        try:
+            return int(v)
+        except (TypeError, ValueError):
+            return 0
+    merged = dict(new_draft)
+    merged["stops"] = sorted(new + missing, key=lambda st: (_n(st.get("dayIndex")), _n(st.get("order"))))
+    print(f"[ITINERARY] model dropped {len(missing)} stop(s); restored them")
+    return merged
+
+
+def fill_missing_notes(draft: dict, places: dict) -> dict:
+    """Stops with no note get the place's own description from the database (cut at a sentence/word boundary)."""
+    by_id = {}
+    for info in (places or {}).values():
+        if isinstance(info, dict):
+            by_id[str(info.get("place_id") or info.get("id") or "")] = info
+    stops = []
+    for st in (draft.get("stops") or []):
+        if isinstance(st, dict) and not str(st.get("notes") or "").strip():
+            desc = str((by_id.get(str(st.get("placeId") or "")) or {}).get("description") or "").strip()
+            if desc:
+                if len(desc) > 240:
+                    cut = desc[:240]
+                    end = cut.rfind(". ")
+                    desc = cut[:end + 1] if end > 80 else cut.rsplit(" ", 1)[0] + "..."
+                st = {**st, "notes": desc}
+        stops.append(st)
+    return {**draft, "stops": stops}
+
+
 def _fmt_clock(t) -> str:
     m = re.match(r"^\s*(\d{1,2}):(\d{2})", str(t or ""))
     if not m:
@@ -461,7 +513,7 @@ def _fmt_clock(t) -> str:
     return f"{h % 12 or 12}:{mi:02d} {'AM' if h < 12 else 'PM'}"
 
 
-def format_itinerary_markdown(draft: dict) -> str:
+def format_itinerary_markdown(draft: dict, full_notes: bool = False) -> str:
     """The schedule as a readable list: one bold heading per day, one line per stop (time, place, short note)."""
     stops = [st for st in (draft.get("stops") or []) if isinstance(st, dict)]
     if not stops:
@@ -499,8 +551,9 @@ def format_itinerary_markdown(draft: dict) -> str:
             when = _fmt_clock(st.get("time"))
             name = str(st.get("placeName") or "Stop").strip()
             note = str(st.get("notes") or "").strip()
-            if len(note) > 80:
-                note = note[:77].rstrip() + "..."
+            limit = 400 if full_notes else 140
+            if len(note) > limit:
+                note = note[:limit - 3].rstrip() + "..."
             line = f"- **{when}** \u00b7 {name}" if when else f"- {name}"
             if note:
                 line += f" \u2014 {note}"
@@ -653,6 +706,7 @@ async def handle_itinerary_turn(request: "ChatRequest", verified_uid: str) -> di
         verified_places = {}
         for c in _place_cities:
             verified_places.update(get_city_data(c, None, None, set(), _per_city))
+        _full_places = verified_places            # full descriptions, used to fill in notes later
         verified_places = _slim_places(verified_places)
 
         # This was missing entirely before -- the itinerary LLM call had no memory of
@@ -713,6 +767,9 @@ RULES:
    short note about the weather if it matters. NEVER list, number or describe the stops, days, times or places
    in "reply" or "closing": the app prints the schedule by itself, right between the two. "closing" is one
    short question or next step (an empty string if there is nothing to add).
+   ALWAYS return the COMPLETE draft with every existing stop; never drop a stop unless the user asked to remove it.
+   When the user asks you to explain or describe the stops, write the "notes" of EVERY stop (1-2 short sentences:
+   what it is and what to see, eat or do there) and keep all the other fields as they are.
 8. This itinerary-building mode stays active for the rest of the conversation once started, even across
    messages that don't mention "itinerary" again -- that's expected, not a bug. If the user's latest
    message is clearly unrelated to the trip (small talk, an off-topic question), respond naturally to it
@@ -770,9 +827,14 @@ RULES:
             reply_text = "I'm having a little trouble organizing that -- could you tell me again which places and days you'd like?"
             candidate_draft = draft
 
+        _wants_detail = bool(re.search(r"\b(explain|explanation|details?|describe|tell me (?:more|about)|what do i get|what(?:'s| is) (?:there|special)|"
+                                       r"why|ipaliwanag|paliwanag|ano ang meron)\b", user_msg))
+        candidate_draft = keep_existing_stops(draft, candidate_draft, request.message)
+        if _wants_detail:
+            candidate_draft = fill_missing_notes(candidate_draft, _full_places)
         _same = json.dumps(candidate_draft.get("stops"), sort_keys=True) == json.dumps(draft.get("stops"), sort_keys=True)
         _asked_to_see = bool(re.search(r"\b(show|see|list|recap|summary|summarize|ipakita|ano na)\b", user_msg))
-        _schedule = format_itinerary_markdown(candidate_draft) if (not _same or _asked_to_see) else ""
+        _schedule = format_itinerary_markdown(candidate_draft, full_notes=_wants_detail) if (not _same or _asked_to_see or _wants_detail) else ""
         spoken_text = " ".join(x for x in (reply_text, closing) if x)
         if _schedule:
             reply_text = f"{reply_text}\n\n{_schedule}" + (f"\n\n{closing}" if closing else "")
