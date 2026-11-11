@@ -400,6 +400,59 @@ def clean_for_speech(text: str) -> str:
 _ENGLISH_HINTS = re.compile(r"\b(the|and|you|your|to|is|are|for|with|of|in|it|this|that|can|will|if|what|how|here|there|just|let|me|my)\b", re.IGNORECASE)
 
 
+_TL_RESPELL = [
+    (re.compile(r"\bdatabase(s?)\b", re.IGNORECASE), r"deytabeys"),                    # not "da-ta-ba-se"
+    (re.compile(r"\bspot(s?)\b", re.IGNORECASE), lambda m: "ispat" + m.group(1).lower()),   # "is-pat", not "is-pot"
+    (re.compile(r"\bexercis(?:e|es|ed|ing)\b", re.IGNORECASE), "eksersays"),              # not "jeksersays"
+    (re.compile(r"\bJos[e\u00e9]\b"), "Hose"),                                          # Spanish J: "Hose", not "Dyose"
+    (re.compile(r"\bJosefina\b"), "Hosefina"), (re.compile(r"\bJosefa\b"), "Hosefa"), (re.compile(r"\bJoselito\b"), "Hoselito"),
+    (re.compile(r"\bexpress\b", re.IGNORECASE), "ekspres"),
+    (re.compile(r"\bextra\b", re.IGNORECASE), "ekstra"),
+    (re.compile(r"\bwi-?fi\b", re.IGNORECASE), "wayfay"),
+]
+_TL_AFFIX = re.compile(r"\b(mag|nag|pag|ma|na|pa|ipa|ipag|mang|nang|pang)-(?=[A-Za-z])", re.IGNORECASE)
+
+
+_SAINT_PLACE = re.compile(r"^\s*(?:[A-Z][\w'.-]*\s+){0,3}?(?:Parish|Church|Cathedral|Shrine|Chapel|Basilica|Academy|School|College|University|Hospital|Seminary|Convent|Monastery)\b")
+_SAINT_LEAD = {"visit", "at", "in", "to", "the", "of", "from", "near", "by", "see", "attend", "go", "and", "or", "sa", "ng", "kay",
+               "malapit", "pumunta", "bisitahin", "puntahan", "simbahan", "parokya", "dasal", "magsimba"}
+
+
+def _st_sub(m) -> str:
+    """"St." is Street after a street name ("Mabini St.", "10th St.") and Saint before a name ("St. Joseph Parish")."""
+    before, after = m.string[:m.start()], m.string[m.end():]
+    prev = re.search(r"([A-Za-z0-9'.-]+)[\s,]*$", before)
+    prev_tok = prev.group(1) if prev else ""
+    nxt = re.match(r"\s*([A-Z][A-Za-z'-]*)", after)
+    end_dot = "." if not after.strip() or after.lstrip(" \t").startswith("\n") else ""     # keep the sentence pause
+    if re.fullmatch(r"\d+(?:st|nd|rd|th)?", prev_tok, re.IGNORECASE):
+        return "Street" + end_dot                                      # "10th St." / "123 St."
+    if nxt and _SAINT_PLACE.match(after):
+        return "Saint"                                                 # "St. Joseph Parish"
+    clause_start = (not before.strip()) or before.rstrip().endswith((",", "(", ".", ":", "-", "\u2014", "\u2013", "\n", ";"))
+    if nxt and (clause_start or prev_tok.lower() in _SAINT_LEAD):
+        return "Saint"                                                 # "Visit St. Jude", "near St. Peter"
+    if prev_tok and prev_tok[0].isupper():
+        return "Street" + end_dot                                      # "A. Mabini St. Maypajo", "Rizal St. corner"
+    return "Saint" if nxt else "Street" + end_dot
+
+
+def _normalize_speech(text: str, lang: str) -> str:
+    """Everything done to a reply's words before a voice reads them."""
+    t = text.replace("\u2011", "-").replace("\u2010", "-").replace("\u00ad", "")      # the model likes non-breaking hyphens
+    t = re.sub(r"\b(?:Brgy|Bgy)\b\.?", "Barangay", t, flags=re.IGNORECASE)               # "Brgy." was read as "birgi"
+    t = re.sub(r"\bSt\b\.?", _st_sub, t)
+    for pat, rep in ((r"\bAve\b\.?", "Avenue"), (r"\bBlvd\b\.?", "Boulevard"), (r"\bRd\b\.", "Road"), (r"\bHwy\b\.?", "Highway"),
+                     (r"\bBldg\b\.?", "Building"), (r"\bExt\b\.", "Extension"), (r"\bcor\b\.", "corner")):
+        t = re.sub(pat, rep, t)
+    t = _spoken_units(t, lang)
+    if lang == "TL":
+        t = _TL_AFFIX.sub(r"\1 ", t)                   # "mag-exercise" -> "mag exercise": keeps the voice from gluing the words
+        for pat, rep in _TL_RESPELL:
+            t = pat.sub(rep, t)
+    return t
+
+
 def pick_voice_lang(text: str, declared: str = "EN") -> str:
     """Pick the voice from the words themselves. The model's EN/TL tag is only a hint, and one wrong tag makes a
     Filipino voice mangle English (or the other way round)."""
@@ -426,7 +479,7 @@ def _spoken_units(text: str, lang: str) -> str:
                 part = "ng tanghali" if h == 12 else ("ng hapon" if h < 6 else "ng gabi")
             return f"{h}{mins} {part}"
         return f"{h}{mins} {'A M' if ap == 'a' else 'P M'}"           # spelled out so the voice says "A M", not "am"
-    text = re.sub(r"\b(\d{1,2})(?::(\d{2}))?\s*([AaPp])\.?\s?[Mm]\b\.?", _time, text)
+    text = re.sub(r"\b(\d{1,2})(?::(\d{2}))?\s*([AaPp])(?:\.\s?[Mm]\b\.?|\s?[Mm]\b)", _time, text)   # "p.m." yes; the full stop after "PM." stays
     t = re.sub(r"(\d)\s*\u00b0\s*C\b", r"\1 digri Celsius" if tl else r"\1 degrees Celsius", text)
     t = re.sub(r"(\d)\s*%", r"\1 porsyento" if tl else r"\1 percent", t)
     t = re.sub(r"(\d)\s*km/h\b", r"\1 kilometro kada oras" if tl else r"\1 kilometers per hour", t)
@@ -1069,20 +1122,66 @@ TL_VOICE = os.environ.get("TL_VOICE", "fil-PH-BlessicaNeural")   # the other fre
 EN_VOICE = os.environ.get("EN_VOICE", "en-US-JennyNeural")
 
 
-async def generate_speech_base64(text: str, mood: str, lang: str = "EN") -> str:
-    """Generates natural neural TTS audio with a sassy, smart AI assistant vibe.
+TTS_ATTEMPT_TIMEOUT = 12     # seconds per try, per piece (it used to be ONE 8 second limit for the whole reply)
+TTS_ATTEMPTS = 3
+TTS_CHUNK_CHARS = 240
+TTS_PARALLEL = 3
 
-    Edge TTS only speaks one language well per voice. We don't have budget for a
-    proper multilingual engine, so instead of always using the English voice (which
-    mispronounces Tagalog badly), we pick between two free Edge TTS voices based on
-    which language actually dominates THIS reply: an English voice for English/mostly-
-    English replies, and a real Filipino neural voice for Tagalog/mostly-Tagalog ones.
-    Genuinely mixed-language sentences will still favor whichever voice was picked --
-    that's an inherent limit of single-language TTS, not something free tooling can fix.
-    """
+
+def _split_for_tts(text: str, limit: int = TTS_CHUNK_CHARS) -> list:
+    """Sentences, packed into pieces of at most `limit` characters (long sentences are cut at commas, then spaces)."""
+    pieces = []
+    for sent in re.split(r"(?<=[.!?])\s+", text.strip()):
+        sent = sent.strip()
+        while len(sent) > limit:
+            cut = sent.rfind(",", 0, limit)
+            if cut < limit // 3:
+                cut = sent.rfind(" ", 0, limit)
+            if cut <= 0:
+                cut = limit
+            pieces.append(sent[:cut + 1].strip())
+            sent = sent[cut + 1:].strip()
+        if sent:
+            pieces.append(sent)
+    chunks, cur = [], ""
+    for p in pieces:
+        if cur and len(cur) + 1 + len(p) > limit:
+            chunks.append(cur)
+            cur = p
+        else:
+            cur = f"{cur} {p}".strip()
+    if cur:
+        chunks.append(cur)
+    return chunks
+
+
+async def _tts_piece(piece: str, voice: str, rate: str, pitch: str) -> bytes:
+    """One piece of speech, with retries: Microsoft's endpoint sometimes stalls or drops a connection."""
+    for attempt in range(TTS_ATTEMPTS):
+        try:
+            communicate = edge_tts.Communicate(piece, voice, rate=rate, pitch=pitch)
+
+            async def _collect() -> bytes:
+                data = b""
+                async for chunk in communicate.stream():
+                    if chunk["type"] == "audio":
+                        data += chunk["data"]
+                return data
+            data = await asyncio.wait_for(_collect(), timeout=TTS_ATTEMPT_TIMEOUT)
+            if data:
+                return data
+        except Exception as e:
+            print(f"Edge-TTS piece failed (try {attempt + 1}/{TTS_ATTEMPTS}): {type(e).__name__}: {str(e)[:120]}")
+        await asyncio.sleep(0.4 * (attempt + 1))
+    return b""
+
+
+async def generate_speech_base64(text: str, mood: str, lang: str = "EN") -> str:
+    """Neural TTS for a reply. Long replies are split into short pieces that are spoken in parallel, so a long
+    places list works as reliably as a one-liner. The voice follows the words (see pick_voice_lang)."""
     try:
         lang = pick_voice_lang(text, lang)             # trust the words over the model's tag
-        text = _spoken_units(text, lang)
+        text = _normalize_speech(text, lang)
         voice = TL_VOICE if lang == "TL" else EN_VOICE
         if lang == "TL":
             # Filipino neural voices sound most natural at their default speed and pitch, so barely touch them
@@ -1099,30 +1198,32 @@ async def generate_speech_base64(text: str, mood: str, lang: str = "EN") -> str:
             elif mood == "SAD":
                 rate, pitch = "-5%", "-6Hz"
 
-        communicate = edge_tts.Communicate(text, voice, rate=rate, pitch=pitch)
+        chunks = _split_for_tts(text)
+        if not chunks:
+            return ""
+        gate = asyncio.Semaphore(TTS_PARALLEL)
 
-        async def _collect() -> bytes:
-            data = b""
-            async for chunk in communicate.stream():
-                if chunk["type"] == "audio":
-                    data += chunk["data"]
-            return data
+        async def _run(piece: str) -> bytes:
+            async with gate:
+                return await _tts_piece(piece, voice, rate, pitch)
 
-        # Never let voice generation hold the whole reply hostage: if Microsoft's endpoint is slow
-        # or blocked, give up after a few seconds and let the client show the text immediately.
-        audio_bytes = await asyncio.wait_for(_collect(), timeout=TTS_TIMEOUT_SECONDS)
-        return base64.b64encode(audio_bytes).decode('utf-8')
-    except asyncio.TimeoutError:
-        print(f"Edge-TTS Timeout: no audio after {TTS_TIMEOUT_SECONDS}s, replying with text only")
-        return ""
+        parts = await asyncio.gather(*[_run(c) for c in chunks])
+        audio_bytes = b"".join(p for p in parts if p)      # same format for every piece, so the clips simply join up
+        if not audio_bytes:
+            print("Edge-TTS: no audio produced, replying with text only")
+            return ""
+        if any(not p for p in parts):
+            print(f"Edge-TTS: {sum(1 for p in parts if not p)} of {len(parts)} pieces failed even after retries")
+        return base64.b64encode(audio_bytes).decode("utf-8")
     except Exception as e:
-        print(f"Edge-TTS Error: {e}")
+        print(f"Edge-TTS Error: {type(e).__name__}: {e}")
         return ""
+
 
 @app.post("/tts")
 async def tts(req: TTSRequest, user: dict = Depends(verify_firebase_token)):
     """On-demand voice for a reply the client already displayed."""
-    text = clean_for_speech(req.text)[:1500]
+    text = clean_for_speech(req.text)[:4000]
     if not text:
         return {"audio": ""}
     lang = req.lang if req.lang in ("EN", "TL") else "EN"
@@ -1235,6 +1336,11 @@ async def transcribe_audio(http_request: Request, file: UploadFile = File(...), 
             }
             if language:
                 kwargs["language"] = language
+            else:
+                # A short Taglish primer keeps code-switched speech spelled as it was spoken (Whisper otherwise often
+                # decides "English" and writes Tagalog words as English guesses).
+                kwargs["prompt"] = ("Kumusta, Navi! Gusto kong pumunta sa Caloocan, Malabon, Navotas o Valenzuela. Saan masarap kumain? "
+                                    "Anong magandang puntahan, simbahan, park, mag-exercise, barangay. Where can I eat? Thank you po.")
             transcription = await run_in_threadpool(lambda: primary_client.audio.transcriptions.create(**kwargs))
 
         return {"text": clean_transcription(transcription)}
@@ -2365,6 +2471,12 @@ async def prepare_chat_turn(request: "ChatRequest", verified_uid: str, status=No
     default_cities = [c for c in CITY_KEYS if c not in avoided_cities and c not in remembered_avoid_cities] or [c for c in CITY_KEYS if c not in avoided_cities]
     cities_for_data = [c for c in (wanted_cities or ([named_city] if named_city in CITY_KEYS else []) or default_cities) if c in CITY_KEYS]
     time_block = current_time_block()
+    voice_note = ""
+    if request.want_audio:      # voice (Live) conversation: the message came from speech recognition
+        _recent_user = [m.get("content", "") for m in request.history if m.get("role") == "user"][-4:]
+        if sum(1 for t in _recent_user if _TAGALOG_HINTS.search(t)) >= 2 and len(_TAGALOG_HINTS.findall(request.message)) < 2:
+            voice_note = ("\nLANGUAGE NOTE: this message was typed by speech recognition, which often writes spoken Taglish as English. "
+                          "The user has been speaking Tagalog/Taglish, so keep replying in natural Taglish, not plain English.\n")
     weather_block = ""
     asks_here = bool(_LOCATION_ASK.search(request.message))
     recent_text = " ".join(m.get("content", "") for m in request.history[-6:])
@@ -2525,7 +2637,7 @@ VERIFIED DATABASE FACTS (places you're allowed to recommend by name):
 PLACES THE USER IS ASKING ABOUT BY NAME (matched in the database -- these ARE verified; [] means the
 user didn't name a specific place). A name here is a PLACE, never a person:
 {named_context}
-{state_block}{directions_block}{memory_block}{time_block}{weather_block}
+{state_block}{directions_block}{memory_block}{time_block}{voice_note}{weather_block}
 GROUND RULES (these still apply, always):
 1. When you DO name a specific place, it must come from VERIFIED DATABASE FACTS or PLACES THE USER IS
    ASKING ABOUT BY NAME above -- never invent a
@@ -3019,6 +3131,32 @@ async def get_session(session_id: str, user: dict = Depends(verify_firebase_toke
     except Exception as e:
         print(f"[FIRESTORE GET ERROR] {e}")
         raise HTTPException(status_code=500, detail="Failed to load session")
+
+
+@app.delete("/sessions")
+async def delete_all_sessions(user: dict = Depends(verify_firebase_token)):
+    """Delete every saved chat of the signed-in user (the sidebar's "Delete all")."""
+    verified_uid = user.get("uid")
+    if not firebase_active or db is None or not verified_uid or verified_uid in GUEST_LIKE_UIDS:
+        return {"deleted": 0}
+
+    def _wipe() -> int:
+        col = db.collection("users").document(verified_uid).collection("sessions")
+        total = 0
+        while True:
+            docs = list(col.limit(400).stream())
+            if not docs:
+                return total
+            batch = db.batch()
+            for d in docs:
+                batch.delete(d.reference)
+            batch.commit()
+            total += len(docs)
+    try:
+        return {"deleted": await run_in_threadpool(_wipe)}
+    except Exception as e:
+        print(f"[FIRESTORE DELETE ALL ERROR] {e}")
+        return {"deleted": 0, "error": True}
 
 
 @app.delete("/sessions/{session_id}")
