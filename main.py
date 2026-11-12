@@ -922,7 +922,7 @@ RULES:
    When the user asks you to explain or describe the stops, write the "notes" of EVERY stop (1-2 short sentences:
    what it is and what to see, eat or do there) and keep all the other fields as they are.
    If the user asks how to get somewhere, never describe routes or transport; tell them to use Google Maps, Waze, the
-   CamaNaviGo app's navigation, or Angkas, Joyride or Grab.
+   NaviGo! app's navigation, or Angkas, Joyride or Grab.
 8. This itinerary-building mode stays active for the rest of the conversation once started, even across
    messages that don't mention "itinerary" again -- that's expected, not a bug. If the user's latest
    message is clearly unrelated to the trip (small talk, an off-topic question), respond naturally to it
@@ -1226,16 +1226,17 @@ async def _tts_piece(piece: str, voice: str, rate: str, pitch: str, volume: str 
     return b""
 
 
-# Both voices are lifted a little so they sound younger and happier (and less flat). VOICE_SEMITONES is the knob:
-# 0 = each voice's own pitch, 2 = a bit childlike (default), 4 = very childish. Emotions still come through: a happy
-# reply is brighter and quicker, a sad one is lower and slower.
-VOICE_SEMITONES = float(os.environ.get("VOICE_SEMITONES", "2.0"))
+# Normal-sounding voices that are warm and happy rather than grumpy: just a small lift above each voice's own pitch and a
+# lively (not rushed) pace. VOICE_SEMITONES is the knob: 0 = the voice's own pitch, 0.5 = gently brighter (default),
+# 1.5 = clearly bright; anything near 2 and above starts to sound childish. Emotions still come through: a happy reply is
+# brighter and quicker, a sad one is lower and slower.
+VOICE_SEMITONES = float(os.environ.get("VOICE_SEMITONES", "0.5"))
 _VOICE_BASE_HZ = {"fil-PH-BlessicaNeural": 215, "fil-PH-AngeloNeural": 125, "en-US-JennyNeural": 215}
 
 
 def _voice_prosody(voice: str, mood: str):
     """(rate, pitch, volume) strings for edge-tts. Pitch is given in semitones and converted to Hz for this voice."""
-    shift, rate, vol = {"HAPPY": (1.0, 12, 4), "SAD": (-1.5, -8, -3)}.get(mood, (0.0, 6, 0))
+    shift, rate, vol = {"HAPPY": (0.7, 8, 3), "SAD": (-1.5, -8, -3)}.get(mood, (0.0, 3, 0))
     hz = round(_VOICE_BASE_HZ.get(voice, 200) * (2 ** ((VOICE_SEMITONES + shift) / 12) - 1))
     return f"{rate:+d}%", f"{hz:+d}Hz", f"{vol:+d}%"
 

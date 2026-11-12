@@ -265,7 +265,7 @@
             background: linear-gradient(to bottom, transparent 0%, var(--void) 74%);
         }
 
-        /* Ambient glow: wide, soft colour washes that flow sideways across the top of the screen (not discrete
+        /* Ambient glow (dark and light blues): wide, soft colour washes that flow sideways across the top of the screen (not discrete
            blobs). Two bands with different colour orders, speeds and directions overlap, so every hue (blue,
            purple, pink, coral, amber, teal) keeps sliding past and blending into the next. Each band is twice
            the screen width with a seamless, repeating colour sequence and only moves by transform, which the
@@ -281,20 +281,20 @@
         }
         .glow-band-1 {
             height: 100%;
-            opacity: 0.5;
+            opacity: 0.58;
             background: linear-gradient(112deg,
-                #4da3ff, #2dd4bf, #4da3ff, #a78bfa, #f472b6, #fb7185, #fbbf24,
-                #fb7185, #f472b6, #a78bfa, #4da3ff, #2dd4bf, #4da3ff, #a78bfa,
-                #f472b6, #fb7185, #fbbf24, #fb7185, #f472b6, #a78bfa, #4da3ff);
+                #1e3a8a, #2563eb, #60a5fa, #bfdbfe, #93c5fd, #3b82f6, #1d4ed8,
+                #8ab4ff, #2563eb, #1e3a8a, #1e3a8a, #2563eb, #60a5fa, #bfdbfe,
+                #93c5fd, #3b82f6, #1d4ed8, #8ab4ff, #2563eb, #1e3a8a, #1e3a8a);
             animation: glow-flow-a 28s linear infinite;
         }
         .glow-band-2 {
             height: 106%;
-            opacity: 0.32;
+            opacity: 0.38;
             background: linear-gradient(68deg,
-                #f472b6, #fb7185, #fbbf24, #fb7185, #f472b6, #a78bfa, #4da3ff,
-                #2dd4bf, #4da3ff, #a78bfa, #f472b6, #fb7185, #fbbf24, #fb7185,
-                #f472b6, #a78bfa, #4da3ff, #2dd4bf, #4da3ff, #a78bfa, #f472b6);
+                #93c5fd, #3b82f6, #1d4ed8, #8ab4ff, #2563eb, #1e3a8a, #1e3a8a,
+                #2563eb, #60a5fa, #bfdbfe, #93c5fd, #3b82f6, #1d4ed8, #8ab4ff,
+                #2563eb, #1e3a8a, #1e3a8a, #2563eb, #60a5fa, #bfdbfe, #93c5fd);
             animation: glow-flow-b 36s linear infinite;
         }
         html[data-theme="light"] .glow-band-1 { opacity: 0.38; }
@@ -361,11 +361,8 @@
             flex-shrink: 0;
         }
 
-        .avatar {
-            width: 100%; height: 100%;
-            border-radius: 4px;
-            object-fit: contain;
-        }
+        .sidebar-ico { width: 20px; height: 20px; color: var(--fore); display: block; }
+        .avatar-wrap:hover .sidebar-ico { color: var(--fore); }
 
         .name-tag {
             font-family: var(--font-display);
@@ -1578,11 +1575,13 @@
 
     <div class="top-nav">
         <div class="top-identity">
-            <button class="avatar-wrap" id="navi-avatar-wrap" onclick="toggleSidebar()" aria-label="Open chat history">
-                <img src="https://cdn.jsdelivr.net/gh/altianalbertsebastian10-tech/camanava-bot@main/navi_avatar.png" 
-                    class="avatar" 
-                    id="navi-avatar" 
-                    alt="">
+            <button class="avatar-wrap" id="navi-avatar-wrap" onclick="toggleSidebar()" title="Chat history" aria-label="Open chat history sidebar">
+                <!-- sidebar icon (not the mascot, so it reads as a menu button) -->
+                <svg class="sidebar-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <rect x="3" y="4" width="18" height="16" rx="3.5"/>
+                    <path d="M9.5 4v16"/>
+                    <path d="M5.9 8.6h0.01M5.9 11.6h0.01" stroke-width="2.4"/>
+                </svg>
             </button>
             <h1 class="name-tag">Navi</h1>
         </div>
