@@ -1542,9 +1542,11 @@ def analyze_conversation(message: str, history: list) -> dict:
         wanted_cities = [c for c in last_pos_cities if c not in avoided_cities]
     if not wanted_cities:      # last resort: the most recent city either side talked about
         for m in reversed(history or []):
-            hit = next((c for c in CITY_KEYS if re.search(CITY_ALIASES.get(c, c), m.get("content", ""), re.IGNORECASE) and c not in avoided_cities), None)
-            if hit:
-                wanted_cities = [hit]
+            hits = [c for c in CITY_KEYS if re.search(CITY_ALIASES.get(c, c), m.get("content", ""), re.IGNORECASE) and c not in avoided_cities]
+            if m.get("role") != "user" and len(hits) != 1:
+                continue        # Navi's own "Caloocan, Malabon, Navotas or Valenzuela?" greeting is a list, not a choice
+            if hits:
+                wanted_cities = hits if m.get("role") == "user" else hits[:1]
                 break
     wanted_cats = cur_pos_cats or [c for c in last_pos_cats if c not in avoided_cats]
     wanted_cats = [c for c in wanted_cats if c not in avoided_cats]
@@ -2603,6 +2605,8 @@ async def prepare_chat_turn(request: "ChatRequest", verified_uid: str, status=No
     # ---- the conversation state the model must respect ----
     LLM_CONTEXT_TURNS = 16
     state_lines = []
+    if not wanted_cities and not named_city and not named_places:
+        state_lines.append("- The user has NOT chosen a city. Do not assume or default to any city (never Caloocan by default): use the verified places from all the cities listed below, or ask which city they prefer.")
     if wanted_cities: state_lines.append("- Cities the user wants right now: " + ", ".join(c.title() for c in wanted_cities) + ".")
     if avoided_cities: state_lines.append("- Cities the user does NOT want: " + ", ".join(c.title() for c in sorted(avoided_cities)) + ". Don't recommend them or list them as options (unless the user asks about them again).")
     if wanted_cats: state_lines.append("- Kinds of places they want: " + ", ".join(CATEGORY_LABELS.get(k, k) for k in wanted_cats) + ".")
@@ -2702,9 +2706,10 @@ GROUND RULES (these still apply, always):
 2. If VERIFIED DATABASE FACTS is empty ({{}}) or has nothing matching what the user is actually asking
    for, that is not something to work around by inventing a plausible-sounding answer -- it is a hard
    stop. Say so plainly and honestly (e.g. "I don't have a specific spot verified for that right now")
-   and either offer the closest thing that IS in the data, or give general, non-specific guidance (e.g.
-   "you could check around the public market area") WITHOUT naming a business, address, or vendor that
-   isn't in the data. An empty or non-matching database is a real, common case, not a failure state to
+   and either offer the closest thing that IS in the data (from any city), or ask one short question
+   (which city, or what kind of place). Do NOT guess where such places can "usually" be found (no "check
+   around the public market", "near City Hall", "along the main road" and the like): you have no data
+   for that, so it would be made up. If the user hasn't chosen a city, never assume one. An empty or non-matching database is a real, common case, not a failure state to
    paper over -- handle it the same way, every time, no exceptions for how confident or locally-authentic
    your guess would sound.
 3. NEVER state specific prices, peso amounts, menu items, dishes sold, or vendor/stall claims for a place
