@@ -1300,15 +1300,17 @@
         #live-overlay[data-state="error"] .live-badge-dot { background: #8b8f9a; box-shadow: none; }
 
         /* --- LIVE MASCOT STAGE ---
-           Navi's mascot sits in the middle of the stage: navi_speaking.webp while Navi talks, navi_resting.webp the rest of
-           the time. Behind it a canvas (drawn in JS, see liveWave) paints a soft blue pulse and rings that radiate outward.
-           The wrapper keeps id="live-orb" so tap-to-send / interrupt and the audio-level hook (--audio-scale) keep working. */
+           Same place the wave used to be (captions untouched). Navi's mascot sits in it: navi_speaking.webp while Navi talks,
+           navi_resting.webp the rest of the time. It never grows or shrinks. Behind it a canvas paints one calm blue gradient
+           glow (see liveWave) whose size and tint ease along with the voice. The wrapper keeps id="live-orb" so tap-to-send /
+           interrupt keep working. The stage is centred at 44% of the screen height; --mascot-y is where the mascot's centre sits
+           in the stage (keep CY in liveWave in step). */
         .live-orb {
+            --mascot-y: 50%;
             position: absolute;
             left: 0; right: 0;
-            top: calc(64px + env(safe-area-inset-top));
-            bottom: calc(262px + env(safe-area-inset-bottom));
-            display: flex; align-items: center; justify-content: center;
+            top: calc(44% - var(--stage-h) / 2);       /* centred a little above the middle of the screen, clear of the captions */
+            height: var(--stage-h);
             cursor: pointer;
             -webkit-tap-highlight-color: transparent;
             opacity: 0;
@@ -1318,16 +1320,21 @@
         #live-overlay.is-active .live-orb { opacity: 1; transform: translateY(0); }
         #live-overlay[data-state="error"] .live-orb { opacity: 0.35; filter: grayscale(1); }
         .live-orb:focus-visible { outline: 2px solid rgba(255,255,255,0.6); outline-offset: -4px; }
-        #live-wave { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: block; pointer-events: none; }
+        /* the glow canvas reaches above and below the stage so the gradient fades out softly instead of being cut off */
+        #live-wave { position: absolute; left: 0; top: -60%; width: 100%; height: 180%; display: block; pointer-events: none; }
         .live-mascot {
-            position: relative; z-index: 1;
-            display: block; height: min(58%, 270px); width: auto; max-width: 80%;
+            position: absolute; z-index: 1;
+            left: 50%; top: var(--mascot-y);
+            transform: translate(-50%, -50%);                 /* centring only: the mascot itself never scales */
+            height: calc(var(--stage-h) * 0.5); max-height: 240px; width: auto; max-width: 70%;
             object-fit: contain; pointer-events: none; user-select: none; -webkit-user-drag: none;
-            transform: scale(var(--audio-scale, 1));          /* swells a little with Navi's voice */
-            transition: transform 0.09s linear;
         }
         .live-mascot[hidden] { display: none; }
-        @media (prefers-reduced-motion: reduce) { .live-mascot { transform: none; } }
+        /* very short screens: a bit higher and smaller so the mascot never sits behind a long caption */
+        @media (max-height: 560px) {
+            .live-orb { top: calc(40% - var(--stage-h) / 2); }
+            .live-mascot { height: calc(var(--stage-h) * 0.42); }
+        }
 
         /* --- STATUS + TRANSCRIPT --- */
         .live-status-text {
@@ -4531,68 +4538,41 @@
         liveSpectrum.stamp = performance.now();
     }
 
-    // --- LIVE PULSE RENDERER ---
-    // A soft blue glow behind the mascot, plus rings that radiate outward like a pulse.
-    //  - speaking: the glow swells and a ring is sent out with the loudness of Navi's voice
-    //  - listening / resting: a calm breathing glow with a faint ring now and then
-    //  - thinking: a steady, quicker rhythm
+    // --- LIVE GLOW RENDERER ---
+    // One calm blue gradient behind the mascot. No rings, no beats: it only eases, slowly, along with the voice.
+    //  - listening: follows the user's voice (their mic);  speaking: follows Navi's voice
+    //  - bass makes the outer halo bigger and a deeper blue; bright, high tones lift the core and cool the tint
+    //  - everything is low-pass filtered (quick-ish to rise, much slower to fall) so it can never flicker or jump
+    //  - thinking / resting: only a very slow breathing
     const liveWave = (() => {
         const canvas = document.getElementById('live-wave');
         const ctx = canvas.getContext('2d');
-        const TAU = Math.PI * 2;
-        const PULSE = [77, 163, 255];          // the mascot's blue: change this one line to retune the glow and the rings
-        // glow: base brightness, ring: strength of the idle rings (0 = none), gap: seconds between them
-        const TARGET = {
-            idle:      { glow: 0.14, ring: 0.00, gap: 3.6 },
-            listening: { glow: 0.20, ring: 0.16, gap: 2.6 },
-            thinking:  { glow: 0.26, ring: 0.30, gap: 1.0 },
-            speaking:  { glow: 0.30, ring: 0.40, gap: 0.7 },
-            error:     { glow: 0.06, ring: 0.00, gap: 4.0 }
-        };
-        const sm = { level: 0 };
-        let raf = 0, W = 0, H = 0, dpr = 1, last = 0, tick = 0, lite = false, reduce = false;
-        let glow = 0.14, nextRing = 0;
-        const rings = [];
+        const PULSE = [77, 163, 255];          // the mascot's blue: change this one line to retune the glow
+        const DEEP  = [46, 104, 255];          // tint for low voices
+        const LIGHT = [118, 208, 255];         // tint for high voices
+        const CY = (0.50 + 0.60) / 1.80;       // mascot centre inside the canvas (stage 50%, canvas starts 60% above and is 180% tall)
+        const GLOW = { idle: 0.13, listening: 0.17, thinking: 0.21, speaking: 0.20, error: 0.05 };   // resting brightness per state
+        const sm = { level: 0, low: 0, high: 0, tint: 0.4 };
+        let raf = 0, W = 0, H = 0, dpr = 1, last = 0, tick = 0, lite = false, reduce = false, glow = 0.13;
 
         function resize() {
-            dpr = Math.min(window.devicePixelRatio || 1, lite ? 1.5 : 2);
+            dpr = Math.min(window.devicePixelRatio || 1, lite ? 1.25 : 2);
             W = Math.max(1, Math.round(canvas.clientWidth * dpr));
             H = Math.max(1, Math.round(canvas.clientHeight * dpr));
             if (canvas.width !== W) canvas.width = W;
             if (canvas.height !== H) canvas.height = H;
         }
-        function rgba(c, a) { return 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',' + Math.max(0, a).toFixed(3) + ')'; }
-        function spawn(strength) {
-            rings.push({ age: 0, life: 2.4 - strength * 0.8, a: strength });
-            if (rings.length > (lite ? 3 : 6)) rings.shift();
-        }
-
-        function draw(now, st, lv) {
-            ctx.clearRect(0, 0, W, H);
-            const cx = W / 2, cy = H / 2, base = Math.min(W, H) * 0.22;
-            const breathe = reduce ? 0 : 0.05 * Math.sin(now / 1000 * (st === 'thinking' ? 3.2 : 1.3));
-            const R = base * (1.4 + lv * 0.4 + breathe);
-            const g = ctx.createRadialGradient(cx, cy, base * 0.2, cx, cy, R * 1.6);
-            const ga = glow + lv * 0.30;
-            g.addColorStop(0, rgba(PULSE, ga * 0.9));
-            g.addColorStop(0.55, rgba(PULSE, ga * 0.32));
-            g.addColorStop(1, rgba(PULSE, 0));
+        function mix(a, b, m) { return [a[0] + (b[0] - a[0]) * m, a[1] + (b[1] - a[1]) * m, a[2] + (b[2] - a[2]) * m]; }
+        function rgba(c, a) { return 'rgba(' + Math.round(c[0]) + ',' + Math.round(c[1]) + ',' + Math.round(c[2]) + ',' + Math.min(0.62, Math.max(0, a)).toFixed(3) + ')'; }
+        // Eases toward a target: rises over roughly half a second, falls over a couple of seconds
+        function follow(cur, tgt, dt, up, down) { return cur + (tgt - cur) * (1 - Math.exp(-dt * (tgt > cur ? up : down))); }
+        function blob(cx, cy, R, c, a) {
+            const g = ctx.createRadialGradient(cx, cy, R * 0.05, cx, cy, R);
+            g.addColorStop(0, rgba(c, a));
+            g.addColorStop(0.5, rgba(c, a * 0.4));
+            g.addColorStop(1, rgba(c, 0));
             ctx.fillStyle = g;
-            ctx.fillRect(0, 0, W, H);
-            // rings: each starts just outside the mascot, spreads out and fades away
-            for (let i = 0; i < rings.length; i++) {
-                const r = rings[i], p = r.age / r.life;
-                const rad = base * (1.25 + p * 0.95), th = base * (0.08 + p * 0.10);
-                const al = r.a * Math.pow(1 - p, 1.6) * 0.9;
-                const rg = ctx.createRadialGradient(cx, cy, Math.max(0, rad - th), cx, cy, rad + th);
-                rg.addColorStop(0, rgba(PULSE, 0));
-                rg.addColorStop(0.5, rgba(PULSE, al));
-                rg.addColorStop(1, rgba(PULSE, 0));
-                ctx.fillStyle = rg;
-                ctx.beginPath();
-                ctx.arc(cx, cy, rad + th, 0, TAU);
-                ctx.fill();
-            }
+            ctx.fillRect(cx - R, cy - R, R * 2, R * 2);
         }
 
         function frame(now) {
@@ -4600,36 +4580,38 @@
             if (lite && (tick++ & 1)) return;       // ~30fps on weaker phones
             const dt = Math.min(0.05, ((now - last) / 1000) || 0.016);
             last = now;
+            const st = GLOW[liveState] !== undefined ? liveState : 'idle';
+            const calm = reduce ? 0.5 : 1;          // "reduce motion": respond half as fast
 
-            const st = TARGET[liveState] ? liveState : 'idle';
-            const tg = TARGET[st];
-
-            // Loudness of Navi's voice: live data while it is fresh, otherwise the simple level the audio hook sets
-            const fresh = (now - liveSpectrum.stamp) < 180;
-            let fallback = 0;
-            if (!fresh) {
-                const raw = parseFloat(orb.style.getPropertyValue('--audio-scale')) || 1;
-                fallback = Math.max(0, Math.min(1, (raw - 1) / 0.25));
-            }
-            const lvTgt = fresh ? liveSpectrum.level : fallback;
-            sm.level += (lvTgt - sm.level) * Math.min(1, dt * (lvTgt > sm.level ? 14 : 4));
-            const lv = st === 'speaking' ? Math.min(1, sm.level * 3) : 0;
-
-            glow += (tg.glow - glow) * Math.min(1, dt * 2.2);
-
-            if (!reduce) {
-                nextRing -= dt;
-                if (st === 'speaking') {
-                    if (lv > 0.18 && nextRing <= 0) { spawn(0.28 + lv * 0.7); nextRing = 0.62 - lv * 0.35; }
-                } else if (tg.ring > 0 && nextRing <= 0) {
-                    spawn(tg.ring); nextRing = tg.gap;
+            // The voice that matters right now: the user's while listening, Navi's while speaking
+            let lvT = 0, lowT = 0, highT = 0, tintT = sm.tint;
+            if (st === 'listening' || st === 'speaking') {
+                const fresh = (now - liveSpectrum.stamp) < 220;
+                if (fresh) {
+                    lvT = Math.min(1, liveSpectrum.level * 2.2);
+                    lowT = Math.min(1, (liveSpectrum.bands[0] + liveSpectrum.bands[1]) * 0.7);
+                    highT = Math.min(1, (liveSpectrum.bands[3] + liveSpectrum.bands[4]) * 0.7);
+                    tintT = Math.max(0, Math.min(1, (liveSpectrum.centroid - 0.15) / 0.55));
+                } else if (st === 'speaking') {
+                    const raw = parseFloat(orb.style.getPropertyValue('--audio-scale')) || 1;   // simple loudness if no spectrum
+                    lvT = Math.max(0, Math.min(1, (raw - 1) / 0.25)) * 0.6;
+                    lowT = highT = lvT * 0.6;
                 }
             }
-            for (let i = rings.length - 1; i >= 0; i--) {
-                rings[i].age += dt;
-                if (rings[i].age >= rings[i].life) rings.splice(i, 1);
-            }
-            draw(now, st, lv);
+            sm.level = follow(sm.level, lvT, dt * calm, 2.4, 0.9);
+            sm.low   = follow(sm.low,   lowT, dt * calm, 2.0, 0.8);
+            sm.high  = follow(sm.high,  highT, dt * calm, 2.0, 0.8);
+            sm.tint  = follow(sm.tint,  tintT, dt * calm, 1.2, 1.2);
+            glow = follow(glow, GLOW[st], dt, 1.2, 1.2);
+
+            const breathe = reduce ? 0 : 0.03 * Math.sin(now / 1000 * (st === 'thinking' ? 1.7 : 0.9));
+            const u = Math.min(W, H / 1.8), base = u * 0.27;
+            const cx = W / 2, cy = H * CY;
+            const tint = mix(DEEP, LIGHT, sm.tint);
+            ctx.clearRect(0, 0, W, H);
+            blob(cx, cy, Math.min(base * (2.05 + 0.30 * sm.low + breathe), W * 0.56), tint, glow * 0.7 + 0.14 * sm.low);              // outer halo: bass
+            blob(cx, cy, base * (1.5 + 0.20 * sm.level + breathe), mix(PULSE, tint, 0.25), glow + 0.20 * sm.level);                  // main glow: loudness
+            if (!lite) blob(cx, cy, base * (1.0 + 0.12 * sm.high + breathe), mix(LIGHT, [255, 255, 255], 0.25), glow * 0.5 + 0.18 * sm.high + 0.06 * sm.level);   // core: bright tones
         }
 
         window.addEventListener('resize', () => { if (raf) resize(); });
@@ -4646,7 +4628,6 @@
             stop() {
                 if (isLiveModeActive) return;        // reopened in the meantime
                 cancelAnimationFrame(raf); raf = 0;
-                rings.length = 0;
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
             }
         };

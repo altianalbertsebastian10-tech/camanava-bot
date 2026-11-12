@@ -454,6 +454,7 @@ _TL_RESPELL = [
     (re.compile(r"\bextra\b", re.IGNORECASE), "ekstra"),
     (re.compile(r"\bwi-?fi\b", re.IGNORECASE), "wayfay"),
 ]
+EN_CAMANAVA = "Kahmahnahvah"        # how the English voice should say CAMANAVA: "Kah-mah-nah-vah"
 _TL_AFFIX = re.compile(r"\b(mag|nag|pag|ma|na|pa|ipa|ipag|mang|nang|pang)-(?=[A-Za-z])", re.IGNORECASE)
 
 
@@ -490,6 +491,9 @@ def _normalize_speech(text: str, lang: str) -> str:
                      (r"\bBldg\b\.?", "Building"), (r"\bExt\b\.", "Extension"), (r"\bcor\b\.", "corner")):
         t = re.sub(pat, rep, t)
     t = _spoken_units(t, lang)
+    if lang == "EN":
+        t = re.sub(r"\bKamanava\b", EN_CAMANAVA, t, flags=re.IGNORECASE)                 # not "Ka-MAY-na-va"
+        t = re.sub(r"\b(\w*?)silog\b", lambda m: m.group(1) + "seelohg", t, flags=re.IGNORECASE)   # "see-lohg" (tapsilog, bangsilog...), not "sigh-log"
     if lang == "TL":
         t = _TL_AFFIX.sub(r"\1 ", t)                   # "mag-exercise" -> "mag exercise": keeps the voice from gluing the words
         for pat, rep in _TL_RESPELL:
@@ -1201,11 +1205,11 @@ def _split_for_tts(text: str, limit: int = TTS_CHUNK_CHARS) -> list:
     return chunks
 
 
-async def _tts_piece(piece: str, voice: str, rate: str, pitch: str) -> bytes:
+async def _tts_piece(piece: str, voice: str, rate: str, pitch: str, volume: str = "+0%") -> bytes:
     """One piece of speech, with retries: Microsoft's endpoint sometimes stalls or drops a connection."""
     for attempt in range(TTS_ATTEMPTS):
         try:
-            communicate = edge_tts.Communicate(piece, voice, rate=rate, pitch=pitch)
+            communicate = edge_tts.Communicate(piece, voice, rate=rate, pitch=pitch, volume=volume)
 
             async def _collect() -> bytes:
                 data = b""
@@ -1222,6 +1226,20 @@ async def _tts_piece(piece: str, voice: str, rate: str, pitch: str) -> bytes:
     return b""
 
 
+# Both voices are lifted a little so they sound younger and happier (and less flat). VOICE_SEMITONES is the knob:
+# 0 = each voice's own pitch, 2 = a bit childlike (default), 4 = very childish. Emotions still come through: a happy
+# reply is brighter and quicker, a sad one is lower and slower.
+VOICE_SEMITONES = float(os.environ.get("VOICE_SEMITONES", "2.0"))
+_VOICE_BASE_HZ = {"fil-PH-BlessicaNeural": 215, "fil-PH-AngeloNeural": 125, "en-US-JennyNeural": 215}
+
+
+def _voice_prosody(voice: str, mood: str):
+    """(rate, pitch, volume) strings for edge-tts. Pitch is given in semitones and converted to Hz for this voice."""
+    shift, rate, vol = {"HAPPY": (1.0, 12, 4), "SAD": (-1.5, -8, -3)}.get(mood, (0.0, 6, 0))
+    hz = round(_VOICE_BASE_HZ.get(voice, 200) * (2 ** ((VOICE_SEMITONES + shift) / 12) - 1))
+    return f"{rate:+d}%", f"{hz:+d}Hz", f"{vol:+d}%"
+
+
 async def generate_speech_base64(text: str, mood: str, lang: str = "EN") -> str:
     """Neural TTS for a reply. Long replies are split into short pieces that are spoken in parallel, so a long
     places list works as reliably as a one-liner. The voice follows the words (see pick_voice_lang)."""
@@ -1229,20 +1247,7 @@ async def generate_speech_base64(text: str, mood: str, lang: str = "EN") -> str:
         lang = pick_voice_lang(text, lang)             # trust the words over the model's tag
         text = _normalize_speech(text, lang)
         voice = TL_VOICE if lang == "TL" else EN_VOICE
-        if lang == "TL":
-            # Filipino neural voices sound most natural at their default speed and pitch, so barely touch them
-            rate, pitch = "+0%", "+0Hz"
-            if mood == "HAPPY":
-                rate = "+4%"
-            elif mood == "SAD":
-                rate = "-4%"
-        else:
-            # The "Sassy Siri" baseline: slightly faster, snappy, and a tiny bit deeper
-            rate, pitch = "+5%", "-2Hz"
-            if mood == "HAPPY":
-                rate, pitch = "+10%", "+2Hz"
-            elif mood == "SAD":
-                rate, pitch = "-5%", "-6Hz"
+        rate, pitch, volume = _voice_prosody(voice, mood)
 
         chunks = _split_for_tts(text)
         if not chunks:
@@ -1251,7 +1256,7 @@ async def generate_speech_base64(text: str, mood: str, lang: str = "EN") -> str:
 
         async def _run(piece: str) -> bytes:
             async with gate:
-                return await _tts_piece(piece, voice, rate, pitch)
+                return await _tts_piece(piece, voice, rate, pitch, volume)
 
         parts = await asyncio.gather(*[_run(c) for c in chunks])
         audio_bytes = b"".join(p for p in parts if p)      # same format for every piece, so the clips simply join up
