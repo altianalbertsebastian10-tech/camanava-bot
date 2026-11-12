@@ -922,7 +922,7 @@ RULES:
    When the user asks you to explain or describe the stops, write the "notes" of EVERY stop (1-2 short sentences:
    what it is and what to see, eat or do there) and keep all the other fields as they are.
    If the user asks how to get somewhere, never describe routes or transport; tell them to use Google Maps, Waze, the
-   NaviGo! app's navigation, or Angkas, Joyride or Grab.
+   CamaNaviGo app's navigation, or Angkas, Joyride or Grab.
 8. This itinerary-building mode stays active for the rest of the conversation once started, even across
    messages that don't mention "itinerary" again -- that's expected, not a bug. If the user's latest
    message is clearly unrelated to the trip (small talk, an off-topic question), respond naturally to it
