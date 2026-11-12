@@ -386,6 +386,7 @@ def clean_for_speech(text: str) -> str:
     t = re.sub(r"\[([^\]]+)\]\(https?://[^)]+\)", r"\1", t)          # [label](url) -> label
     t = re.sub(r"https?://\S+", "", t)                                   # never read a web address aloud
     t = emoji.replace_emoji(t, replace='')
+    t = re.sub(r"(\d\s*[AaPp]\.?\s?[Mm]\.?|\b\d{1,2}:\d{2})\s*[\u2013\u2014-]\s*(?=\d)", r"\1 to ", t)   # "6AM-5PM" -> "6AM to 5PM"
     t = t.replace("\u00b7", ",").replace("\u2014", ",").replace("\u2013", ",")
     t = re.sub(r"^\s*[-*\u2022]\s+", "", t, flags=re.MULTILINE)          # bullet markers
     t = t.replace('*', '').replace('#', '')
@@ -400,12 +401,55 @@ def clean_for_speech(text: str) -> str:
 _ENGLISH_HINTS = re.compile(r"\b(the|and|you|your|to|is|are|for|with|of|in|it|this|that|can|will|if|what|how|here|there|just|let|me|my)\b", re.IGNORECASE)
 
 
+_TL_NUM = {1: "isa", 2: "dalawa", 3: "tatlo", 4: "apat", 5: "lima", 6: "anim", 7: "pito", 8: "walo", 9: "siyam", 10: "sampu",
+           11: "labing isa", 12: "labindalawa", 13: "labintatlo", 14: "labing apat", 15: "labinlima", 16: "labing anim",
+           17: "labimpito", 18: "labingwalo", 19: "labinsiyam"}
+_TL_TENS = {20: "dalawampu", 30: "tatlumpu", 40: "apatnapu", 50: "limampu"}
+
+
+def _tl_number(n: int) -> str:
+    if n in _TL_NUM:
+        return _TL_NUM[n]
+    tens, unit = (n // 10) * 10, n % 10
+    return _TL_TENS[tens] if unit == 0 else f"{_TL_TENS[tens]}'t {_TL_NUM[unit]}"
+
+
+def _tl_linked(n: int) -> str:
+    """The number joined to the noun after it: 15 -> "labinlimang" (minuto), 45 -> "apatnapu't limang", 4 -> "apat na"."""
+    w = _tl_number(n)
+    last = w.split()[-1]
+    if last[-1] in "aeiou":
+        return w + "ng"
+    return w + "g" if last[-1] == "n" else w + " na"
+
+
+def _tl_time(h: int, mi, ap) -> str:
+    """6 AM -> "ika-anim ng umaga"; 7:15 AM -> "ika-pito at labinlimang minuto ng umaga"; 18:30 -> "ika-anim at tatlumpung minuto ng gabi"."""
+    if ap is None and h >= 13:
+        ap = "p"
+    elif ap is None and h == 0:
+        ap, h = "a", 12
+    h12 = h % 12 or 12
+    if ap == "a":
+        part = "ng hatinggabi" if h12 == 12 else "ng umaga"
+    elif ap == "p":
+        part = "ng tanghali" if h12 == 12 else ("ng hapon" if h12 < 6 else "ng gabi")
+    else:
+        part = ""
+    mins = "" if not mi or int(mi) == 0 else f" at {_tl_linked(int(mi))} minuto"
+    return f"ika-{_tl_number(h12)}{mins} {part}".strip()
+
+
+# "Hose" is a real English word, so the voice says "hows". The accented Spanish form avoids that. If it still sounds off,
+# try "Ho-se" or "Hoseh" (set TL_JOSE_SPELLING on the server).
+TL_JOSE_SPELLING = os.environ.get("TL_JOSE_SPELLING", "Hos\u00e9")
 _TL_RESPELL = [
     (re.compile(r"\bdatabase(s?)\b", re.IGNORECASE), r"deytabeys"),                    # not "da-ta-ba-se"
     (re.compile(r"\bspot(s?)\b", re.IGNORECASE), lambda m: "ispat" + m.group(1).lower()),   # "is-pat", not "is-pot"
     (re.compile(r"\bexercis(?:e|es|ed|ing)\b", re.IGNORECASE), "eksersays"),              # not "jeksersays"
-    (re.compile(r"\bJos[e\u00e9]\b"), "Hose"),                                          # Spanish J: "Hose", not "Dyose"
-    (re.compile(r"\bJosefina\b"), "Hosefina"), (re.compile(r"\bJosefa\b"), "Hosefa"), (re.compile(r"\bJoselito\b"), "Hoselito"),
+    (re.compile(r"\bJos[e\u00e9]\b"), TL_JOSE_SPELLING),                                          # Spanish J: "Hose", not "Dyose"
+    (re.compile(r"\bJosefina\b"), TL_JOSE_SPELLING[:-1] + "efina"), (re.compile(r"\bJosefa\b"), TL_JOSE_SPELLING[:-1] + "efa"),
+    (re.compile(r"\bJoselito\b"), TL_JOSE_SPELLING[:-1] + "elito"),
     (re.compile(r"\bexpress\b", re.IGNORECASE), "ekspres"),
     (re.compile(r"\bextra\b", re.IGNORECASE), "ekstra"),
     (re.compile(r"\bwi-?fi\b", re.IGNORECASE), "wayfay"),
@@ -471,15 +515,17 @@ def _spoken_units(text: str, lang: str) -> str:
 
     def _time(m):
         h, mi, ap = int(m.group(1)), m.group(2), m.group(3).lower()
-        mins = "" if not mi or mi == "00" else f":{mi}"
         if tl:
-            if ap == "a":
-                part = "ng hatinggabi" if h == 12 else "ng umaga"
-            else:
-                part = "ng tanghali" if h == 12 else ("ng hapon" if h < 6 else "ng gabi")
-            return f"{h}{mins} {part}"
+            return _tl_time(h, mi, ap)
+        mins = "" if not mi or mi == "00" else f":{mi}"
         return f"{h}{mins} {'A M' if ap == 'a' else 'P M'}"           # spelled out so the voice says "A M", not "am"
     text = re.sub(r"\b(\d{1,2})(?::(\d{2}))?\s*([AaPp])(?:\.\s?[Mm]\b\.?|\s?[Mm]\b)", _time, text)   # "p.m." yes; the full stop after "PM." stays
+    if tl:
+        # times without AM/PM ("7:15", "18:30") would be read as "seven hours fifteen minutes"
+        text = re.sub(r"(?<![\d:])(\d{1,2}):(\d{2})(?![\d:])",
+                      lambda m: _tl_time(int(m.group(1)), m.group(2), None) if int(m.group(1)) < 24 and int(m.group(2)) < 60 else m.group(0), text)
+        # "ika-anim ng umaga to ika-lima ng hapon" -> "... hanggang ..."
+        text = re.sub(r"(ng (?:umaga|tanghali|hapon|gabi|hatinggabi))\s+(?:to|until|till)\s+(ika-)", r"\1 hanggang \2", text)
     t = re.sub(r"(\d)\s*\u00b0\s*C\b", r"\1 digri Celsius" if tl else r"\1 degrees Celsius", text)
     t = re.sub(r"(\d)\s*%", r"\1 porsyento" if tl else r"\1 percent", t)
     t = re.sub(r"(\d)\s*km/h\b", r"\1 kilometro kada oras" if tl else r"\1 kilometers per hour", t)
