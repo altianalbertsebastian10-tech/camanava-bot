@@ -455,6 +455,18 @@ _TL_RESPELL = [
     (re.compile(r"\bwi-?fi\b", re.IGNORECASE), "wayfay"),
 ]
 EN_CAMANAVA = "Kahmahnahvah"        # how the English voice should say CAMANAVA: "Kah-mah-nah-vah"
+
+# Filipino food words the ENGLISH voice reads wrongly (it applies English spelling rules: "bangus" -> "bang-gause",
+# "halo" -> "hey-lo"). Each entry is (pattern, how to spell it so the voice says it right). Only the spoken text is
+# changed; what the user reads on screen stays as written. If a word still sounds off, tweak its respelling here.
+_EN_RESPELL = [
+    (re.compile(r"\bsapin[- ]?sapin\b", re.IGNORECASE), "suh-pin suh-pin"),     # not "say-pin say-pin"
+    (re.compile(r"\bhalo[- ]?halo\b", re.IGNORECASE), "huh-loh huh-loh"),       # not "hey-lo hey-lo"
+    (re.compile(r"\bbangus\b", re.IGNORECASE), "buh-ngoos"),                    # not "bang-gause"
+    (re.compile(r"\bbulungan\b", re.IGNORECASE), "boo-loo-ngun"),               # not "boo-loong-gun"
+    (re.compile(r"\bbiko\b", re.IGNORECASE), "bee-koh"),                        # not "bye-koh"
+    (re.compile(r"\bsa\b"), "suh"),                                             # Filipino "sa" (as in "Kamayan sa Palapat"), not "S-A"
+]
 _TL_AFFIX = re.compile(r"\b(mag|nag|pag|ma|na|pa|ipa|ipag|mang|nang|pang)-(?=[A-Za-z])", re.IGNORECASE)
 
 
@@ -493,6 +505,8 @@ def _normalize_speech(text: str, lang: str) -> str:
     t = _spoken_units(t, lang)
     if lang == "EN":
         t = re.sub(r"\bKamanava\b", EN_CAMANAVA, t, flags=re.IGNORECASE)                 # not "Ka-MAY-na-va"
+        for pat, rep in _EN_RESPELL:
+            t = pat.sub(rep, t)
         t = re.sub(r"\b(\w*?)silog\b", lambda m: m.group(1) + "seelohg", t, flags=re.IGNORECASE)   # "see-lohg" (tapsilog, bangsilog...), not "sigh-log"
     if lang == "TL":
         t = _TL_AFFIX.sub(r"\1 ", t)                   # "mag-exercise" -> "mag exercise": keeps the voice from gluing the words
