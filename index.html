@@ -399,6 +399,7 @@
         }
         .status-indicator[data-mode="thinking"] .pulse-dot { background-color: var(--warn); box-shadow: 0 0 8px var(--warn); animation: dot-pulse 1.1s ease-in-out infinite; }
         .status-indicator[data-mode="speaking"] .pulse-dot { background-color: var(--info); box-shadow: 0 0 8px var(--info); animation: dot-pulse 0.9s ease-in-out infinite; }
+        .status-indicator[data-mode="offline"] .pulse-dot { background-color: var(--danger); box-shadow: 0 0 8px var(--danger); animation: none; }
         @keyframes dot-pulse { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.35); opacity: 0.6; } }
         /* The status word is spoken to screen readers always, and shown on wider screens */
         .status-label { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; }
@@ -2603,14 +2604,28 @@
         return '<div class="resp-body">' + out.join('') + '</div>';
     }
 
+    let currentStatusMode = 'idle';
     function updateStatusDisplay(mode) {
+        currentStatusMode = mode;
         const tag = document.getElementById('status-tag');
+        if (!tag) return;
         const indicator = tag.closest('.status-indicator');
+        // No internet connection: the header says Offline (red dot) whatever else is going on.
+        if (navigator.onLine === false) {
+            swapText(tag, 'Offline');
+            if (indicator) indicator.dataset.mode = 'offline';
+            return;
+        }
         if      (mode === 'thinking') swapText(tag, 'Thinking');
         else if (mode === 'speaking') swapText(tag, 'Responding');
         else                          swapText(tag, 'Online');
         if (indicator) indicator.dataset.mode = (mode === 'thinking' || mode === 'speaking') ? mode : 'idle';
     }
+
+    // Keep the header tag in step with the connection: Offline when it drops, back to Online when it returns.
+    window.addEventListener('offline', () => updateStatusDisplay(currentStatusMode));
+    window.addEventListener('online',  () => updateStatusDisplay(currentStatusMode));
+    window.addEventListener('DOMContentLoaded', () => { if (navigator.onLine === false) updateStatusDisplay(currentStatusMode); });
 
     function handleKeyPress(e) {
         if (e.key === 'Enter' && !e.isComposing && !isNaviThinking && !document.getElementById('send-btn').disabled) send();

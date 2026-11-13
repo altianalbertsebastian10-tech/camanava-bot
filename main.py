@@ -36,6 +36,9 @@ threading.Thread(target=self_ping, daemon=True).start()
 
 primary_client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
 backup_client = Groq(api_key=os.environ.get("GROQ_BACKUP_API_KEY"))
+# Optional third account: set GROQ_THIRD_API_KEY to use it. If the variable is missing the app runs on two keys as before.
+third_client = Groq(api_key=os.environ["GROQ_THIRD_API_KEY"]) if os.environ.get("GROQ_THIRD_API_KEY") else None
+GROQ_CLIENTS = [("primary", primary_client), ("backup", backup_client)] + ([("third", third_client)] if third_client else [])
 
 app = FastAPI()
 
@@ -180,11 +183,10 @@ _LLM_TURN = [0]
 
 def _llm_sync(messages, **kwargs):
     # Each Groq account has its own tokens-per-minute budget, so alternate which one goes first (that doubles the
-    # budget the app can use per minute) and fall back to the other if one refuses.
-    clients = [("primary", primary_client), ("backup", backup_client)]
+    # budget the app can use per minute) and fall back to the next one if one refuses.
     _LLM_TURN[0] += 1
-    if _LLM_TURN[0] % 2 == 0:
-        clients.reverse()
+    shift = _LLM_TURN[0] % len(GROQ_CLIENTS)          # round-robin: each turn starts on the next account
+    clients = GROQ_CLIENTS[shift:] + GROQ_CLIENTS[:shift]
     last_err = None
     for name, client in clients:
         try:
@@ -499,11 +501,35 @@ def _st_sub(m) -> str:
     return "Saint" if nxt else "Street" + end_dot
 
 
+_DR_LEAD = {"ni", "kay", "si", "ang", "ng", "sa", "of", "by", "with", "from", "to", "see", "meet", "visit", "the", "and", "or",
+            "at", "in", "for", "called", "named", "kasama", "kina"}
+
+
+def _dr_sub(m, lang: str = "EN") -> str:
+    """"Dr." is Doctor before a person's name ("Museo ni Dr. Pio Valenzuela") and Drive after a street name
+    ("Ortigas Dr.", "Tandang Sora Dr. Quezon City")."""
+    before, after = m.string[:m.start()], m.string[m.end():]
+    prev = re.search(r"([A-Za-z0-9'.-]+)[\s,]*$", before)
+    prev_tok = prev.group(1) if prev else ""
+    nxt = re.match(r"\s*([A-Z][A-Za-z'-]*)", after)
+    doctor = "Doktor" if lang == "TL" else "Doctor"
+    if not nxt:                                                        # nothing name-like follows: a street ("... Ortigas Dr.")
+        end_dot = "." if not after.strip() or after.lstrip(" \t").startswith("\n") else ""
+        return "Drive" + end_dot
+    clause_start = (not before.strip()) or before.rstrip().endswith((",", "(", ".", ":", "-", "\u2014", "\u2013", "\n", ";"))
+    if clause_start or prev_tok.lower() in _DR_LEAD:
+        return doctor                                                  # "Dr. Santos", "ni Dr. Pio", "meet Dr. Rizal"
+    if prev_tok and prev_tok[0].isupper():
+        return "Drive"                                                 # "Ortigas Dr. Pasig"
+    return doctor
+
+
 def _normalize_speech(text: str, lang: str) -> str:
     """Everything done to a reply's words before a voice reads them."""
     t = text.replace("\u2011", "-").replace("\u2010", "-").replace("\u00ad", "")      # the model likes non-breaking hyphens
     t = re.sub(r"\b(?:Brgy|Bgy)\b\.?", "Barangay", t, flags=re.IGNORECASE)               # "Brgy." was read as "birgi"
     t = re.sub(r"\bSt\b\.?", _st_sub, t)
+    t = re.sub(r"\bDr\b\.?", lambda m: _dr_sub(m, lang), t)                              # Doctor (a person) or Drive (a street)
     for pat, rep in ((r"\bAve\b\.?", "Avenue"), (r"\bBlvd\b\.?", "Boulevard"), (r"\bRd\b\.", "Road"), (r"\bHwy\b\.?", "Highway"),
                      (r"\bBldg\b\.?", "Building"), (r"\bExt\b\.", "Extension"), (r"\bcor\b\.", "corner")):
         t = re.sub(pat, rep, t)
@@ -3006,7 +3032,9 @@ async def stream_chat_events(request: "ChatRequest", verified_uid: str, is_disco
         ]
         yield _sse({"type": "status", "text": "Writing a reply"})
         stream = None
-        for client in (primary_client, backup_client):
+        _LLM_TURN[0] += 1
+        _shift = _LLM_TURN[0] % len(GROQ_CLIENTS)
+        for _name, client in GROQ_CLIENTS[_shift:] + GROQ_CLIENTS[:_shift]:
             try:
                 stream = await run_in_threadpool(
                     lambda c=client: c.chat.completions.create(
