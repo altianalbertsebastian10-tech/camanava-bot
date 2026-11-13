@@ -465,6 +465,8 @@ _EN_RESPELL = [
     (re.compile(r"\bnanay(['\u2019]s)?\b", re.IGNORECASE), lambda m: "nah-nay" + (m.group(1) or "")),   # nah-NAY
     (re.compile(r"\bniugan\b", re.IGNORECASE), "nee-oo-gahn"),                  # nee-OO-gahn
     (re.compile(r"\bmalabon\b", re.IGNORECASE), "mah-lah-bohn"),                # /ma-la-BON/
+    (re.compile(r"\bmuseo\b", re.IGNORECASE), "moo-seh-oh"),                    # moo-SEH-oh
+    (re.compile(r"\b[Nn]i\b"), "knee"),                                         # Filipino "ni" (e.g. "Museo ni ..."); "NI" left alone
     (re.compile(r"\bbangus\b", re.IGNORECASE), "bah-ngoos"),                    # bah-NGOOS, not "bang-gause"
     (re.compile(r"\bbulungan\b", re.IGNORECASE), "boo-loo-ngun"),               # not "boo-loong-gun"
     (re.compile(r"\bbiko\b", re.IGNORECASE), "bee-koh"),                        # not "bye-koh"
