@@ -2309,9 +2309,14 @@
     // instead of always starting blank. This is what "close and reopen retains chat
     // history" actually needs -- the storage/session system already existed, nothing
     // was ever automatically loading it back on a fresh page load.
+    // Set to true to reopen the most recent conversation on load. false = always start on the welcome screen
+    // (past chats are still available from the history list).
+    const RESTORE_LAST_SESSION = false;
+
     async function restoreLatestSession() {
         if (hasRestoredSession) return;
         hasRestoredSession = true;
+        if (!RESTORE_LAST_SESSION) return;
 
         try {
             let sessions;
